@@ -237,3 +237,17 @@ TruMenu | Achievements | Enabled | bool | Erfolge aufzeichnen (Q20) | Record ach
 # 2026-11-12 (labels): TruMenu 0.22.36 - [Debug] LabelCollected / LabelLaraGear in TruMenu.ini (LgReadSwitch, about once a second = live)
 TruMenu | Debug | LabelCollected | bool | Namen: Eingesammeltes grau zeigen | Labels: show collected in grey | live | 0 | Aufgehobenes / Verstecktes: 0 kein Name, 1 grau // Picked up / hidden: 0 no label, 1 grey label | TruMenu 0.22.36
 TruMenu | Debug | LabelLaraGear | bool | Namen an Laras Ausrüstung | Labels on Lara's gear | live | 0 | Waffen / Geräte an Lara (aus den Spieldaten) // Weapons / tools on Lara (from the game data) | TruMenu 0.22.36
+# 2026-11-13 (P5): TruMenu 0.22.37 debug view - read at the start (the dbg.* items switch them at once)
+TruMenu | Debug | KeyItems | bool | Schlüsselgegenstände beim Start | Key items at the start | restart | 0 | Teile, Schalter, Türen, Linie Teil -> Ziel // Parts, switches, doors, part -> target lines | TruMenu 0.22.37
+TruMenu | Debug | StyleCollect | choice:name,symbol,both | Sammelobjekte: Name / Symbol / beides | Collectibles: name / symbol / both | restart | both | Artefakt, Schatz, Relikt, Krug #n, Medipack // Artifact, treasure, relic, jar #n, medipack | TruMenu 0.22.37
+TruMenu | Debug | StyleKeyItems | choice:name,symbol,both | Schlüsselgegenstände: Name / Symbol | Key items: name / symbol / both | restart | both | Teil, Ziel, Schalter, Tür, Greifpunkt // Part, target, switch, door, grapple point | TruMenu 0.22.37
+TruMenu | Debug | StyleNames | choice:name,symbol,both | Objektnamen: Name / Symbol / beides | Object names: name / symbol / both | restart | both | Ohne Symbol bleibt der Name stehen // A name without a symbol keeps its text | TruMenu 0.22.37
+TruMenu | Debug | StyleCheckpoints | choice:name,symbol,both | Checkpoints: Name / Symbol / beides | Checkpoints: name / symbol / both | restart | both | Symbol = Fahne // Symbol = flag | TruMenu 0.22.37
+TruMenu | Debug | StylePortals | choice:name,symbol,both | Ladebereiche: Name / Symbol / beides | Loading areas: name / symbol / both | restart | both | Symbol = Rahmen mit Pfeil // Symbol = frame with an arrow | TruMenu 0.22.37
+TruMenu | Debug | LabelRoom | bool | Raum immer am Etikett | Room always on the label | restart | 1 | Lesbarer Raumname (Kraken-Raum) // Readable room name (Kraken room) | TruMenu 0.22.37
+TruMenu | Debug | DistMetres | bool | Entfernung in Metern | Distance in metres | restart | 0 | 0 = Spieleinheiten (5140u), 1 = Meter // 0 = game units (5140u), 1 = metres | TruMenu 0.22.37
+TruMenu | Debug | DrawDistance | int:0..50000:1000 | Sichtweite (0 = aus) | Draw distance (0 = off) | restart | 0 | Je Gebiet: TruMenu.debugview.txt // Per area: TruMenu.debugview.txt | TruMenu 0.22.37
+TruMenu | Debug | Occlusion | int:0..2 | Hinter Wänden: 0 zeigen 1 blass 2 weg | Behind walls: 0 shown 1 faded 2 hidden | restart | 1 | Braucht Tiefe (Depth 1 / 2) // Needs depth (Depth 1 / 2) | TruMenu 0.22.37
+TruMenu | Debug | HideCo | bool | co_-Objekte ausblenden | Hide co_ objects | restart | 1 | Szenen-Objekte; co_rock bleibt // Cutscene objects; co_rock stays | TruMenu 0.22.37
+TruMenu | Debug | HideFx | bool | fx_-Effekte ausblenden | Hide fx_ effects | restart | 1 | Effekte; Greif-Hinweise bleiben // Effects; grab prompts stay | TruMenu 0.22.37
+TruMenu | Debug | RoomOnly | bool | Nur aktueller Raum (Schalter, Teile) | Current room only (switches, parts) | restart | 0 | Tore / Schalter / Teile nur in Laras Raum // Gates / switches / parts in Lara's room only | TruMenu 0.22.37

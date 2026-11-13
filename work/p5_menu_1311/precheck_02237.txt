@@ -1,0 +1,9 @@
+# TruMenu 0.22.37 (debug view P5): kP5Checks = the reward bits / reward table of the pickup 0x5db6a0 and the save
+# writer's link parent field, in the order of the table in TruMenu.cpp
+# (checked offline: ../bin/pyt -t 120 tools/pe_bytes_check.py <Steam tru.exe> --file work/p5_menu_1311/precheck_02237.txt)
+0x005db6aa 83e11f 8bc6 51 c1e805
+0x005db6c1 8b0d6492c500 83c40c 85948190ed0300 0f85a3010000 09948190ed0300
+0x005db6df 8b3d38f3e700 85ff
+0x005db712 8b5704 8d04f2 8b7004 0fb700 c1e604 037714
+0x005db730 8b0e 8b156492c500 c1e104
+0x00555422 8b8028020000 894610

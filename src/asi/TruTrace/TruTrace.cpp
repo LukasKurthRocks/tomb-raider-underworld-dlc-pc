@@ -81,7 +81,8 @@
 
 namespace {
 
-const char kVersion[] = "TruTrace 0.3.1";            // 0.3.1: dated log lines (Q107)
+const char kVersion[] = "TruTrace 0.3.2";            // 0.3.1: dated log lines (Q107); 0.3.2: ProgressFilter default,
+                                                      // stale player machines cleared (P5)
 const DWORD kImageBase = 0x00400000;
 
 // ---- game data (read only) ----
@@ -258,7 +259,12 @@ const Fact kFacts[] = {
 int g_enabled = 1, g_logLevel = 1, g_maxPerSec = 40, g_maxPerCat = 50000, g_pollMs = 5;
 int g_catOn[kCatCount] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 int g_gameDataMs = 250;
-char g_progFilterText[256] = "checkpoint,breakwall,trigger,door,gate,lever,plate,switch,spawner";
+// 0.3.2 (P5, docs Befund-P1-Mittelmeer-Objekte-1311.md): + _rw_ (rewards: appear / collected), weightbreak (jars:
+// hit 0x2b / damage 0x11c, removal), ping_map (sonar pings destroyed on solve), grapple (grapple walls) - 13 of 16 tokens
+#define TRUTRACE_PROG_FILTER "checkpoint,breakwall,trigger,door,gate,lever,plate,switch,spawner,_rw_,weightbreak,ping_map," \
+                             "grapple"
+const char kProgFilterDefault[] = TRUTRACE_PROG_FILTER;
+char g_progFilterText[256] = TRUTRACE_PROG_FILTER;
 int g_soundLiveMs = 4000, g_soundRepeat = 3, g_teleUnits = 300, g_teleWindowMs = 3000, g_timeMs = 1000;
 int g_watchObject = 858;
 char g_spawnFilter[64] = "thrall";
@@ -1201,11 +1207,24 @@ bool ChartStartEnter(Regs *r, DWORD *) {
 
 struct Snap { DWORD tick, player, gt, a64, c94, iflags, ctl; float pos[3], yaw; DWORD machine[3], rec[3]; };
 
+// 0.3.2 (P5 / P1-crash follow-up 5, docs Befund-DLC1-Absturz-Spinne-1311.md section 5: 1 190 caught AVs in 11 min at
+// RD / W after a level change - the remembered machines belonged to the old player): a new player instance (level
+// change, reload) forgets every remembered machine; a remembered machine whose owner +8 is not the player any more is
+// dropped before its record is read
+DWORD g_machinesPlayer = 0;
 void TakeSnap(Snap *s) {
     memset(s, 0, sizeof(*s));
     s->tick = GetTickCount();
     s->player = D(kPlayerPtr);
+    if (s->player != g_machinesPlayer) {
+        if (g_machinesPlayer && (g_playerMachines[0] || g_playerMachines[1] || g_playerMachines[2] || g_playerMachines[3]))
+            Log(kCatTele, 2, "player 0x%08lx -> 0x%08lx: remembered player machines cleared", g_machinesPlayer, s->player);
+        for (DWORD &x : g_playerMachines) x = 0;
+        g_machinesPlayer = s->player;
+    }
     if (!s->player) return;
+    for (DWORD &x : g_playerMachines)
+        if (x && D(x + 8) != s->player) x = 0;   // no longer the player's (RD guards the read; at most one per stale entry)
     for (int i = 0; i < 3; ++i) s->pos[i] = F(s->player + 0x20 + 4 * i);
     s->yaw = F(s->player + 0x38);
     s->iflags = D(s->player + 0x14);
@@ -1605,6 +1624,8 @@ bool StreamLoadEnter(Regs *r, DWORD *ctx) {
     UnitText(D(kUnitId), cur, sizeof(cur));
     Log(kCatLevel, 1, "STREAM_LevelLoadAndInit '%s' from 0x%08lx (%s); current unit before %s", name, E[0],
         LoadCaller(E[0]), cur);
+    if (E[0] == kRetLevelLoad)                 // 0.3.2: a level load - the remembered player machines are stale
+        for (DWORD &x : g_playerMachines) x = 0;
     return true;
 }
 
@@ -2218,8 +2239,7 @@ void ReadOptions(const char *dir) {
     g_catOn[kCatData] = GetPrivateProfileIntA("Trace", "GameData", 1, ini);
     g_gameDataMs = GetPrivateProfileIntA("Trace", "GameDataMs", 250, ini);
     if (g_gameDataMs < 50) g_gameDataMs = 50;
-    GetPrivateProfileStringA("Trace", "ProgressFilter", "checkpoint,breakwall,trigger,door,gate,lever,plate,switch,spawner",
-                             g_progFilterText, sizeof(g_progFilterText), ini);
+    GetPrivateProfileStringA("Trace", "ProgressFilter", kProgFilterDefault, g_progFilterText, sizeof(g_progFilterText), ini);
     g_progFilterN = 0;
     for (const char *p = g_progFilterText; *p && g_progFilterN < 16;) {
         while (*p == ',' || *p == ' ') ++p;
@@ -2679,8 +2699,9 @@ extern "C" __declspec(dllexport) int __cdecl TruTraceSelfTest(char *report, int 
 }
 
 extern "C" __declspec(dllexport) const char *TruTraceVersion() {
-    return "TruTrace 0.3.1 (log only: sound start / end F5, teleport + chart state F6, 0x1f4 / 0x1f5 receivers, spawn "
+    return "TruTrace 0.3.2 (log only: sound start / end F5, teleport + chart state F6, 0x1f4 / 0x1f5 receivers, spawn "
            "requests, object 858 entry, TimeVector; 0.2: level change requests, unit loads, player placement + checkpoint "
            "id, stream unit moves / portals / table, save / restore, progress instances, messages, game data changes; "
-           "0.3: [Sound] SoundSlots object sound-slot play; 0.3.1: dated log lines, this export said 0.2 until 0.3.1)";
+           "0.3: [Sound] SoundSlots object sound-slot play; 0.3.1: dated log lines, this export said 0.2 until 0.3.1; "
+           "0.3.2: ProgressFilter default + _rw_, weightbreak, ping_map, grapple; stale player machines cleared)";
 }

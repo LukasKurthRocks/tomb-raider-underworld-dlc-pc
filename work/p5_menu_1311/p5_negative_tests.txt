@@ -1,0 +1,15 @@
+ok   0 unchanged sources                           problems   0 
+ok   1 kP5Checks row changed                       problems   1 - TruMenu.cpp: kP5Checks (6 rows) must be the 6 rows of precheck_02237.txt in order
+ok   2 return visit CP 76 moved back               problems   1 - TruMenu.cpp: kChapOrder base rows != q105_chaporder_rows.txt incl. return visits (91 / 91, want 91)
+ok   3 LabelFilter without the co_ / fx_ rule      problems   1 - TruMenu.cpp: LabelFilter must return 4 for co_ / fx_ and give reason 5 for the reward bit
+ok   4 P5Collected writes the game                 problems   1 - TruMenu.cpp: int P5Collected must not write game memory or call the game
+ok   5 QlTick gate before the pending check        problems   1 - TruMenu.cpp: QlTick must ask LevelChangePending before its 100 ms gate
+ok   6 occlusion queries after sb->Apply           problems   1 - TruMenu.cpp: DpDrawBuffer must issue the occlusion queries before sb->Apply
+ok   7 kOpts Occlusion default 2                   problems   1 - TruMenu.cpp: kOpts [Debug] Occlusion must default to 1
+ok   8 room name row changed                       problems   1 - TruMenu.cpp: kRoomNames (111 rows) != q105_room_names.txt (111)
+ok   9 QlForget without the tracker id test        problems   1 - TruMenu.cpp: QlForget must dump with 0x5c1790 only entries that still carry the id
+ok   10 INI without HideFx                         problems   1 - TruMenu_neg.ini: [Debug] HideFx=1 missing
+ok   11 switches row DrawDistance live             problems   1 - TruMenu_neg.switches.txt: row TruMenu | Debug | DrawDistance | ... | restart | 0 | ... | TruMenu 0.22.37 missi
+ok   12 generator: tomb intro 160 missing          problems   1 - PROBLEM Base game l1: l1_baldrs_tomb Paket R ids [160] are no checkpoint* / cinematic_object intro of the unit
+ok   13 generator: real inputs = committed rows    problems   0 
+14 cases, 14 as expected, 0 not

@@ -1,0 +1,6 @@
+Built work\asi\menu0260\TruMenu.asi (2065920 bytes, x86 DLL, sha256 3e29b1e67805b3a2e2ecf3c82d30c41219d222ce5763fa0e83f132f6748ac5f7) - TruMenu 0.22.37
+  warnings: 2 (both imgui_demo.cpp), 0 in TruMenu.cpp; imports / exports = 0.22.36 (tools/pe_import_export_diff.py)
+Built work\asi\trace032\TruTrace.asi (185856 bytes, x86 DLL, sha256 be8900ecb79652c82f5a5236b9a430dc36b8052b1fae512d5ef7ca841f1c89c8) - TruTrace 0.3.2
+  warnings: 0; sample .ini sha256 e9e580996987a520d452bfcbc24019e1df6fdab93a315e9c08818bfe29001573
+Byte checks: tools/pe_bytes_check.py <Steam tru.exe> --file work/p5_menu_1311/precheck_02237.txt -> 6 checks, 0 mismatches
+trumenu_ini_check: exit 0, 47 ok lines, 0 other (ini_check_final.txt); negative tests: 14 cases as expected (p5_negative_tests.txt)

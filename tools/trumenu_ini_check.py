@@ -232,12 +232,15 @@ DP_RING_PERCENT = {'dbg.alpha': (10, 100), 'dbg.bright': (30, 150)}
 DP_RING_SWITCHES = ('dbg.fade', 'dbg.fill', 'dbg.short', 'dbg.larain', 'dbg.style')
 DV_OWN_ITEM = {'portals': 'dbg.portals', 'checkpoints': 'dbg.checkpoints', 'legend': 'dbg.legend', 'names': 'dbg.names',
                'slide': 'dbg.slide', 'enemycoll': 'dbg.enemycoll',
-               'collect': 'dbg.collect', 'enemies': 'dbg.enemies'}                                  # 0.20
+               'collect': 'dbg.collect', 'enemies': 'dbg.enemies',                                  # 0.20
+               'keyitems': 'dbg.keyitems'}                                                          # 0.22.37
 # 0.15: the pass ids of the flat view (kRmPassNames in TruMenu.cpp), their mask, the ring switches without an argument
 RM_PASSES = ('0x200', '0x100', '0x80', '0x400', '0x800', '1', '2')
 RM_PASS_ALL = 0xf83
 RM_RING_SWITCHES = ('dbg.flat', 'dbg.census', 'dbg.flatedges', 'dbg.flatmodels', 'dbg.flatanyrt', 'dbg.render')
-DV_LAYER_COUNT = 17                          # 0.20: + collect, enemies
+DV_LAYER_COUNT = 18                          # 0.20: + collect, enemies; 0.22.37: + keyitems
+# 0.22.37: layers added after the ring was frozen (0.21.5, TruMenu.radial.txt line 11: no new ring entries) - bar + menu only
+DV_RING_FROZEN = ('keyitems',)
 # 0.17 quick toggles: [Quick] keys / ranges, the buttons the open bar owns, [Shot] OnCine ranges, the new items, the row
 # tables of the bar and the items a value row may use
 QB_KEYS = ('Enabled', 'OpenButtons', 'ChordMs', 'ShowClosed', 'Language', 'Top', 'Scale')
@@ -824,7 +827,7 @@ def check_debug(ini_path, radial_path):
     if os.path.exists(radial_path) and labels != 1:
         problems.append('%s: dbg.labels must be in the radial file once, found %d' % (os.path.basename(radial_path), labels))
     if os.path.exists(radial_path):          # 0.14: every layer and every dbg.* switch item once
-        want = [DV_OWN_ITEM.get(l, l) for l in layers] + ['dbg.view', 'dbg.triggers', 'dbg.status']
+        want = [DV_OWN_ITEM.get(l, l) for l in layers if l not in DV_RING_FROZEN] + ['dbg.view', 'dbg.triggers', 'dbg.status']
         want += list(RM_RING_SWITCHES) + ['dbg.flatpass ' + p for p in RM_PASSES] + \
             ['dbg.flatcolour material', 'dbg.flatcolour class']                     # 0.15 render mode
         want += list(DP_RING_SWITCHES) + ['%s %s' % (w, a) for w, args in sorted(DP_RING_ARGS.items()) for a in args]
@@ -1568,6 +1571,9 @@ def check_0211(ini_path, radial_path, rows):
     mm = re.search(r'\nvoid M20Draw\([^;{]*\) \{.*?\n\}', src, re.S)
     mbody = mm.group(0) if mm else ''
     i_nd = mbody.find('if (LfNotDrawn(inst)) {      // 0.21: picked up')
+    if i_nd < 0:   # 0.22.37 (P5): collected ones with LabelCollected 1 reach the else branch grey - the register needs !nd
+        i_nd = mbody.find('if ((nd && !bit) || (bit && !g_lblCollected)) {   // 0.21: picked up')
+        if 'if (intro && placed && !nd && placedN < 256) {' not in mbody: i_nd = -1
     i_reg = mbody.find('placedIntro[placedN] = intro;')
     i_else = mbody.find('} else {', i_nd)
     if not (0 <= i_nd < i_else < i_reg): problems.append('TruMenu.cpp: M20Draw must register placed intros only for drawn '
@@ -4161,9 +4167,11 @@ def check_02234(ini_path, switches_path):
     for line in open(B_ROWS_02234, encoding='utf-8'):
         m = re.match(r'\s*\{"(Base game l\d)", "(\w+)", false, "([0-9 ]*)", (?:"(.*)"|nullptr)\},$', line.rstrip())
         if m: want.append((m.group(1), m.group(2), m.group(3), m.group(4)))
+    # (0.22.37: both patterns skip the return-visit rows "..., 2}" - check_02237 compares those)
     if have != want or len(want) != 84:
         problems.append('TruMenu.cpp: kChapOrder base rows != work/b_nav_1211/q105_chaporder_rows.txt (%d / %d)' % (len(have), len(want)))
-    if ('Base game l1', 'l1_kraken_entrance', '', 'Kapitel 1.2 Niflheim|Chapter 1.2 Niflheim') not in want:
+    if not any(g == 'Base game l1' and u == 'l1_kraken_entrance' and h == 'Kapitel 1.2 Niflheim|Chapter 1.2 Niflheim'
+               for g, u, c, h in want):   # 0.22.37: its checkpoints are Paket R's 672 673 696 now
         problems.append('q105_chaporder_rows.txt: chapter 1.2 must head l1_kraken_entrance (J-5)')
     bar = qb_rows(src, True)
     lara = [(i, a, k) for t, de, i, a, k, layer, tail in bar if t == 'kQbLara']
@@ -4190,6 +4198,8 @@ def check_02234(ini_path, switches_path):
 
 
 Q113_CP_02235 = os.path.join(ROOT, 'work', 'q113_chain_1211', 'q113_cp_order.txt')
+# 0.22.37 (P5): the first-visit rows the Paket R run corrected (generator PAKET_R_FWD)
+P5_PAKET_R_UNITS = ('l1_kraken_room', 'l1_kraken_entrance', 'l1_norse_hallway_a', 'l1_baldrs_tomb')
 
 
 def check_02235():
@@ -4217,10 +4227,12 @@ def check_02235():
     n_ids = 0
     for g, u, c, h in have:
         n_ids += len(c.split())
+        if u in P5_PAKET_R_UNITS: continue   # 0.22.37: the Paket R rows (check_02237: = the generator, proven ids)
         if walk and walk.get(u) != c.split():
             problems.append('TruMenu.cpp: kChapOrder %s checkpoints "%s" != walking order %s' % (u, c, walk.get(u)))
-    if len(have) != 84 or n_ids != 303:
-        problems.append('TruMenu.cpp: kChapOrder base rows %d / ids %d (want 84 / 303)' % (len(have), n_ids))
+    # 0.22.37: 303 + 7 save ids Paket R added (84, 696, 672, 673, 781, 160, 42) - 76 moved to the return row = 309
+    if len(have) != 84 or n_ids != 309:
+        problems.append('TruMenu.cpp: kChapOrder base rows %d / ids %d (want 84 / 309 since 0.22.37)' % (len(have), n_ids))
     heads = {u: ''.join(re.findall(r'"([^"]*)"', h)) for g, u, c, h in have if h != 'nullptr'}
     for u, want in (('l1_baldrsstairs_a', 'Rundweg ab l1_kraken_room: Treppen -> Grab'),
                     ('l2_norsehall', 'Rundweg ab l2_puzzleroom: norsehall'), ('l4_templepath', 'Abstecher in 4.2: Tempel')):
@@ -4309,8 +4321,9 @@ def check_02236(ini_path, switches_path):
         if '{"%s", "", "' % item not in src: problems.append('TruMenu.cpp: bar help row %s missing' % item)
     for need in ('[dbg.labelcollected]###dvlcol', '[dbg.labelgear]###dvlgear'):
         if need not in src: problems.append('TruMenu.cpp: menu checkbox %s missing (page Debug view)' % need)
-    sw = [l.rstrip('\r\n') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Debug | Label')]
-    want = {'LabelCollected', 'LabelLaraGear'}
+    want = {'LabelCollected', 'LabelLaraGear'}   # (0.22.37 adds LabelRoom - only these two keys are 0.22.36's)
+    sw = [l.rstrip('\r\n') for l in open(switches_path, encoding='utf-8')
+          if l.startswith('TruMenu | Debug | Label') and l.split(' | ')[2] in want]
     got = {l.split(' | ')[2] for l in sw if ' | bool | ' in l and ' | live | 0 | ' in l and l.endswith('| TruMenu 0.22.36')}
     if got != want or len(sw) != 2:
         problems.append('%s: rows TruMenu | Debug | LabelCollected / LabelLaraGear | bool | ... | live | 0 | ... | TruMenu '
@@ -4323,6 +4336,169 @@ def check_02236(ini_path, switches_path):
         problems.append('Set-TruMenu.ps1: the 0.22.35 build hash (work/asi/menu0258) is missing')
     return problems, ('label filter (dbg.labels + dbg.names -> LabelFilter -> the one LfNotDrawn; Lara\'s gear by parent '
                       '+0x54 / weapon manager, %d byte checks = precheck_02236; LabelCollected / LabelLaraGear 0, live)' % len(rows))
+
+
+P5_CHECKS_02237 = os.path.join(ROOT, 'work', 'p5_menu_1311', 'precheck_02237.txt')
+P5_ROOMS_02237 = os.path.join(ROOT, 'work', 'b_nav_1211', 'q105_room_names.txt')
+P5_KEYS_02237 = {'KeyItems': '0', 'StyleCollect': 'both', 'StyleKeyItems': 'both', 'StyleNames': 'both',
+                 'StyleCheckpoints': 'both', 'StylePortals': 'both', 'LabelRoom': '1', 'DistMetres': '0',
+                 'DrawDistance': '0', 'Occlusion': '1', 'HideCo': '1', 'HideFx': '1', 'RoomOnly': '0'}
+P5_ITEMS_02237 = (('dbg.keyitems', 'bool', 'ValDvKeyItems', 'RunDvKeyItems'),
+                  ('dbg.labelstyle', 'action', 'ValDvLabelStyle', 'RunDvLabelStyle'),
+                  ('dbg.room', 'bool', 'ValDvRoom', 'RunDvRoom'), ('dbg.metres', 'bool', 'ValDvMetres', 'RunDvMetres'),
+                  ('dbg.drawdist', 'action', 'ValDvDrawDist', 'RunDvDrawDist'),
+                  ('dbg.occlusion', 'action', 'ValDvOcclusion', 'RunDvOcclusion'),
+                  ('dbg.hideco', 'bool', 'ValDvHideCo', 'RunDvHideCo'), ('dbg.hidefx', 'bool', 'ValDvHideFx', 'RunDvHideFx'),
+                  ('dbg.roomonly', 'bool', 'ValDvRoomOnly', 'RunDvRoomOnly'))
+
+
+def check_02237(ini_path, switches_path):
+    """0.22.37 (P5, 13.11.; workspace docs/Befund-P5-Debugansicht-1311.md): kP5Checks = the 6 rows of the offline-checked
+    work/p5_menu_1311/precheck_02237.txt; kChapOrder = ALL rows of the generator output q105_chaporder_rows.txt (also the
+    7 return visits ", 2}" - CP 76 on the kraken_room return, 160 / 42 in the tomb, going_in 781 / going_out 782);
+    kRoomNames = q105_room_names.txt; the reward bit / table, prefix filter, key items and occlusion read only (no game
+    write, no game call); LabelFilter: 4 = co_ / fx_, reason 5 = reward bit; the label layers ask P5OcclFactor;
+    DpDrawBuffer issues the queries before sb->Apply, DpOnReset releases them; arena.load: QlTick asks LevelChangePending
+    before its 100 ms gate and QlForget dumps (0x5c1790) only entries that still carry the id; 12 [Debug] keys with
+    defaults (kOpts, TruMenu.ini, switches rows restart); 8 items; bar rows; README 0.22.37 with TO TEST; Set-TruMenu.ps1
+    knows the 0.22.36 hash; TruTrace 0.3.2 ProgressFilter default (_rw_, weightbreak, ping_map, grapple)"""
+    problems = []
+    src = read_cpp()
+    if '0.22.37 (debug view P5' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.37 part "0.22.37 (debug view P5"')
+    offline = []
+    if os.path.exists(P5_CHECKS_02237):
+        for line in open(P5_CHECKS_02237, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/p5_menu_1311/precheck_02237.txt (the offline byte list) is missing')
+    rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kP5Checks')]
+    if rows != offline or len(rows) != 6:
+        problems.append('TruMenu.cpp: kP5Checks (%d rows) must be the 6 rows of precheck_02237.txt in order' % len(rows))
+    if 'g_p5Ok = g_dvBaseOk && g_coOk && DvChecks(kP5Checks,' not in src:
+        problems.append('TruMenu.cpp: g_p5Ok must be g_dvBaseOk && g_coOk && DvChecks(kP5Checks, ...)')
+    # kChapOrder: every base row (first visits and return visits) = the generator output
+    raw = open(CPP, encoding='utf-8').read()
+    order = raw[raw.index('const ChapOrder kChapOrder[] = {'):]
+    order = order[:order.index('\n};')]
+    pat = r'\{"(Base game l\d)", "(\w+)", false, "([0-9 ]*)",\s*((?:"[^"]*"\s*)+|nullptr)(?:,\s*(\d+))?\}'
+    have = [(g, u, c, ''.join(re.findall(r'"([^"]*)"', h)) if h != 'nullptr' else None, v or '1')
+            for g, u, c, h, v in re.findall(pat, order)]
+    want = []
+    for line in open(B_ROWS_02234, encoding='utf-8'):
+        m = re.match(r'\s*\{"(Base game l\d)", "(\w+)", false, "([0-9 ]*)", (?:"(.*)"|nullptr)(?:, (\d+))?\},$', line.rstrip())
+        if m: want.append((m.group(1), m.group(2), m.group(3), m.group(4), m.group(5) or '1'))
+    if have != want or len(want) != 91:
+        problems.append('TruMenu.cpp: kChapOrder base rows != q105_chaporder_rows.txt incl. return visits (%d / %d, want 91)'
+                        % (len(have), len(want)))
+    ret = {u: c for g, u, c, h, v in want if v == '2'}
+    first = {u: c for g, u, c, h, v in want if v == '1'}
+    if len(ret) != 7 or ret.get('l1_kraken_room') != '76 75' or ret.get('l1_norse_hallway_a') != '782 779':
+        problems.append('q105_chaporder_rows.txt: 7 return visits wanted, kraken_room "76 75", norse_hallway_a "782 779"')
+    if '76' in first.get('l1_kraken_room', '').split() or first.get('l1_baldrs_tomb') != '140 72 160 42 141' or \
+            '781' not in first.get('l1_norse_hallway_a', '').split():
+        problems.append('q105_chaporder_rows.txt: Paket R first visits (no 76 in kraken_room, tomb 140 72 160 42 141, 781)')
+    if 'int visit; };' not in src or 'co && co->visit > 1 ?' not in fn_body(src, 'int QbChapRows('):
+        problems.append('TruMenu.cpp: ChapOrder.visit and the return mark on page Kapitel missing')
+    if 'g_chapCpOpen == rowKey' not in fn_body(src, 'int QbChapRows('):
+        problems.append('TruMenu.cpp: a return visit row must open its checkpoints alone (row key)')
+    # room names = the generator's rooms file
+    rooms_want = []
+    if os.path.exists(P5_ROOMS_02237):
+        rooms_want = [l.strip() for l in open(P5_ROOMS_02237, encoding='utf-8') if l.strip()]
+    else:
+        problems.append('work/b_nav_1211/q105_room_names.txt is missing')
+    m = re.search(r'const P5Room kRoomNames\[\] = \{\n(.*?)\n\};', raw, re.S)
+    rooms_have = [l.strip() for l in (m.group(1).split('\n') if m else []) if l.strip()]
+    if rooms_have != rooms_want or len(rooms_want) < 84:
+        problems.append('TruMenu.cpp: kRoomNames (%d rows) != q105_room_names.txt (%d)' % (len(rooms_have), len(rooms_want)))
+    # read only: no game write / game call in the P5 readers and the label paths
+    for fn in ('int P5Collected(', 'int P5RewardKind(', 'bool P5PrefixHidden(', 'void P5KeyDraw(', 'void P5KeyLabels(',
+               'float P5OcclFactor(', 'void P5OcclIssue(', 'void P5CapUpdate(', 'int P5SymOfName(', 'void P5DrawSymbol('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('('))
+        if any(w in body for w in ('WriteByte(', 'WriteBytes(', 'WriteDword(', 'reinterpret_cast<volatile', 'Fn>(')):
+            problems.append('TruMenu.cpp: %s must not write game memory or call the game' % fn.strip('('))
+    col = fn_body(src, 'int P5Collected(')
+    for need in ('CoKindOf(', 'data + 0x3ed90 + (ri >> 5) * 4', '(word >> (ri & 31)) & 1'):
+        if need not in col: problems.append('TruMenu.cpp: P5Collected lacks %s' % need)
+    lf = fn_body(src, 'int LabelFilter(')
+    if 'if (P5PrefixHidden(inst)) return 4;' not in lf or 'P5Collected(inst)) *reason = 5;' not in lf:
+        problems.append('TruMenu.cpp: LabelFilter must return 4 for co_ / fx_ and give reason 5 for the reward bit')
+    for fn in ('void DvDrawNames(', 'bool M20Label(', 'void DvTagsDraw(', 'void DrawUberLabels('):
+        if 'P5OcclFactor(' not in fn_body(src, fn): problems.append('TruMenu.cpp: %s must ask P5OcclFactor' % fn.strip('('))
+    # live wish 13.11.: Lara's room only (uber labels + key items), readable names
+    if 'P5RoomOnlyDrops(c.inst)' not in fn_body(src, 'void DrawUberLabels(') or \
+            '!P5RoomOnlyDrops(inst)' not in fn_body(src, 'void P5KeyDraw('):
+        problems.append('TruMenu.cpp: [Debug] RoomOnly must filter the uber labels and the key items')
+    for fn in ('void DrawUberLabels(', 'void P5KeyDraw(', 'void DvDrawNames('):
+        if 'P5Readable(name)' not in fn_body(src, fn): problems.append('TruMenu.cpp: %s must show P5Readable' % fn.strip('('))
+    if '{"switch_oneway_wall", "Wandschalter (einmalig)", "wall switch (one-way)"},' not in raw or \
+            '{"hpole", "Stange (waagrecht)", "pole (horizontal)"},' not in raw or '{"sewer_gate", "Kanaltor", "sewer gate"},' not in raw:
+        problems.append('TruMenu.cpp: kP5Readable must hold the owner examples (switch_oneway_wall, hpole, sewer_gate)')
+    uc = fn_body(src, 'int UberCollect(')
+    if 'roomOnly && P5RoomOnlyDrops(inst)' not in uc or 'strstr(name, "_uo_") || strstr(name, "_ei_") || strstr(name, "_pt_")' not in uc:
+        problems.append('TruMenu.cpp: UberCollect with roomOnly must keep Lara\'s room and take every _uo_ / _ei_ / _pt_ object')
+    if 'UberCollect(g_ubCand, max, lara, player, &g_ubFound, g_p5RoomOnly != 0)' not in fn_body(src, 'void DrawUberLabels('):
+        problems.append('TruMenu.cpp: DrawUberLabels must pass [Debug] RoomOnly to UberCollect')
+    for fn in ('void DrawLabels(', 'void DvDrawNames(', 'void P5KeyDraw('):   # hidden helpers: "versteckt", not "eingesammelt"
+        if 'P5IsReward(' not in fn_body(src, fn) or 'LabelHiddenText()' not in fn_body(src, fn):
+            problems.append('TruMenu.cpp: %s must say "versteckt" for a hidden instance that is no collectible' % fn.strip('('))
+    db = fn_body(src, 'void DpDrawBuffer(')
+    if not (0 <= db.find('P5OcclIssue(dev, c, b);') < db.find('sb->Apply();')):
+        problems.append('TruMenu.cpp: DpDrawBuffer must issue the occlusion queries before sb->Apply')
+    if 'P5OcclRelease();' not in fn_body(src, 'void DpOnReset('):
+        problems.append('TruMenu.cpp: DpOnReset must release the occlusion queries')
+    # arena.load: release at the level change
+    qt = fn_body(src, 'void QlTick(')
+    if not (0 <= qt.find('if (LevelChangePending(why, sizeof(why))) { QlForget(why); return; }') < qt.find('now - last < 100')):
+        problems.append('TruMenu.cpp: QlTick must ask LevelChangePending before its 100 ms gate')
+    if 'if (unit != g_qlUnit) g_qlUnit = unit;' not in qt:
+        problems.append('TruMenu.cpp: a portal move (same player) must keep the arena.load list')
+    qf = fn_body(src, 'void QlForget(')
+    if 'static_cast<SHORT>(id) == q.id' not in qf or 'QlDumpOne(q.id)' not in qf:
+        problems.append('TruMenu.cpp: QlForget must dump with 0x5c1790 only entries that still carry the id')
+    # keys, items, bar, switches, README, Set-TruMenu, TruTrace
+    header, opt_rows = table(src)
+    keys = {(s, k): d for s, k, d, _ in opt_rows}
+    ini = open(ini_path, encoding='utf-8').read().replace('\r\n', '\n')
+    for k, d in P5_KEYS_02237.items():
+        if keys.get(('Debug', k)) != d: problems.append('TruMenu.cpp: kOpts [Debug] %s must default to %s' % (k, d))
+        if '\n%s=%s\n' % (k, d) not in ini: problems.append('%s: [Debug] %s=%s missing' % (os.path.basename(ini_path), k, d))
+    for item, typ, val, run in P5_ITEMS_02237:
+        if not re.search(r'\{"%s", "%s", .*?,\s+false,\s+%s,\s+%s\}' % (re.escape(item), typ, val, run), src, re.S):
+            problems.append('TruMenu.cpp: item %s (%s, %s / %s) missing' % (item, typ, val, run))
+        if not re.search(r'\{"%s", "[*]?", "' % re.escape(item), src): problems.append('TruMenu.cpp: bar help row %s missing' % item)
+    if '"dbg.keyitems", "", kQbBool, kDvKeyItems, kQcLayer, 0, 0}' not in src:
+        problems.append('TruMenu.cpp: bar row Schluesselgegenstaende (dbg.keyitems, page Level data) missing')
+    if 'P5MenuControls(o, sizeof(o));' not in src: problems.append('TruMenu.cpp: menu controls (page Debug view) missing')
+    sw = [l.rstrip('\r\n').split(' | ') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Debug | ')]
+    got = {f[2]: f for f in sw if len(f) >= 10 and f[9] == 'TruMenu 0.22.37'}
+    for k, d in P5_KEYS_02237.items():
+        f = got.get(k)
+        if not f or f[6] != 'restart' or f[7] != d:
+            problems.append('%s: row TruMenu | Debug | %s | ... | restart | %s | ... | TruMenu 0.22.37 missing'
+                            % (os.path.basename(switches_path), k, d))
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.37 - ' not in readme or '\n### TO TEST 0.22.37' not in readme:
+        problems.append('README.md: section "## 0.22.37 - ..." with "### TO TEST 0.22.37" missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '1648a83dde7feb4033220d6f4c101ba1a2dd3b8e5fe1c3dc651459b62802a09a' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.36 build hash (work/asi/menu0259) is missing')
+    tt = open(os.path.join(ROOT, 'src', 'asi', 'TruTrace', 'TruTrace.cpp'), encoding='utf-8').read()
+    tini = open(os.path.join(ROOT, 'src', 'asi', 'TruTrace', 'TruTrace.ini'), encoding='utf-8').read()
+    filt = 'checkpoint,breakwall,trigger,door,gate,lever,plate,switch,spawner,_rw_,weightbreak,ping_map,grapple'
+    if 'const char kVersion[] = "TruTrace 0.3.2";' not in tt or '\nProgressFilter=%s\n' % filt not in tini.replace('\r\n', '\n'):
+        problems.append('TruTrace: 0.3.2 with the ProgressFilter default %s (source + sample .ini) wanted' % filt)
+    tf = re.search(r'#define TRUTRACE_PROG_FILTER ((?:"[^"]*"\s*\\?\s*)+)', tt)
+    if not tf or ''.join(re.findall(r'"([^"]*)"', tf.group(1))) != filt:
+        problems.append('TruTrace.cpp: TRUTRACE_PROG_FILTER must be %s' % filt)
+    return problems, ('debug view P5 (%d byte checks = precheck_02237; kChapOrder %d base rows = generator incl. %d return '
+                      'visits; %d room names; %d keys, %d items; arena.load release at the level change; TruTrace 0.3.2 '
+                      'filter)' % (len(rows), len(want), len(ret), len(rooms_want), len(P5_KEYS_02237), len(P5_ITEMS_02237)))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -4685,8 +4861,10 @@ def check_02231():
         problems.append('TruMenu.cpp: unit.go must refuse a unit without data')
     order = src[src.index('const ChapOrder kChapOrder[] = {'):]
     order = order[:order.index('\n};')]
-    if order.count('{"Base game l') != 84:
-        problems.append('TruMenu.cpp: kChapOrder must hold 84 base-game rows (has %d)' % order.count('{"Base game l'))
+    n_visit2 = len(re.findall(r'(?:nullptr|")\s*, 2\},', order))   # 0.22.37: the Paket R return visits (visit 2)
+    if order.count('{"Base game l') - n_visit2 != 84:
+        problems.append('TruMenu.cpp: kChapOrder must hold 84 base-game rows (has %d + %d return visits)'
+                        % (order.count('{"Base game l') - n_visit2, n_visit2))
     if 'ChapBaseGroup(kUnits[i].group) ? " force" : ""' not in fn_body(src, 'int QbChapRows('):
         problems.append('TruMenu.cpp: base-game checkpoint rows must run cp.jump ... force')
     jt = src[src.index('const NavCheckBytes kJtChecks[] = {'):]
@@ -4901,6 +5079,10 @@ def main(argv):
     for p in cproblems36: print('Q02236 %s' % p)
     if not cproblems36: print('ok: 0.22.36 %s' % csummary36)
     problems += cproblems36
+    cproblems37, csummary37 = check_02237(ini_path, opt.get('--switches', SWITCHES))   # 0.22.37 (P5 debug view)
+    for p in cproblems37: print('Q02237 %s' % p)
+    if not cproblems37: print('ok: 0.22.37 %s' % csummary37)
+    problems += cproblems37
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

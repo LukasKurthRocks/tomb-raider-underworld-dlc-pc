@@ -9,6 +9,30 @@ were. It answers "where do we have to change it?" for open points of the DLC por
 runs in the game), byte checks 0.1 51 / 51 + 0.2 55 / 55 + 0.3 8 / 8, not played.** 0.2: built 2026-11-05
 (`work\asi\trace02`), self test 17 / 17. 0.1: built 2026-11-04 (`work\asi\trace01`), self test 11 / 11.
 
+## 0.3.2: progress filter for rewards, jars, pings, grapple walls (P5, 2026-11-13)
+
+Built 2026-11-13 into `work\asi\trace032`, not installed, not played. Only the default of `[Trace] ProgressFilter`
+changed (TruTrace.cpp + sample .ini): `checkpoint,breakwall,trigger,door,gate,lever,plate,switch,spawner` + **`_rw_`**
+(artifacts / treasures / relics / medipacks: birth, flag change on pick-up, removal), **`weightbreak`** (jars: messages
+0x2b hit / 0x11c damage, removal - workspace `docs\Befund-P1-Mittelmeer-Objekte-1311.md` section 2), **`ping_map`**
+(sonar ping objects, destroyed by the puzzle's "solved" handler) and **`grapple`** (`tp_ei_grapple_wall`, two runtime
+instances per intro 326). 13 of the 16 tokens. An owner-edited .ini keeps its own list. The sound category already has
+its switch: **`Sound=0`** places none of its hooks (in Paket R the sound lines hit their rate limit; the sample .ini now
+says so). **Stale player machines** (P1-crash follow-up 5, workspace `docs\Befund-DLC1-Absturz-Spinne-1311.md` section 5:
+1 190 caught access violations in 11 min in the poll thread's `RD` / `W` after a level change, and nonsense lines
+`record -1 [...]`): the teleport snapshot forgets every remembered machine when the player instance changes (level
+change, reload) and drops a machine whose owner `+8` is no longer the player; a real level load
+(`STREAM_LevelLoadAndInit` from 0x5de02a) clears them too. Install: `scripts\windows\Set-TruTrace.ps1 -Install
+-SourceDir work\asi\trace032`.
+
+| # | TO TEST 0.3.2 | expected |
+|---|---|---|
+| 1 | start with 0.3.2 and the new sample .ini (or `ProgressFilter` copied), read `TruTrace.log` from the last `session start` | `0.2: ... progress 1 / messages 1 (filter 'checkpoint,...,grapple', 13 tokens)`; `TruTrace 0.3.2` in the header and TruLink `modules` |
+| 2 | Mediterranean: break a jar (`*_pt_weightbreak_*`), pick up the artifact it drops | `progress` lines for the jar (message 0x2b or 0x11c, then removal) and for `tp_rw_artifact_spawned` (birth, flag change / removal); `gamedata` bit +0x3ed9x as before |
+| 3 | negative: `ProgressFilter=checkpoint` in the .ini | only checkpoint instances again (the .ini wins over the default) |
+| 4 | `Sound=0` | no `sound` lines, `hooks:` line without the sound hooks |
+| 5 | level change (e.g. DLC 1 start or a chapter load), then 10 min play; TruQoL `exit.log` at the end | no burst of first-chance AVs in the TruTrace worker thread; no `machine 0x... record -1 [...]` lines after the change |
+
 ## 0.3.1: dated log lines (Q107, 2026-11-12)
 
 Built 2026-11-12 into `work\asi\i_1211\TruTrace`, not installed, not played (0.3 is installed since 2026-11-05).

@@ -2928,6 +2928,118 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.37 - debug view P5: symbols, rooms, key items, draw distance, occlusion, chain after Paket R (2026-11-13)
+
+Built into `work\asi\menu0260`, not installed, no live test (finding in the workspace `docs\Befund-P5-Debugansicht-1311.md`;
+owner wishes of Paket R 12.11. = Q119 / Q120, data of P1 `docs\Befund-P1-Mittelmeer-Objekte-1311.md`). Section
+"0.22.37 debug view P5" in `TruMenu.cpp`; render thread, read only - nothing is written into tru.exe memory.
+- **Name / symbol / both per layer:** `[Debug] StyleCollect`, `StyleKeyItems`, `StyleNames`, `StyleCheckpoints`,
+  `StylePortals` = `name` | `symbol` | `both` (default `both`), item `dbg.labelstyle <layer>|all <name|symbol|both>`
+  (`dbg.style` stays the 0.16 display info). Symbols are ImGui primitives on a dark disc (no texture files): artifact
+  (diamond), treasure (coin), relic (star - when the game's reward table names the index a relic), reward jar (with
+  `#n` beside it in symbol-only mode), medipack (box with cross, `*_rw_shard` = health pack per P1), switch / lever,
+  door / gate, key item (key), key-item target (rings), grapple point (hook), checkpoint (flag), portal (frame with
+  arrow). An object name without a symbol keeps its text in symbol-only mode. The **legend** gets one row per symbol
+  drawn this frame (symbol instead of the colour square, count).
+- **Distance, height, room:** collectible, key-item and object-name labels name the room **always** (`[Debug]
+  LabelRoom` 1, item `dbg.room`): readable DE / EN name in the bar language (`Kraken-Raum` / `Kraken room` for
+  `l1_kraken_room`), fallback the unit name; trigger / checkpoint / portal labels keep the 0.16 rule (room only when it
+  is not Lara's unit) with the readable name. Names = `kRoomNames`, generated with the chapter rows
+  (`work\b_nav_1211\q105_order_table.py` ... `OUT_ROOMS` -> `q105_room_names.txt`, 111 units; a reading of the unit
+  name - the game has no room names). **`[Debug] DistMetres`** (item `dbg.metres`, default 0 = the documented
+  `5140u ^2540u`): 1 = `51.4m ^25.4m`.
+- **Collected = the game's own bit:** the reward pickup 0x5db6a0(index) sets bit `index & 31` of
+  `[[0xc59264] + 0x3ed90 + (index >> 5) * 4]` once (P1); index = intro data +0x30. Collectibles (`dbg.collect`), key
+  items and the name labels follow `[Debug] LabelCollected` for a set bit (0 = no label, 1 = grey ` | eingesammelt`),
+  also when the game still draws the instance (`labels: ... no label - reward bit +0x3ed90 set (0.22.37)`). A hidden
+  instance without the bit stays out as in 0.21. Relic / treasure from the reward table `[0xe7f338]` (generalbank
+  DTP 36) - the game loads it at the first pickup of a session, before that the object name decides.
+- **Key items layer** (`dbg.keyitems`, `[Debug] KeyItems`, bar page Level data, menu page Debug view): carryable parts
+  (`_pt_` without weightbreak / reward, `*puzzle_piece*`, `*_key*`), switches / levers / pressure plates, doors /
+  gates, grapple points, and **P1's part -> target links** (`kP5Links`, unit + intro ids from the script members P1
+  read in the unit data: eye pieces 232 / 233 -> centre 231 -> CP 234, keys 970 / 971 -> 976 / 978, switch 498 ->
+  tomb door 497, switch 30 -> platform 27 + chains 61 / 62, switches 55 / 57 -> cogs 36 / 32 + kraken 33, hint 353 ->
+  grapple wall 326, wall switch 748 -> gate 743 + flint walls 746 / 747, scene 51 (42) -> gate 45, locks 69 / 70, pings
+  66 - 68) as a **world line** part -> target (depth path). State line: part `liegt` / **`getragen?`** (link parent
+  id `inst+0x228` != 0 - the field the save writer stores at 0x555422; that it means "carried" is **not proven live**)
+  / `eingesetzt / weg` (not drawn any more); the instance's uber node (`Zustand open` ...), a node named open / solved
+  / destroyed / done / broken / dead / activated / complete = `= erledigt` (green). Radius / count = `[Debug]
+  MarkRadius` / `MarkMax`.
+- **Draw distance:** `[Debug] DrawDistance` (default 0 = off) caps the radii of triggers, collectibles / enemies, key
+  items, object names and Thrall-Labels; rows per unit or area in **`TruMenu.debugview.txt`** next to tru.exe
+  (`l1_kraken_room 8000`, `l1_* 12000`; a unit row wins over the longest prefix row). Item `dbg.drawdist <units>|off |
+  here <units>|clear | reload` - `here` writes the row of Lara's unit at once; menu slider "draw distance here".
+- **Behind walls** (`[Debug] Occlusion` 0 off / **1 faded** / 2 hidden, item `dbg.occlusion`): no engine ray is called -
+  the targeter's sight ray (0x713200 -> 0x4935f0 -> 0x493330) is game-thread code with its own query record, the labels
+  are drawn at Present. Instead every label anchor is tested against the **scene's own depth buffer**: inside the 0.16
+  depth pass (`DpDrawBuffer`, same mapping `DpDepth`) a D3D9 occlusion query draws 5 x 5 pixels with no colour; the
+  answer of 1 .. 3 frames ago dims (30 %) or drops the label. Needs `[Debug] Depth` 1 / 2 and an accepted depth
+  mapping (`dbg.depthdump`), else the labels are drawn as before; the world markers / lines were already dimmed by the
+  0.16 depth pass. 48 queries, released at Reset.
+- **co_ / fx_** (`[Debug] HideCo` / `HideFx`, default 1, items `dbg.hideco` / `dbg.hidefx`): name labels and key items
+  leave out `co_*` (cutscene objects - P1: 39 of 43 in a scene's cast; `co_rock*` stays) and `fx_*` (effects,
+  `*_grab_prompt` stays).
+- **Live wish 13.11. - only the current room, fade, readable names:** `[Debug] RoomOnly` (default 0, item
+  `dbg.roomonly`, bar Render "Nur aktueller Raum", menu checkbox) keeps the **uber labels** (`dbg.uber`: gates,
+  platforms, switches, levers) and the **key items** of Lara's room only - the room is her stream unit (the data has no
+  finer room); an instance of an unknown unit stays. The uber labels now **fade behind walls** with the same `[Debug]
+  Occlusion` (they get their anchor tested while a debug view layer keeps the depth pass running). **Readable names**
+  next to the object name on uber labels, key items and object names: `kP5Readable` (37 name patterns, DE / EN in the
+  bar language, the specific ones first), e.g. `ms_ei_switch_oneway_wall` -> "Wandschalter (einmalig)" / "wall switch
+  (one-way)", `tp_ei_grapple_wall` -> "Greifwand", `*hpole*` -> "Stange (waagrecht)"; a name without a pattern stays
+  as it is.
+- **Live finding 13.11. (`dlc_watertunnel`, sewer bar):** with `RoomOnly` the uber labels take **every `_uo_` / `_ei_`
+  / `_pt_` puzzle object of Lara's room** besides the uber states and `UberMatch` (the owner's `UberMatch=switch,lever`
+  hid the sewer gate), radius at least 50000 (the room bounds it); the label names the readable name and the uber
+  node in the bar language: `dlc1_uo_sewer_gate 9xxx (Kanaltor, verschlossen)` (`kP5NodeWords`: locked, open, closed,
+  solved, destroyed, ... - an unlisted node keeps its name). The grey suffix of a hidden instance says **`versteckt` /
+  `hidden`** unless it is a real collectible (`*_rw_*` / `*_pt_*reward*`) - before, `dlc_dispatcher` showed
+  "eingesammelt". **Not built:** the label anchor stays the instance origin (`+0x20`) - an interaction / grab point or
+  model bounds of an instance are not known in our data yet (the uber action 29 "interaction record" is unread, the
+  model DTP has only the segment bind offsets); the sewer gate's origin is 51 m from its bar.
+- **Chain after Paket R** (page Kapitel): same generator (`q105_order_table.py` `PAKET_R_FWD` / `PAKET_R_RET`, proof:
+  every id a save intro of its unit, no checkpoint id lost): CP 76 on the **return visit** of `l1_kraken_room`, the
+  saving cinematics 84 / 696 / 160 (scene 50) / 42 (scene 51), `checkpoint_l1_going_in` 672 / 673 / 781 on the way in,
+  `_going_out` 674 / 675 / 782 on the way back; **7 return visits as rows of their own** (`visit 2`, "(Rückweg)",
+  heading "Rückweg zum Boot (Paket R)"); a return row opens its checkpoints alone. 84 base rows + 7 = 91.
+- **arena.load leak (N-5):** a level change no longer forgets the list with the extra references inside the engine:
+  `QlTick` (Present = game thread) asks the pending request (GameTracker+0xb9) every frame, before its 100 ms gate,
+  and gives every request of TruMenu whose tracker entry still carries its id `STREAM_DumpObject` 0x5c1790 once - the
+  arena.unload call (Paket R: +0xb9 at 20:38:37.219, old units dumped .246, load .532). A change seen only afterwards
+  releases in a loaded level only (main state 1, a player), never during the load; a portal move keeps the list. Log
+  `arena.load: <why> - 0.22.37: TruMenu's references released before the level change (...)`.
+- **Byte checks** `kP5Checks` (6, = `work\p5_menu_1311\precheck_02237.txt`, `tools/pe_bytes_check.py` on the Steam exe
+  6 / 6 ok): reward bit test / set, table pointer, entry / record, kind, save writer +0x228. Failed: no reward bits, no
+  relic from the table, no `getragen?` (the rest works).
+
+```text
+0.22.37 debug view P5: reward bits / table + link parent ok (6 checks); key items layer off; styles collect both, keyitems both, names both, checkpoints both, portals both; LabelRoom 1, DistMetres 0, Occlusion faded, HideCo 1, HideFx 1, DrawDistance 0, TruMenu.debugview.txt no TruMenu.debugview.txt; 25 link(s) of P1
+0.14 debug view drawn: ... key items 6 of 9 (radius 15000; 2 link line(s) of 25 known; 0 hidden / gone without label; 412 instances); names ... 0.22.37: 14 co_ / fx_ hidden, 3 behind geometry hidden, 11 symbols); ...
+arena.load: level change pending (GameTracker+0xb9) - 0.22.37: TruMenu's references released before the level change (mayan_thrall dumped; 1 dumped with 0x5c1790, 0 no longer held, 0 failed)
+```
+
+### TO TEST 0.22.37
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | start | start, `TruMenu.log` | `0.22.37 debug view P5: reward bits / table + link parent ok (6 checks)` |
+| 2 | symbols | Mediterranean, `dbg.collect 1`, bar Render "Symbole + Namen" / "Nur Symbole" / "Nur Namen" | diamond / coin / jar with `#n` / medipack box; symbol-only = no boxes; legend rows with the symbols |
+| 3 | room | any label in `l1_kraken_room` | ` [Kraken-Raum]` also in Lara's own unit; bar language en = ` [Kraken room]`; `dbg.metres 1` = `m` |
+| 4 | collected | pick up an artifact with `dbg.labelcollected 1` | grey ` | eingesammelt` at once (bit set), log `... reward bit +0x3ed90 set` or a hide flag |
+| 5 | key items | `l1_seafloor` eye puzzle, `dbg.keyitems 1` | key symbols at 232 / 233, target at 231, lines 232 -> 231 -> 234; picking up a piece: `getragen? (Eltern-Id n)` or not (= the meaning of +0x228, report) |
+| 6 | key items 2 | `l1_kraken_room` at switch 498 | line 498 -> door 497, door `Zustand closed`, after the switch `open = erledigt` (green) |
+| 7 | behind walls | names on, look at a label behind a wall | faded (default); `dbg.occlusion hidden` = gone; `dbg.depth off` = all drawn as before |
+| 8 | draw distance | `dbg.drawdist here 3000` in the kraken room | labels only within 30 m; `TruMenu.debugview.txt` has `l1_kraken_room 3000`; `here clear` = back |
+| 9 | co_ / fx_ | names `*` in `l1_seafloor` | no `co_light_rig` / `fx_haze_*`; `co_rock` and `fx_*_grab_prompt` stay; `dbg.hideco 0` = back |
+| 10 | chain | page Kapitel, base game l1 | `l1_kraken_room (Rückweg)` with CP 76 / 75 below the heading "Rückweg zum Boot"; tomb 140 72 160 42 141 |
+| 11 | arena.load | `arena.load mayan_thrall`, ready, then `level.load` | log `... references released before the level change (mayan_thrall dumped ...)`; `arena.enemies` afterwards `loadable` |
+| 12 | negative | `[Debug] Depth=0` | no occlusion (labels as before), `dbg.occlusion` value says `waits for the depth mapping` |
+| 13 | room only | `l1_kraken_room`, `dbg.uber 1` + `dbg.keyitems 1`, bar Render "Nur aktueller Raum" | only switches / gates / parts of the kraken room; `dbg.uber` value `... n outside Lara's room (RoomOnly)`; off = the neighbours again |
+| 14 | readable | same place | `ms_ei_switch_oneway_wall 498 (Wandschalter (einmalig))`, `tp_ei_grapple_wall ... (Greifwand)`; bar language en = English |
+| 15 | uber fade | `dbg.uber 1` with a debug view layer on, a gate behind a wall | the gate label faded (Occlusion 1) / gone (2) |
+| 16 | room puzzle objects | `dlc_watertunnel` at the sewer bar, `dbg.uber 1`, "Nur aktueller Raum" on (own `UberMatch` kept) | `dlc1_uo_sewer_gate ... (Kanaltor, verschlossen)` and the other `_uo_` / `_ei_` / `_pt_` objects of the unit; off = as before |
+| 17 | hidden text | names `*`, `dbg.labelcollected 1`, a hidden helper (e.g. `dlc_dispatcher`) | grey ` | versteckt`; a picked-up artifact ` | eingesammelt` |
+
 ## 0.22.36 - label filter: collected items and Lara's gear (2026-11-12)
 
 Built into `work\asi\menu0259`, not installed, no live test (finding in the workspace `docs\Befund-Labels-1211.md`,

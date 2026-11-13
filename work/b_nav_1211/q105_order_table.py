@@ -16,7 +16,17 @@ Q113 (2026-11-12, TruMenu 0.22.35): with CP_ORDER (work/q113_chain_1211/q113_cp_
 q113_chain.py) the checkpoints of each unit come in WALKING order (entry portal -> exit portal) instead of +0x52 (group J:
 +0x52 is no walking order); the script proves that every unit's id set is the same as before (nothing lost / added).
 
-Usage (from trudlcport): ../bin/pyt -t 300 work/b_nav_1211/q105_order_table.py PORTALS INTROS CALLS OUT_CPP OUT_MD [CP_ORDER]
+P5 (2026-11-13, TruMenu 0.22.37; docs/Befund-PaketR-Mittelmeer-1211.md, docs/Befund-P1-Mittelmeer-Objekte-1311.md): the
+Paket R run (TruTrace SAVE lines 12.11. 20:35-22:50) corrects l1: CP 76 belongs to the RETURN visit of l1_kraken_room,
+the tomb saves at the cinematic objects 160 (scene 50) and 42 (scene 51), the gate cinematic 696 and the kraken room
+cinematic 84 save too, checkpoint_l1_going_in (672 / 673 / 781) saves on the way in, checkpoint_l1_going_out (674 / 675 /
+782) on the way back; the return visits are rows of their own (visit 2). PAKET_R_FWD / PAKET_R_RET below; the script
+PROVES that every id of a corrected or return row is an intro of that unit (object checkpoint* or cinematic_object in
+INTROS) and that a unit's rows together still hold every one of its 'checkpoint' ids (nothing lost). With OUT_ROOMS it
+writes the readable room names (DE / EN, kRoomNames rows) of every unit of the level list.
+
+Usage (from trudlcport): ../bin/pyt -t 300 work/b_nav_1211/q105_order_table.py PORTALS INTROS CALLS OUT_CPP OUT_MD [CP_ORDER
+[OUT_ROOMS]]
 """
 import sys, re, collections
 
@@ -40,11 +50,24 @@ LOOP2 = ('text', 'Rundweg ab l2_puzzleroom: norsehall -> Türme -> upperhallway 
          'Loop from l2_puzzleroom: norsehall -> towers -> upperhallway -> back; two doors = alternatives (inferred)')
 TEMPLE = ('text', 'Abstecher in 4.2: Tempel (Kopfschmuck-Schlüssel), dann zurück zum Ballspielplatz',
           'Side trip in 4.2: temple (headdress key), then back to the ball court')
+BACK = ('text', 'Rückweg zum Boot (Paket R): Kraken-Raum -> Treppen -> Eingang -> Gang -> Meeresgrund -> Boot',
+        'Return to the boat (Paket R): kraken room -> stairs -> entrance -> hallway -> sea floor -> boat')
+# P5 (Paket R, TruTrace SAVE lines 12.11.): walking order of the first visit where the run corrected Q113, and the
+# return visits (visit 2) with the saves seen on the way back (ids space separated; '' = no save on that visit)
+PAKET_R_FWD = {'l1_kraken_room': '75 84 56 58 77 78 74 73 46',     # 76 -> return visit; 84 = cinematic (scene 45) saves
+               'l1_kraken_entrance': '672 673 696',               # going_in 672 / 673, gate cinematic 696 (title card 1.2)
+               'l1_norse_hallway_a': '779 780 781',               # 781 checkpoint_l1_going_in at the exit portal
+               'l1_baldrs_tomb': '140 72 160 42 141'}             # cinematics 160 (scene 50) / 42 (scene 51) save
+PAKET_R_RET = {'l1_kraken_room': '76 75', 'l1_krakenstairs_b': '594 593', 'l1_krakenstairs_a': '634 633',
+               'l1_kraken_entrance': '675 674', 'l1_norse_hallway_a': '782 779', 'l1_seafloor': '234', 'l1_seatop': ''}
 ORDER = {
     'Base game l1': [('l1_seatop', (1, 1)), ('l1_seafloor', None), ('l1_norse_hallway_a', None), ('l1_kraken_entrance', (1, 2)),
                      ('l1_krakenstairs_a', None), ('l1_krakenstairs_b', None), ('l1_kraken_room', None),
                      ('l1_baldrsstairs_a', LOOP), ('l1_baldrsstairs_b', None), ('l1_baldrs_tomb', (1, 3)),
-                     ('l1_baldrs_sideroom', None), ('l1_baldrs_hall', None), ('l1_cineseatop', (1, 4)),
+                     ('l1_baldrs_sideroom', None), ('l1_baldrs_hall', None),
+                     ('l1_kraken_room', BACK, 2), ('l1_krakenstairs_b', None, 2), ('l1_krakenstairs_a', None, 2),
+                     ('l1_kraken_entrance', None, 2), ('l1_norse_hallway_a', None, 2), ('l1_seafloor', None, 2),
+                     ('l1_seatop', None, 2), ('l1_cineseatop', (1, 4)),
                      ('l1_ship_exterior', None), ('l1_ship_upper_hallway_a', None), ('l1_ship_upper_hallway_b', None),
                      ('l1_ship_upper_hallway', None), ('l1_ship_engine_hall', None), ('l1_ship_natla_room', (1, 5)),
                      ('l1_ship_lower_hallway', None), ('l1_ship_sinking_hall', None), ('l1_cine_ship_sinking', None),
@@ -83,6 +106,85 @@ HEAD_AT_OTHER = {}
 # l1_kraken_entrance, its title-card function f2 is called by script 5321 f1 = l1_kraken_entrance intro 696
 # cinematic_object +0x52 40 (gate cutscene; group J, docs/Befund-Gruppe-J-1211.md 2.1, work/j_data_1211/script_owner_refs.py).
 OWNER_EXTRA = {(1, 2): ('l1_kraken_entrance', 696), (2, 3): ('l2_shrineroom', 2794), (5, 2): ('l5_valgrind', 7332)}
+# P5 (TruMenu 0.22.37, owner wish: "Kraken-Raum" instead of l1_kraken_room on the labels): readable room names DE / EN of every
+# unit of the level list - a plain reading of the unit name (the game has no room names), no game data
+ROOMS = {
+    'l1_seatop': ('Meeresoberfläche (Boot)', 'Sea surface (boat)'), 'l1_seafloor': ('Meeresgrund', 'Sea floor'),
+    'l1_norse_hallway_a': ('Nordischer Gang', 'Norse hallway'), 'l1_kraken_entrance': ('Kraken-Eingang', 'Kraken entrance'),
+    'l1_krakenstairs_a': ('Kraken-Treppe A', 'Kraken stairs A'), 'l1_krakenstairs_b': ('Kraken-Treppe B', 'Kraken stairs B'),
+    'l1_kraken_room': ('Kraken-Raum', 'Kraken room'), 'l1_baldrsstairs_a': ('Baldr-Treppe A', 'Baldr stairs A'),
+    'l1_baldrsstairs_b': ('Baldr-Treppe B', 'Baldr stairs B'), 'l1_baldrs_tomb': ('Baldrs Grab', "Baldr's tomb"),
+    'l1_baldrs_sideroom': ('Baldr-Nebenraum', 'Baldr side room'), 'l1_baldrs_hall': ('Baldr-Halle', 'Baldr hall'),
+    'l1_cineseatop': ('Meeresoberfläche (Szene)', 'Sea surface (cutscene)'),
+    'l1_ship_exterior': ('Schiff außen', 'Ship exterior'),
+    'l1_ship_upper_hallway_a': ('Schiff oberer Gang A', 'Ship upper hallway A'),
+    'l1_ship_upper_hallway_b': ('Schiff oberer Gang B', 'Ship upper hallway B'),
+    'l1_ship_upper_hallway': ('Schiff oberer Gang', 'Ship upper hallway'),
+    'l1_ship_engine_hall': ('Schiff Maschinenhalle', 'Ship engine hall'),
+    'l1_ship_natla_room': ('Schiff Natla-Raum', 'Ship Natla room'),
+    'l1_ship_lower_hallway': ('Schiff unterer Gang', 'Ship lower hallway'),
+    'l1_ship_sinking_hall': ('Schiff sinkende Halle', 'Ship sinking hall'),
+    'l1_cine_ship_sinking': ('Schiff sinkt (Szene)', 'Ship sinking (cutscene)'),
+    'l1_rutlands_ship_m1': ('Rutlands Schiff (nicht ladbar)', "Rutland's ship (not loadable)"),
+    'l2_cliffclimb': ('Klippe', 'Cliff climb'), 'l2_cliffhall': ('Klippenhalle', 'Cliff hall'),
+    'l2_cliffhall_b': ('Klippenhalle B', 'Cliff hall B'), 'l2_junglehub': ('Dschungel-Knoten', 'Jungle hub'),
+    'l2_hubhall': ('Knotenhalle', 'Hub hall'), 'l2_puzzleroom': ('Rätselraum', 'Puzzle room'),
+    'l2_norsehall': ('Nordische Halle', 'Norse hall'), 'l2_norsehub': ('Nordischer Knoten', 'Norse hub'),
+    'l2_towerconnector': ('Turm-Verbindung', 'Tower connector'), 'l2_towerroom': ('Turmraum', 'Tower room'),
+    'l2_upperhallway': ('Oberer Gang', 'Upper hallway'), 'l2_shrineroom': ('Schreinraum', 'Shrine room'),
+    'l2_maproom': ('Kartenraum', 'Map room'), 'l2_flushtunnel': ('Spültunnel', 'Flush tunnel'),
+    'l2_mapconnector': ('Karten-Verbindung (nicht ladbar)', 'Map connector (not loadable)'),
+    'l2_puzzleconnector': ('Rätsel-Verbindung (nicht ladbar)', 'Puzzle connector (not loadable)'),
+    'l3_main_bedroom': ('Schlafzimmer', 'Main bedroom'), 'l3_bedroom_hall': ('Flur am Schlafzimmer', 'Bedroom hall'),
+    'l3_main_hall': ('Eingangshalle', 'Main hall'),
+    'l3_mansion_exterior_afterburn': ('Anwesen außen (nach dem Brand)', 'Mansion exterior (after the fire)'),
+    'l3_caverns_start': ('Höhlen-Start', 'Caverns start'), 'l3_chapel': ('Kapelle', 'Chapel'),
+    'l3_stairhall': ('Treppenhalle', 'Stair hall'), 'l3_secretchamber': ('Geheimkammer', 'Secret chamber'),
+    'l3_chamberrockhall': ('Felskammer-Halle', 'Chamber rock hall'),
+    'l4_trailstart': ('Pfad-Start', 'Trail start'), 'l4_trailtube': ('Pfad-Röhre', 'Trail tube'),
+    'l4_ballcourt': ('Ballspielplatz', 'Ball court'), 'l4_templepath': ('Tempelpfad', 'Temple path'),
+    'l4_temple': ('Tempel', 'Temple'), 'l4_staircase_upper': ('Obere Treppe', 'Upper staircase'),
+    'l4_staircase_xibalba': ('Xibalbá-Treppe', 'Xibalba staircase'), 'l4_traprooms': ('Fallenräume', 'Trap rooms'),
+    'l4_staircase_mictlan': ('Mictlan-Treppe', 'Mictlan staircase'), 'l4_ragnarok_room': ('Ragnarök-Raum', 'Ragnarok room'),
+    'l4_pool': ('Becken', 'Pool'),
+    'l5_startsnow': ('Schnee-Start', 'Snow start'), 'l5_valgrind_tunnel': ('Valgrind-Tunnel', 'Valgrind tunnel'),
+    'l5_valgrind': ('Valgrind', 'Valgrind'), 'l5_valaskjalf_entry': ('Valaskjalf-Eingang', 'Valaskjalf entry'),
+    'l5_valaskjalf_entryb': ('Valaskjalf-Eingang B', 'Valaskjalf entry B'), 'l5_valaskjalf': ('Valaskjalf', 'Valaskjalf'),
+    'l6_ship_exterior': ('Schiff außen', 'Ship exterior'),
+    'l6_ship_upper_hallway_a': ('Schiff oberer Gang A', 'Ship upper hallway A'),
+    'l6_ship_upper_hallway_b': ('Schiff oberer Gang B', 'Ship upper hallway B'),
+    'l6_ship_upper_hallway': ('Schiff oberer Gang', 'Ship upper hallway'),
+    'l6_ship_engine_hall': ('Schiff Maschinenhalle', 'Ship engine hall'),
+    'l6_ship_natla_room': ('Schiff Natla-Raum', 'Ship Natla room'),
+    'l7_thin_ice': ('Dünnes Eis', 'Thin ice'), 'l7_arctic_sea': ('Arktisches Meer', 'Arctic sea'),
+    'l7_helheim_hall01': ('Helheim-Halle 1', 'Helheim hall 1'), 'l7_helheim_hall02': ('Helheim-Halle 2', 'Helheim hall 2'),
+    'l7_helheim01': ('Helheim 1', 'Helheim 1'), 'l7_helheim02': ('Helheim 2', 'Helheim 2'),
+    'l7_helheim03': ('Helheim 3', 'Helheim 3'), 'l7_yggdrasil': ('Yggdrasil', 'Yggdrasil'),
+    'l7_yggdrasil_hall01': ('Yggdrasil-Halle 1', 'Yggdrasil hall 1'),
+    'l7_yggdrasil_hall02': ('Yggdrasil-Halle 2', 'Yggdrasil hall 2'),
+    'l7_yggdrasil_end': ('Yggdrasil-Ende', 'Yggdrasil end'), 'l7_monastery': ('Kloster', 'Monastery'),
+    'l7_himalaya_end': ('Himalaya (Ende)', 'Himalaya (end)'),
+    # DLC units (TruMenu kUnits groups DLC 1 / DLC 2 / other starts)
+    'dlc_level1_start': ('DLC 1 Start', 'DLC 1 start'), 'dlc_caverns': ('Höhlen', 'Caverns'),
+    'dlc_caverns_hall': ('Höhlenhalle', 'Caverns hall'), 'dlc_water_wheel': ('Wasserrad', 'Water wheel'),
+    'dlc_pillory': ('Pranger', 'Pillory'), 'dlc_dungeonhalla': ('Kerkerhalle A', 'Dungeon hall A'),
+    'dlc_dungeonhallb': ('Kerkerhalle B', 'Dungeon hall B'), 'dlc_watertunnel': ('Wassertunnel', 'Water tunnel'),
+    'dlc_dungeon': ('Kerker', 'Dungeon'), 'dlc_treasureroom': ('Schatzkammer', 'Treasure room'),
+    'dlc_level1_left': ('DLC 1 links (ungenutzt)', 'DLC 1 left (unused)'),
+    'dlc_level1_right': ('DLC 1 rechts (ungenutzt)', 'DLC 1 right (unused)'),
+    'dlc_level2_start': ('DLC 2 Start', 'DLC 2 start'), 'dlc_yggdrasil_hall01': ('Yggdrasil-Halle 1', 'Yggdrasil hall 1'),
+    'dlc_yggdrasil_hall02': ('Yggdrasil-Halle 2', 'Yggdrasil hall 2'), 'dlc_yggdrasil_end': ('Yggdrasil-Ende', 'Yggdrasil end'),
+    'dlc2_ceremony_room': ('Zeremonienraum', 'Ceremony room'),
+    'dlc2_hall_machine_ceremony': ('Gang Maschine - Zeremonie', 'Hall machine - ceremony'),
+    'dlc2_machine_room': ('Maschinenraum', 'Machine room'),
+    'dlc2_hall_goo_machine': ('Gang Schleim - Maschine', 'Hall goo - machine'), 'dlc2_goo_room': ('Schleimraum', 'Goo room'),
+    'dlc2_hall_ceremony_goo': ('Gang Zeremonie - Schleim', 'Hall ceremony - goo'),
+    'dlc2_treasure_room_cine': ('Schatzkammer (Szene)', 'Treasure room (cutscene)'),
+    'dlc_level3_start': ('DLC 3 Start (ungenutzt)', 'DLC 3 start (unused)'),
+    'dlc_level4_start': ('DLC 4 Start (ungenutzt)', 'DLC 4 start (unused)'),
+    'dlc_level5_start': ('DLC 5 Start (ungenutzt)', 'DLC 5 start (unused)'),
+    'dlc_level6_start': ('DLC 6 Start (ungenutzt)', 'DLC 6 start (unused)'),
+}
 
 
 def esc(s):
@@ -96,7 +198,7 @@ def esc(s):
     return ''.join(out)
 
 
-def main(portals, intros, calls, out_cpp, out_md, cp_order=None):
+def main(portals, intros, calls, out_cpp, out_md, cp_order=None, out_rooms=None):
     walk = {}
     if cp_order:            # Q113: unit TAB checkpoint ids in walking order
         for line in open(cp_order, encoding='utf-8'):
@@ -112,12 +214,15 @@ def main(portals, intros, calls, out_cpp, out_md, cp_order=None):
         m = re.match(r'^\s+-> (\S+)', line)
         if m and unit: adj[unit].add(m.group(1)); adj[m.group(1)].add(unit)
     cps = collections.defaultdict(list)
+    saves = collections.defaultdict(dict)   # P5: unit -> intro id -> object (checkpoint* / cinematic_object)
     unit = None
     for line in open(intros, encoding='utf-8', errors='replace'):
         m = re.match(r'^== (\S+):', line)
         if m: unit = m.group(1); continue
         m = re.match(r'^\s+intro\s+(\d+)\s+checkpoint\s.*\+0x52\s+(\d+)', line)
         if m: cps[unit].append((int(m.group(2)), int(m.group(1))))
+        m = re.match(r'^\s+intro\s+(\d+)\s+(checkpoint\S*|cinematic_object)\s', line)
+        if m: saves[unit][int(m.group(1))] = m.group(2)
     chap_unit = {}
     owner = None
     for line in open(calls, encoding='utf-8', errors='replace'):
@@ -133,9 +238,12 @@ def main(portals, intros, calls, out_cpp, out_md, cp_order=None):
     rows, md = [], ['| Gruppe | # | Unit | Kapitel-Start (Skript 72) | CP | Checkpoint-Intros (%s) |' % (
                         'Laufrichtung, Q113' if cp_order else '+0x52-Reihenfolge'),
                     '|---|---|---|---|---|---|']
+    n_fix = n_ret = n_added = 0
     for group, order in ORDER.items():
         before = []
-        for k, (u, head) in enumerate(order):
+        for k, entry in enumerate(order):
+            u, head = entry[0], entry[1]
+            visit = entry[2] if len(entry) > 2 else 1
             listed.add(u)
             if u not in units and u not in NOT_LOADABLE: problems.append('%s: %s neither extracted nor a known not-loadable name' % (group, u))
             chap = head if isinstance(head, tuple) and len(head) == 2 else None
@@ -151,6 +259,22 @@ def main(portals, intros, calls, out_cpp, out_md, cp_order=None):
                 if u not in walk: problems.append('%s: %s missing in %s' % (group, u, cp_order))
                 elif sorted(walk[u]) != sorted(ids): problems.append('%s: %s walking order %s is not the id set %s' % (group, u, walk[u], ids))
                 else: ids = walk[u]
+            # P5 (Paket R): corrected first visits and the return visits; every id must be a save intro of the unit, the
+            # unit's rows together must keep every 'checkpoint' id
+            fix = PAKET_R_RET.get(u) if visit == 2 else PAKET_R_FWD.get(u) if cp_order else None
+            if visit == 2 and fix is None: problems.append('%s: %s visit 2 without PAKET_R_RET' % (group, u))
+            if fix is not None and cp_order:
+                new = [int(x) for x in fix.split()]
+                bad = [i for i in new if i not in saves.get(u, {})]
+                if bad: problems.append('%s: %s Paket R ids %s are no checkpoint* / cinematic_object intro of the unit' % (group, u, bad))
+                if visit == 1:
+                    lost = sorted(set(ids) - set(new) - set(int(x) for x in PAKET_R_RET.get(u, '').split()))
+                    if lost: problems.append('%s: %s Paket R rows lose checkpoint ids %s' % (group, u, lost))
+                    n_added += len(set(new) - set(ids))
+                    n_fix += 1
+                else:
+                    n_ret += 1
+                ids = new
             if head is None: hd = ''
             elif head[0] == 'text': hd = '%s|%s' % (head[1], head[2])
             else:
@@ -163,17 +287,28 @@ def main(portals, intros, calls, out_cpp, out_md, cp_order=None):
                     hd = 'Kapitel %d.%d %s%s|Chapter %d.%d %s%s' % (head[0], head[1], de, a, head[0], head[1], en, b.replace('%s', ''))
                 else:
                     hd = 'Kapitel %d.%d %s|Chapter %d.%d %s' % (head[0], head[1], de, head[0], head[1], en)
-            rows.append('    {"%s", "%s", false, "%s", %s},' % (group, u, ' '.join(str(i) for i in ids),
-                                                               '"%s"' % esc(hd) if hd else 'nullptr'))
+            rows.append('    {"%s", "%s", false, "%s", %s%s},' % (group, u, ' '.join(str(i) for i in ids),
+                                                                 '"%s"' % esc(hd) if hd else 'nullptr',
+                                                                 ', %d' % visit if visit > 1 else ''))
             cs = ''
             if chap: cs = '%d.%d %s' % (chap[0], chap[1], TITLE[chap][0]) + (' (Intro %d in %s)' % (caller[1], caller[0]) if caller else ' (Klassen-Skript 5273, Unit offen)')
-            md.append('| %s | %d | `%s`%s | %s | %d | %s |' % (group.replace('Base game ', ''), k + 1, u,
-                      ' (nicht ladbar)' if u in NOT_LOADABLE else '', cs, len(ids), ' '.join(str(i) for i in ids) or '-'))
+            md.append('| %s | %d | `%s`%s%s | %s | %d | %s |' % (group.replace('Base game ', ''), k + 1, u,
+                      ' (nicht ladbar)' if u in NOT_LOADABLE else '', ' (Rückweg)' if visit > 1 else '', cs, len(ids),
+                      ' '.join(str(i) + ('' if saves.get(u, {}).get(i, 'checkpoint') == 'checkpoint' else
+                                         ' (%s)' % saves[u][i]) for i in ids) or '-'))
     for u in sorted(units - listed):
         problems.append('extracted unit %s is in no ORDER list' % u)
     open(out_cpp, 'w', encoding='utf-8', newline='\n').write('\n'.join(rows) + '\n')
     open(out_md, 'w', encoding='utf-8', newline='\n').write('\n'.join(md) + '\n')
-    n_cp = sum(len(cps.get(u, [])) for g in ORDER.values() for u, _ in g)
+    if out_rooms:           # P5: kRoomNames rows of every unit of the level list (base ORDER + the DLC names)
+        base = [u for g in ORDER.values() for u in dict.fromkeys(e[0] for e in g)]
+        missing = [u for u in base if u not in ROOMS]
+        if missing: problems.append('ROOMS lacks %s' % ', '.join(missing))
+        open(out_rooms, 'w', encoding='utf-8', newline='\n').write(''.join(
+            '    {"%s", "%s", "%s"},\n' % (u, esc(de), esc(en)) for u, (de, en) in ROOMS.items()))
+        print('P5: %d room names (%d base units), %d Paket R rows corrected (%d save ids added), %d return rows' % (
+            len(ROOMS), len(base), n_fix, n_added, n_ret))
+    n_cp = sum(len(cps.get(e[0], [])) for g in ORDER.values() for e in g if len(e) < 3)
     print('%d groups, %d units listed (%d extracted, %d not loadable), %d checkpoints, %d chapter callers' % (
         len(ORDER), len(listed), len(units), len(listed & NOT_LOADABLE), n_cp, len(chap_unit)))
     for p in problems: print('PROBLEM ' + p)
@@ -181,4 +316,4 @@ def main(portals, intros, calls, out_cpp, out_md, cp_order=None):
 
 
 if __name__ == '__main__':
-    sys.exit(main(*sys.argv[1:7]))
+    sys.exit(main(*sys.argv[1:8]))

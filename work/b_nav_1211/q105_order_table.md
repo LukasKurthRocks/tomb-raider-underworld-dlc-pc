@@ -2,27 +2,34 @@
 |---|---|---|---|---|---|
 | l1 | 1 | `l1_seatop` | 1.1 Der Weg nach Avalon (Intro 997 in l1_seatop) | 1 | 1000 |
 | l1 | 2 | `l1_seafloor` |  | 1 | 234 |
-| l1 | 3 | `l1_norse_hallway_a` |  | 2 | 779 780 |
-| l1 | 4 | `l1_kraken_entrance` | 1.2 Niflheim (Intro 696 in l1_kraken_entrance) | 0 | - |
+| l1 | 3 | `l1_norse_hallway_a` |  | 3 | 779 780 781 (checkpoint_l1_going_in) |
+| l1 | 4 | `l1_kraken_entrance` | 1.2 Niflheim (Intro 696 in l1_kraken_entrance) | 3 | 672 (checkpoint_l1_going_in) 673 (checkpoint_l1_going_in) 696 (cinematic_object) |
 | l1 | 5 | `l1_krakenstairs_a` |  | 2 | 633 634 |
 | l1 | 6 | `l1_krakenstairs_b` |  | 2 | 593 594 |
-| l1 | 7 | `l1_kraken_room` |  | 9 | 75 76 56 58 77 78 74 73 46 |
+| l1 | 7 | `l1_kraken_room` |  | 9 | 75 84 (cinematic_object) 56 58 77 78 74 73 46 |
 | l1 | 8 | `l1_baldrsstairs_a` |  | 2 | 270 271 |
 | l1 | 9 | `l1_baldrsstairs_b` |  | 2 | 239 240 |
-| l1 | 10 | `l1_baldrs_tomb` | 1.3 Das Nordische Äquivalent (Intro 160 in l1_baldrs_tomb) | 3 | 140 72 141 |
+| l1 | 10 | `l1_baldrs_tomb` | 1.3 Das Nordische Äquivalent (Intro 160 in l1_baldrs_tomb) | 5 | 140 72 160 (cinematic_object) 42 (cinematic_object) 141 |
 | l1 | 11 | `l1_baldrs_sideroom` |  | 2 | 91 92 |
 | l1 | 12 | `l1_baldrs_hall` |  | 2 | 5 6 |
-| l1 | 13 | `l1_cineseatop` | 1.4 Gott des Donners (Intro 1780 in l1_cineseatop) | 0 | - |
-| l1 | 14 | `l1_ship_exterior` |  | 9 | 1554 1555 1556 1557 1558 1560 1559 1561 1562 |
-| l1 | 15 | `l1_ship_upper_hallway_a` |  | 2 | 1524 1525 |
-| l1 | 16 | `l1_ship_upper_hallway_b` |  | 2 | 1488 1489 |
-| l1 | 17 | `l1_ship_upper_hallway` |  | 2 | 1447 1448 |
-| l1 | 18 | `l1_ship_engine_hall` |  | 2 | 1412 1411 |
-| l1 | 19 | `l1_ship_natla_room` | 1.5 Reich der Toten (Intro 1288 in l1_ship_natla_room) | 2 | 1292 1354 |
-| l1 | 20 | `l1_ship_lower_hallway` |  | 2 | 1295 1294 |
-| l1 | 21 | `l1_ship_sinking_hall` |  | 2 | 1054 1055 |
-| l1 | 22 | `l1_cine_ship_sinking` |  | 0 | - |
-| l1 | 23 | `l1_rutlands_ship_m1` (nicht ladbar) |  | 0 | - |
+| l1 | 13 | `l1_kraken_room` (Rückweg) |  | 2 | 76 75 |
+| l1 | 14 | `l1_krakenstairs_b` (Rückweg) |  | 2 | 594 593 |
+| l1 | 15 | `l1_krakenstairs_a` (Rückweg) |  | 2 | 634 633 |
+| l1 | 16 | `l1_kraken_entrance` (Rückweg) |  | 2 | 675 (checkpoint_l1_going_out) 674 (checkpoint_l1_going_out) |
+| l1 | 17 | `l1_norse_hallway_a` (Rückweg) |  | 2 | 782 (checkpoint_l1_going_out) 779 |
+| l1 | 18 | `l1_seafloor` (Rückweg) |  | 1 | 234 |
+| l1 | 19 | `l1_seatop` (Rückweg) |  | 0 | - |
+| l1 | 20 | `l1_cineseatop` | 1.4 Gott des Donners (Intro 1780 in l1_cineseatop) | 0 | - |
+| l1 | 21 | `l1_ship_exterior` |  | 9 | 1554 1555 1556 1557 1558 1560 1559 1561 1562 |
+| l1 | 22 | `l1_ship_upper_hallway_a` |  | 2 | 1524 1525 |
+| l1 | 23 | `l1_ship_upper_hallway_b` |  | 2 | 1488 1489 |
+| l1 | 24 | `l1_ship_upper_hallway` |  | 2 | 1447 1448 |
+| l1 | 25 | `l1_ship_engine_hall` |  | 2 | 1412 1411 |
+| l1 | 26 | `l1_ship_natla_room` | 1.5 Reich der Toten (Intro 1288 in l1_ship_natla_room) | 2 | 1292 1354 |
+| l1 | 27 | `l1_ship_lower_hallway` |  | 2 | 1295 1294 |
+| l1 | 28 | `l1_ship_sinking_hall` |  | 2 | 1054 1055 |
+| l1 | 29 | `l1_cine_ship_sinking` |  | 0 | - |
+| l1 | 30 | `l1_rutlands_ship_m1` (nicht ladbar) |  | 0 | - |
 | l2 | 1 | `l2_cliffclimb` | 2.1 Überreste (Intro 2562 in l2_cliffclimb) | 6 | 3835 3832 3834 3833 3831 2569 |
 | l2 | 2 | `l2_cliffhall` |  | 3 | 3755 3754 3756 |
 | l2 | 3 | `l2_cliffhall_b` |  | 3 | 3680 3679 3681 |

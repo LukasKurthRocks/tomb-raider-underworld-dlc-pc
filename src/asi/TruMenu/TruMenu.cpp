@@ -63,7 +63,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.36 (label filter, live 2026-11-12: the name labels dbg.labels / dbg.names ask the 0.21 collected / hidden check LfNotDrawn as the collectibles layer - [Debug] LabelCollected 0 none / 1 grey 'eingesammelt'; Lara's own gear by game data (parent +0x54 = player from BirthObject, weapon-manager slots + gear list) - [Debug] LabelLaraGear 0 none / 1 shown; both live, items dbg.labelcollected / dbg.labelgear, 11 byte checks) - 0.22.35 (level chain, Q113: base-game checkpoints of the Kapitel page in walking order, loop directions + l4_temple side trip as headings) - 0.22.34 (achievements, photo.pose, group M; Q20 / I-2: [Achievements] Enabled=1 (default, read at the start) bends the 16 push immediates of the achievement binder 0x7abb80 (script 66, all bound to the empty 0x796620) to TruMenu's stubs before the generalbank binds them - 'achievement <id> <name> unlocked' once per profile (= the save folder) in TruMenu.log and TruMenu.achievements.txt, names / gamerscore of the Xbox ids f0 1 .. f15 18 (f12 - f15 unsure), repeats counted; ach.list / ach.status, page Figur group Erfolge, big window page Achievements; F2: photo.pose 1..7|next|off = Lara's screen_capture_0n (anim table 1605 - n, section checked, resident) through the game's anim request 0x444ba0 mode 0 (the uber / script play-anim path) - photo mode only; off / photo.off = the slot noted from processor +0x44 again in mode 1; J-5: chapter 1.2 heading before l1_kraken_entrance (title card from intro 696); K follow-up: ai.spawn warns when a resident kind's children are not loaded; 36 byte checks); " "0.22.33 (photo mode, arena.load, glyphs.status, group K; F1 / Q78: photo.on = the game's own FreeCamera (camera manager mode 5 through its switch 0x5edd70(mgr, 5, 0) - CAMERA_SetMode knows only 6 / 11 / 12; its own stick / mouse input and generalbank DTP 16 values) + the world pause bit 0x1000 (the camera update still runs) + the UI byte 0xcdc9a0 (the game's screenshot task hides the HUD the same way); photo.off / leaving by itself on a level change, a new player / unit, main state != 1, a cutscene, the game's pause menu or a camera the game took = mode, Lara's control, pause bit and HUD as before; refused in cutscenes / loading / pause / flight / cine.pause / another camera layer; photo.shot = shot.save clean photo_<n>; Q83: arena.load <kind> requests one of the 26 enemy kinds with the game's object request with reference 0x5c1760 (checks tracker 204 / anim pool 3000 / 3D navgraph / DRMs, at most 2 kinds), ready = object + children at status 2 and anim slots resolved (log line), ai.spawn refuses it before; arena.unload <kind>|all = STREAM_DumpObject 0x5c1790 once for its own requests; arena.enemies lists the states; Q95: glyphs.status = DeviceGlyphs, device now (pad / keyboard / mouse), last switch time, prompt counters; 37 byte checks, no new INI key); " "0.22.32 (arena, group A; Q86: ai.spawn names the LP each spawned enemy got from the game's enemy init (brain+0x2c64; tune health record by the EnemyHP step [[0xc59264]+0x3ef98]), the EnemyHP step and warns while one-hit kill [0xe91ffd] is on - the 2026-11-11 21:02 thrall 'LP 0' was that cheat, its AI ran; no name / an inexact or unloaded name = the list of the loaded AI enemy kinds with the reason; Q100: arena.mode [spot] = player object, doppelganger byte [[0xfadb58]+0x1244] and TruDlc2Player flag, fits / WARNING per spot, logged; arena.go reads the mode first - a main-game spot with the flag set loads with level.load (new game tracker clears it), a DLC 2 spot without it warns - and ends with arena.mode <spot>; Q98: spots 1d l5_valgrind CP 7329, 1e l2_puzzleroom CP 2074, 1f l4_traprooms CP 5722 - the largest open navmesh floors with a resident enemy kind; read only, no new INI key, no hook); " "0.22.31 (level navigation + puzzles, group B; Q105: the 15 unit names in no PC archive (q105_units.tsv: three base units of the level list, six container / costume / cine names, the six known DLC slots) grey and refused by level.load / level.start / unit.go / cp.jump unless a mods\\<unit>.drm exists, one 'units:' log line; page Kapitel base game in play order from the stream portals with chapter headings (callers of generalbank script 72 SetChapterUIData) and the checkpoint intros per unit - right 2x = backup + load, a checkpoint row = cp.jump <unit> <cp> force (new optional third word: cheat.flight 1;player.goto <cp> force); Q106: uber.dump prints every joint-range transition (condition 14 / 15) with the joint's live value (the engine's getter 0x4e1ef0 / 0x4e1ea0), joint.set <intro> <joint> <value>|stop drives a hinge / rail joint with the engine's limit setters 0x4d9fc0 / 0x4d9f50 / 0x4da0c0 + wake 0x4d8fd0 until the uber leaves its node or 6 s (game thread, a cheat), page Kapitel group 'Raetsel in der Naehe' lists the uber objects with their current node and joint targets, 'solve' rows run joint.set; 27 byte checks); " "0.22.30 (log dates, device glyphs, drawn guards; Q107: every TruMenu.log line starts with 'YYYY-MM-DD HH:MM:SS.mmm' and the first line of a process is the session header '=== <date time> TruMenu <version> session start (pid n) ===' (src/asi/TruLog.h, shared with the other plugins); the log page / overlay take a stamp with or without the date and show the time; Q95: [Input] DeviceGlyphs=1 (default 0) - the last used device (pad: a button, a trigger or a stick past its dead zone in the game's poll; keyboard / mouse: a key, a click, the wheel, a mouse move away from the client centre) decides the button prompts of UIText: 23 bytes of 0x5a7c20 at 0x5a7d75 call GlName - pad = the symbol of the first XInput binding (Start / Back U+1810 / U+1811 too), keyboard / mouse = the name of the first other binding, else the game's own name; 12 byte checks, 'glyphs:' log lines; Q103 rest: the quick bar's presses and every widget of the big menu (ImGuiItemFlags_Disabled) act only after 3 drawn frames since the open, else 'quick: buttons 0x.... ignored - not drawn (n frames)' / 'menu: input ignored - not drawn (n frames)'); " "0.22.29 (radial lock, Q103:[Radial] Enabled=0 also closes a ring that is still open (settings.reset) and drops its pending release / open / close requests; a release, confirm, A / click or R3 runs a ring entry only when DrawRadial drew the ring in at least 3 frames since the open, else 'radial: <what> ignored - not drawn (n frames)'; the close line names the drawn frames; no new INI key); " "0.22.28 (test packages, Q90: page Tests group 'Testpakete 11.11. (Q90)' with one closed sub-group per package A, 1 .. 9 of docs\\Testpakete-1111.md - a hint line, jump / load rows of existing items (level.start, level.load, arena.go), the existing switch rows of TruMenu.switches.txt the package toggles (kQbSwitch = the page Fixes row: TruShadowPower ShakeTuTimeStep / [Player] TuTimeStep / DoppelgangerSettings / CameraTuTimeStep, TruQoL [FrameLimit] Enabled / MaxFps, TruRockVein JumpTarget / LedgeProbe, TruMenu [Log] Save), probe rows (save.inv / save.find 5240 / 5695 / save.pending / save.waiting, adren.meter / adren.fill, phys.status, log.script / log.scriptfile) and TO TEST checks (kQbCheck tp<package>.<name>: right ok, left fail, X skip, again = open; added with test.add at the first mark, TruMenu.log 'tests: test.mark <id> <state>'); every row flagged kQfTp (test-package content: a real row of its page or deleted after the tests); no new INI key, no hook); " "0.22.27 (save probe, Q79:save.pending / save.inv / save.waiting / save.find read the save arenas - live [0xc59258] and checkpoint snapshot [0xc5925c], the restore buffer 0xc57258 with the reason a block waits (unit / object / link parent, as 0x555640 / 0x5bb160 / 0x5bb640), the inventory area +0x34c of both game blocks (15 + 8 intro ids, 6 counts), the 64-slot waiting table 0xc592a8, dead bits; read only, 32 byte checks (TruSaveProbe.h); [Log] Save=1 (default 0, live) = two TruMenu.log lines per SAVE_SaveGame / SAVE_RestoreGame through their memcpy calls 0x557127 / 0x5571a3, 5 more byte checks); " "0.22.26 (test arena, Q76:page Tests group 'Arena 1 - Kampf (Q76)' - three flat floors with resident AI enemy kinds, arena.go 1a|1b|1c = one shortcut as cp.jump (backup, unit.go, wait.unit, flight, player.goto <intro> force; 1a l7_helheim03 generator 8785, 1b l7_yggdrasil_hall02 generator 8762, 1c dlc_yggdrasil_hall02 checkpoint 10644), arena.list (one list of arenas / spots: arena 2 Museum later), flight / god mode, the ai.spawn rows, ai.remove spawned (only the instances ai.spawn made, by address + allocation stamp +0x44), fight diagnosis rows; adrenaline meter: adren.meter (CM+0x3c / max [[0xfad764]+0x2d0], CM+0x1fc bits 22 / 27, doppelganger byte [[0xfadb58]+0x1244]; read only), adren.fill (the game's meter-full 0x6e6630, body of the script native 0x777a50; cheat), adren.keep 1|0 (refill once per game frame while below the maximum and bits 22 / 27 clear; not kept); 6 byte checks); " "0.22.25 (settings.reset writes the whole TruMenu.ini: the default text is measured and built in a buffer of its size - 0.10 .. 0.22.24 kept it in a static 16384-byte buffer and wrote only the first 16383 of the 42 KB, a truncated INI; text built before the backup, write and close checked, the answer names bytes and keys; other table texts: TruMenu.log lines up to 2047 characters (was 511, light.cut lines were cut), [Quick] Closed 1023 characters (was 383, too short for every group) and like [Debug] CheckpointHide only whole keys / ids, settings.show ends with the count of the keys it could not hold); " "0.22.24 (fall watch + fall net, Q19 hall02 fall out of the world: TruMenu.log lines at LogLevel 1 for Lara's chart records 742 / 743 / 1068 / 1080 and states 1008 / 1015 with position, a watchdog line every second while in the fall record 1068, safe-ground ring additions, rate-limited; [Rescue] FallNet=1 (default 0, live) puts Lara back on the newest safe-ground sample when she is more than 3 s in 1068 and more than 3000 units below it - player.unstuck's teleport, at most 3 per fall, never in menus / cinematics; 2 byte checks); " "0.22.23 (switches file limit:TruMenu.switches.txt holds up to 512 switch lines (was 160; 24 groups as before), file format unchanged; switch lines past 512 and group lines past 24 are not shown and named in one TruMenu.log line each with the count and the first line number, sw.reload / the bar head say so; the quick bar page Fixes (128 rows) names the rows of an open group it cannot hold instead of cutting them silently - the long menu section Fixes shows every row); " "0.22.22 (teaser timer line, live 2026-11-10: the line follows the bar language [Quick] Language as every overlay; it shows the game clock (the dt the clock got since its (re)start) next to TruMenu's wall clock since that (re)start, and 'Pause-Bit aktiv (halbe Zeit)' / 'Pause bit set (half time)' while the frame time [0xe7f188] is the fixed 0.5 of the pause bit [0xe7f0b4] & 0x10000000 - read only, 4 byte checks); " "0.22.21 (teaser timer: menu.attracttimer 1|0 / [Menu] AttractTimerShow, bar row 'Teaser-Uhr anzeigen' in Spiel-Einstellungen / Hauptmen\303\274 - while in the front end (main state 6 / 10) a line in a screen corner ([Menu] AttractTimerPosition, default tr) shows the AttractTimer clock: elapsed / alarm, or while menu.noattract holds it a shadow count (the dt the game hands the clock update while the clock runs, back to 0 when the game restarts the clock) that flashes 1 s and writes one TruMenu.log line each time it passes the alarm (40 s, then every 40 s with repeat) - the moment the teaser would have started; with menu.noattract off it flashes when the real clock fires; read only through the same update slot 0x84584c, no behaviour change, no new byte checks); " "0.22.20 (main menu attract video off: menu.noattract 1|0 / [Menu] NoAttract, bar row 'Hauptmen\303\274-Video aus' in Spiel-Einstellungen / Hauptmen\303\274 - the clock f11 native 0x795cc0 (called only by the AttractTimer script 60) hands TruMenu the AttractTimer clock, the clock update slot 0x84584c holds its elapsed time at 0 in the front end (main state 6 / 10), so the alarm never fires: no stopTitleMusic, no StopMovie, no teaser; every other clock and the menu background stay the game's; 13 byte checks); " "0.22.19 (pages remembered:the quick bar opens on the page it showed last ([Quick] LastPage, written 1 s after a page change or at the close; a name that is no page any more = page 1, logged) and the big window with the pages that were open ([Menu] OpenPages, written when a page is opened / closed), also after a restart, RememberPage=0 = off; power.infinite 1|0 = TruShadowPower 0.23 [Meter] Infinite written into TruShadowPower.ini (only that line, a missing key added), bar row 'Kraft unendlich' in Rettung / Cheats, greyed with the reason while TruShadowPower.asi 0.23+ is not loaded or its INI is missing); " "0.22.18 (volumes / mouse saved through the game's own write 0x4796b0 (0x478010 only refreshes their mirrors); every bar section a collapsible group, sub-groups, rows indented per level with a guide line, the long menu's groups collapsible; frame stepping: View held = step mode (each RB tap one frame), RB + View held 0.4 s = [Settings] StepRate frames per s; subtitles top / free height and left / right with a margin (origin x of 0x477180 moved per line); voice.lang = speech language only (MultiFS mask 0x472d80 while 0x472be0 is free), voice.full = speech now + registry Language; media list fallback, media.music.inlevels, music volume 0 warning row; goo drip candidate columns (bone 0, old position, physics body); light.demote = a 4th shadow caster takes a free plain place (hooks 0x504e06 / 0x504341); bar settings written back to TruMenu.ini (quick.lang, camera, mute, light switches); defaults: big menu window and ring off, quick bar on, bar language English; TruShadowPower [Meter] Infinite row); " "0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.37 (debug view P5, Paket R / Q119: labels as name / symbol / both per layer ([Debug] Style*, dbg.labelstyle; ImGui symbols + legend), room always + readable (kRoomNames, LabelRoom) and metres (DistMetres), key items layer dbg.keyitems (parts, switches, doors, grapple points, P1 part -> target lines, state from link parent +0x228 / uber node), the game's reward bit +0x3ed90 as 'collected' (LabelCollected semantics), DrawDistance + TruMenu.debugview.txt per unit, labels behind walls faded / hidden by D3D9 occlusion queries in the depth pass (Occlusion), co_ / fx_ hidden (HideCo / HideFx), live wishes: uber labels + key items of Lara's room only (RoomOnly, dbg.roomonly; then every _uo_ / _ei_ / _pt_ object of the room, readable name + node 'Kanaltor, verschlossen'), uber labels fade behind walls, readable names (kP5Readable: 'Wandschalter (einmalig)'), grey 'versteckt' for hidden non-collectibles, kChapOrder after Paket R (CP 76 return visit, 160 / 42, going_in / going_out, 7 return rows), arena.load references released at a level change; 6 byte checks) - 0.22.36 (label filter, live 2026-11-12: the name labels dbg.labels / dbg.names ask the 0.21 collected / hidden check LfNotDrawn as the collectibles layer - [Debug] LabelCollected 0 none / 1 grey 'eingesammelt'; Lara's own gear by game data (parent +0x54 = player from BirthObject, weapon-manager slots + gear list) - [Debug] LabelLaraGear 0 none / 1 shown; both live, items dbg.labelcollected / dbg.labelgear, 11 byte checks) - 0.22.35 (level chain, Q113: base-game checkpoints of the Kapitel page in walking order, loop directions + l4_temple side trip as headings) - 0.22.34 (achievements, photo.pose, group M; Q20 / I-2: [Achievements] Enabled=1 (default, read at the start) bends the 16 push immediates of the achievement binder 0x7abb80 (script 66, all bound to the empty 0x796620) to TruMenu's stubs before the generalbank binds them - 'achievement <id> <name> unlocked' once per profile (= the save folder) in TruMenu.log and TruMenu.achievements.txt, names / gamerscore of the Xbox ids f0 1 .. f15 18 (f12 - f15 unsure), repeats counted; ach.list / ach.status, page Figur group Erfolge, big window page Achievements; F2: photo.pose 1..7|next|off = Lara's screen_capture_0n (anim table 1605 - n, section checked, resident) through the game's anim request 0x444ba0 mode 0 (the uber / script play-anim path) - photo mode only; off / photo.off = the slot noted from processor +0x44 again in mode 1; J-5: chapter 1.2 heading before l1_kraken_entrance (title card from intro 696); K follow-up: ai.spawn warns when a resident kind's children are not loaded; 36 byte checks); " "0.22.33 (photo mode, arena.load, glyphs.status, group K; F1 / Q78: photo.on = the game's own FreeCamera (camera manager mode 5 through its switch 0x5edd70(mgr, 5, 0) - CAMERA_SetMode knows only 6 / 11 / 12; its own stick / mouse input and generalbank DTP 16 values) + the world pause bit 0x1000 (the camera update still runs) + the UI byte 0xcdc9a0 (the game's screenshot task hides the HUD the same way); photo.off / leaving by itself on a level change, a new player / unit, main state != 1, a cutscene, the game's pause menu or a camera the game took = mode, Lara's control, pause bit and HUD as before; refused in cutscenes / loading / pause / flight / cine.pause / another camera layer; photo.shot = shot.save clean photo_<n>; Q83: arena.load <kind> requests one of the 26 enemy kinds with the game's object request with reference 0x5c1760 (checks tracker 204 / anim pool 3000 / 3D navgraph / DRMs, at most 2 kinds), ready = object + children at status 2 and anim slots resolved (log line), ai.spawn refuses it before; arena.unload <kind>|all = STREAM_DumpObject 0x5c1790 once for its own requests; arena.enemies lists the states; Q95: glyphs.status = DeviceGlyphs, device now (pad / keyboard / mouse), last switch time, prompt counters; 37 byte checks, no new INI key); " "0.22.32 (arena, group A; Q86: ai.spawn names the LP each spawned enemy got from the game's enemy init (brain+0x2c64; tune health record by the EnemyHP step [[0xc59264]+0x3ef98]), the EnemyHP step and warns while one-hit kill [0xe91ffd] is on - the 2026-11-11 21:02 thrall 'LP 0' was that cheat, its AI ran; no name / an inexact or unloaded name = the list of the loaded AI enemy kinds with the reason; Q100: arena.mode [spot] = player object, doppelganger byte [[0xfadb58]+0x1244] and TruDlc2Player flag, fits / WARNING per spot, logged; arena.go reads the mode first - a main-game spot with the flag set loads with level.load (new game tracker clears it), a DLC 2 spot without it warns - and ends with arena.mode <spot>; Q98: spots 1d l5_valgrind CP 7329, 1e l2_puzzleroom CP 2074, 1f l4_traprooms CP 5722 - the largest open navmesh floors with a resident enemy kind; read only, no new INI key, no hook); " "0.22.31 (level navigation + puzzles, group B; Q105: the 15 unit names in no PC archive (q105_units.tsv: three base units of the level list, six container / costume / cine names, the six known DLC slots) grey and refused by level.load / level.start / unit.go / cp.jump unless a mods\\<unit>.drm exists, one 'units:' log line; page Kapitel base game in play order from the stream portals with chapter headings (callers of generalbank script 72 SetChapterUIData) and the checkpoint intros per unit - right 2x = backup + load, a checkpoint row = cp.jump <unit> <cp> force (new optional third word: cheat.flight 1;player.goto <cp> force); Q106: uber.dump prints every joint-range transition (condition 14 / 15) with the joint's live value (the engine's getter 0x4e1ef0 / 0x4e1ea0), joint.set <intro> <joint> <value>|stop drives a hinge / rail joint with the engine's limit setters 0x4d9fc0 / 0x4d9f50 / 0x4da0c0 + wake 0x4d8fd0 until the uber leaves its node or 6 s (game thread, a cheat), page Kapitel group 'Raetsel in der Naehe' lists the uber objects with their current node and joint targets, 'solve' rows run joint.set; 27 byte checks); " "0.22.30 (log dates, device glyphs, drawn guards; Q107: every TruMenu.log line starts with 'YYYY-MM-DD HH:MM:SS.mmm' and the first line of a process is the session header '=== <date time> TruMenu <version> session start (pid n) ===' (src/asi/TruLog.h, shared with the other plugins); the log page / overlay take a stamp with or without the date and show the time; Q95: [Input] DeviceGlyphs=1 (default 0) - the last used device (pad: a button, a trigger or a stick past its dead zone in the game's poll; keyboard / mouse: a key, a click, the wheel, a mouse move away from the client centre) decides the button prompts of UIText: 23 bytes of 0x5a7c20 at 0x5a7d75 call GlName - pad = the symbol of the first XInput binding (Start / Back U+1810 / U+1811 too), keyboard / mouse = the name of the first other binding, else the game's own name; 12 byte checks, 'glyphs:' log lines; Q103 rest: the quick bar's presses and every widget of the big menu (ImGuiItemFlags_Disabled) act only after 3 drawn frames since the open, else 'quick: buttons 0x.... ignored - not drawn (n frames)' / 'menu: input ignored - not drawn (n frames)'); " "0.22.29 (radial lock, Q103:[Radial] Enabled=0 also closes a ring that is still open (settings.reset) and drops its pending release / open / close requests; a release, confirm, A / click or R3 runs a ring entry only when DrawRadial drew the ring in at least 3 frames since the open, else 'radial: <what> ignored - not drawn (n frames)'; the close line names the drawn frames; no new INI key); " "0.22.28 (test packages, Q90: page Tests group 'Testpakete 11.11. (Q90)' with one closed sub-group per package A, 1 .. 9 of docs\\Testpakete-1111.md - a hint line, jump / load rows of existing items (level.start, level.load, arena.go), the existing switch rows of TruMenu.switches.txt the package toggles (kQbSwitch = the page Fixes row: TruShadowPower ShakeTuTimeStep / [Player] TuTimeStep / DoppelgangerSettings / CameraTuTimeStep, TruQoL [FrameLimit] Enabled / MaxFps, TruRockVein JumpTarget / LedgeProbe, TruMenu [Log] Save), probe rows (save.inv / save.find 5240 / 5695 / save.pending / save.waiting, adren.meter / adren.fill, phys.status, log.script / log.scriptfile) and TO TEST checks (kQbCheck tp<package>.<name>: right ok, left fail, X skip, again = open; added with test.add at the first mark, TruMenu.log 'tests: test.mark <id> <state>'); every row flagged kQfTp (test-package content: a real row of its page or deleted after the tests); no new INI key, no hook); " "0.22.27 (save probe, Q79:save.pending / save.inv / save.waiting / save.find read the save arenas - live [0xc59258] and checkpoint snapshot [0xc5925c], the restore buffer 0xc57258 with the reason a block waits (unit / object / link parent, as 0x555640 / 0x5bb160 / 0x5bb640), the inventory area +0x34c of both game blocks (15 + 8 intro ids, 6 counts), the 64-slot waiting table 0xc592a8, dead bits; read only, 32 byte checks (TruSaveProbe.h); [Log] Save=1 (default 0, live) = two TruMenu.log lines per SAVE_SaveGame / SAVE_RestoreGame through their memcpy calls 0x557127 / 0x5571a3, 5 more byte checks); " "0.22.26 (test arena, Q76:page Tests group 'Arena 1 - Kampf (Q76)' - three flat floors with resident AI enemy kinds, arena.go 1a|1b|1c = one shortcut as cp.jump (backup, unit.go, wait.unit, flight, player.goto <intro> force; 1a l7_helheim03 generator 8785, 1b l7_yggdrasil_hall02 generator 8762, 1c dlc_yggdrasil_hall02 checkpoint 10644), arena.list (one list of arenas / spots: arena 2 Museum later), flight / god mode, the ai.spawn rows, ai.remove spawned (only the instances ai.spawn made, by address + allocation stamp +0x44), fight diagnosis rows; adrenaline meter: adren.meter (CM+0x3c / max [[0xfad764]+0x2d0], CM+0x1fc bits 22 / 27, doppelganger byte [[0xfadb58]+0x1244]; read only), adren.fill (the game's meter-full 0x6e6630, body of the script native 0x777a50; cheat), adren.keep 1|0 (refill once per game frame while below the maximum and bits 22 / 27 clear; not kept); 6 byte checks); " "0.22.25 (settings.reset writes the whole TruMenu.ini: the default text is measured and built in a buffer of its size - 0.10 .. 0.22.24 kept it in a static 16384-byte buffer and wrote only the first 16383 of the 42 KB, a truncated INI; text built before the backup, write and close checked, the answer names bytes and keys; other table texts: TruMenu.log lines up to 2047 characters (was 511, light.cut lines were cut), [Quick] Closed 1023 characters (was 383, too short for every group) and like [Debug] CheckpointHide only whole keys / ids, settings.show ends with the count of the keys it could not hold); " "0.22.24 (fall watch + fall net, Q19 hall02 fall out of the world: TruMenu.log lines at LogLevel 1 for Lara's chart records 742 / 743 / 1068 / 1080 and states 1008 / 1015 with position, a watchdog line every second while in the fall record 1068, safe-ground ring additions, rate-limited; [Rescue] FallNet=1 (default 0, live) puts Lara back on the newest safe-ground sample when she is more than 3 s in 1068 and more than 3000 units below it - player.unstuck's teleport, at most 3 per fall, never in menus / cinematics; 2 byte checks); " "0.22.23 (switches file limit:TruMenu.switches.txt holds up to 512 switch lines (was 160; 24 groups as before), file format unchanged; switch lines past 512 and group lines past 24 are not shown and named in one TruMenu.log line each with the count and the first line number, sw.reload / the bar head say so; the quick bar page Fixes (128 rows) names the rows of an open group it cannot hold instead of cutting them silently - the long menu section Fixes shows every row); " "0.22.22 (teaser timer line, live 2026-11-10: the line follows the bar language [Quick] Language as every overlay; it shows the game clock (the dt the clock got since its (re)start) next to TruMenu's wall clock since that (re)start, and 'Pause-Bit aktiv (halbe Zeit)' / 'Pause bit set (half time)' while the frame time [0xe7f188] is the fixed 0.5 of the pause bit [0xe7f0b4] & 0x10000000 - read only, 4 byte checks); " "0.22.21 (teaser timer: menu.attracttimer 1|0 / [Menu] AttractTimerShow, bar row 'Teaser-Uhr anzeigen' in Spiel-Einstellungen / Hauptmen\303\274 - while in the front end (main state 6 / 10) a line in a screen corner ([Menu] AttractTimerPosition, default tr) shows the AttractTimer clock: elapsed / alarm, or while menu.noattract holds it a shadow count (the dt the game hands the clock update while the clock runs, back to 0 when the game restarts the clock) that flashes 1 s and writes one TruMenu.log line each time it passes the alarm (40 s, then every 40 s with repeat) - the moment the teaser would have started; with menu.noattract off it flashes when the real clock fires; read only through the same update slot 0x84584c, no behaviour change, no new byte checks); " "0.22.20 (main menu attract video off: menu.noattract 1|0 / [Menu] NoAttract, bar row 'Hauptmen\303\274-Video aus' in Spiel-Einstellungen / Hauptmen\303\274 - the clock f11 native 0x795cc0 (called only by the AttractTimer script 60) hands TruMenu the AttractTimer clock, the clock update slot 0x84584c holds its elapsed time at 0 in the front end (main state 6 / 10), so the alarm never fires: no stopTitleMusic, no StopMovie, no teaser; every other clock and the menu background stay the game's; 13 byte checks); " "0.22.19 (pages remembered:the quick bar opens on the page it showed last ([Quick] LastPage, written 1 s after a page change or at the close; a name that is no page any more = page 1, logged) and the big window with the pages that were open ([Menu] OpenPages, written when a page is opened / closed), also after a restart, RememberPage=0 = off; power.infinite 1|0 = TruShadowPower 0.23 [Meter] Infinite written into TruShadowPower.ini (only that line, a missing key added), bar row 'Kraft unendlich' in Rettung / Cheats, greyed with the reason while TruShadowPower.asi 0.23+ is not loaded or its INI is missing); " "0.22.18 (volumes / mouse saved through the game's own write 0x4796b0 (0x478010 only refreshes their mirrors); every bar section a collapsible group, sub-groups, rows indented per level with a guide line, the long menu's groups collapsible; frame stepping: View held = step mode (each RB tap one frame), RB + View held 0.4 s = [Settings] StepRate frames per s; subtitles top / free height and left / right with a margin (origin x of 0x477180 moved per line); voice.lang = speech language only (MultiFS mask 0x472d80 while 0x472be0 is free), voice.full = speech now + registry Language; media list fallback, media.music.inlevels, music volume 0 warning row; goo drip candidate columns (bone 0, old position, physics body); light.demote = a 4th shadow caster takes a free plain place (hooks 0x504e06 / 0x504341); bar settings written back to TruMenu.ini (quick.lang, camera, mute, light switches); defaults: big menu window and ring off, quick bar on, bar language English; TruShadowPower [Meter] Infinite row); " "0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -584,6 +584,37 @@ const OptDef kOpts[] = {
     {"Debug", "LabelLaraGear", "0", "0.22.36 (dbg.labelgear): name labels (dbg.labels, dbg.names) of Lara's own gear - "
                                     "instances born by Lara\n(parent +0x54 = the player) or held by her weapon manager "
                                     "(slots, gear list): 0 = no label, 1 = label;\nre-read about once a second"},
+    // 0.22.37 debug view P5 (section "0.22.37 debug view P5")
+    {"Debug", "KeyItems", "0", "0.22.37: 1 = key items on from the start (dbg.keyitems): carryable parts, switches / levers, "
+                               "doors / gates, grapple\npoints and the part -> target lines of the Mediterranean puzzles "
+                               "(state: lies / carried? / inserted, uber node)"},
+    {"Debug", "StyleCollect", "both", "0.22.37 (dbg.labelstyle collect): collectibles as name, symbol or both (artifact, "
+                                      "treasure, relic, reward jar with\n#n, medipack)"},
+    {"Debug", "StyleKeyItems", "both", "0.22.37 (dbg.labelstyle keyitems): key items as name, symbol or both (key item, "
+                                       "target, switch, door, grapple\npoint)"},
+    {"Debug", "StyleNames", "both", "0.22.37 (dbg.labelstyle names): object names as name, symbol or both (a name without a "
+                                    "symbol keeps its\ntext)"},
+    {"Debug", "StyleCheckpoints", "both", "0.22.37 (dbg.labelstyle checkpoints): checkpoint labels as name, symbol (flag) "
+                                          "or both"},
+    {"Debug", "StylePortals", "both", "0.22.37 (dbg.labelstyle portals): loading area labels as name, symbol (frame with "
+                                      "arrow) or both"},
+    {"Debug", "LabelRoom", "1", "0.22.37 (dbg.room): 1 = collectible, key-item and object-name labels name the room always, "
+                                "readable (Kraken-Raum /\nKraken room, bar language), else the unit name; 0 = the unit only "
+                                "when it is not Lara's (0.16)"},
+    {"Debug", "DistMetres", "0", "0.22.37 (dbg.metres): 1 = label distances / heights in metres (100 game units = 1 m); "
+                                 "0 = game units '5140u ^2540u'"},
+    {"Debug", "DrawDistance", "0", "0.22.37 (dbg.drawdist): cap of the label / marker radii (triggers, collectibles, "
+                                   "enemies, key items, names,\nThrall-Labels) in game units, 0 = off; per unit / area "
+                                   "rows in TruMenu.debugview.txt next to tru.exe\n('<unit> <units>' or '<prefix>* "
+                                   "<units>'; dbg.drawdist here <units> writes the row of Lara's unit)"},
+    {"Debug", "Occlusion", "1", "0.22.37 (dbg.occlusion): labels behind walls - 0 = drawn as before, 1 = faded, 2 = hidden; "
+                                "tested against the\nscene depth (needs Depth 1 / 2)"},
+    {"Debug", "HideCo", "1", "0.22.37 (dbg.hideco): 1 = no name labels / key items at co_* objects (cutscene objects; "
+                             "co_rock* stays); 0 = labelled"},
+    {"Debug", "HideFx", "1", "0.22.37 (dbg.hidefx): 1 = no name labels / key items at fx_* objects (effects; "
+                             "*_grab_prompt stays); 0 = labelled"},
+    {"Debug", "RoomOnly", "0", "0.22.37 (dbg.roomonly): 1 = uber labels (dbg.uber: gates, platforms, switches) and key "
+                               "items only in Lara's room (her\nstream unit); 0 = every room in the radius"},
     {"Debug", "UberLabels", "0", "0.21.7: 1 = uber labels on from the start (dbg.uber): gates / platforms / switches near "
                                  "Lara with their state\nand the time left (\"Tor: oben, noch 12 s\"); read only"},
     {"Debug", "UberRadius", "8000", "0.21.7: uber labels only up to this distance from Lara (game units, 500 .. 50000; "
@@ -946,6 +977,16 @@ void LgReadSwitch();                         // 0.22.36, section "0.22.36 label 
 void LgCollect();
 int LabelFilter(const char *layer, DWORD inst, DWORD player, int *reason);
 const char *LabelCollectedText();
+float P5Radius(float r);                     // 0.22.37, section "0.22.37 debug view P5": draw distance of Lara's area
+ImU32 P5Fade(ImU32 c, float a);              // 0.22.37: colour with its alpha times a
+float P5OcclFactor(DWORD key, const float *p);   // 0.22.37: 1 visible / unknown, dim factor or 0 behind geometry
+const char *P5Readable(const char *name);    // 0.22.37: readable DE / EN name of an object name pattern, nullptr = none
+bool P5RoomOnlyDrops(DWORD inst);            // 0.22.37: [Debug] RoomOnly and the instance is not in Lara's unit
+extern int g_p5RoomOnly;                     // 0.22.37 [Debug] RoomOnly
+const char *P5NodeWord(const char *node);    // 0.22.37: a state node name in the bar language ("locked" -> "verschlossen")
+bool P5IsReward(DWORD inst);                 // 0.22.37: a real collectible (0.20 kinds: _rw_ / _pt_ reward)
+const char *LabelHiddenText();               // 0.22.37: " | versteckt" / " | hidden" (grey, not a collectible)
+void DvUnitsRead();                          // 0.16 owner units (section "0.14 debug view")
 volatile LONG g_cameraChanges = 1;                                          // 0.8 [Log] CameraChanges
 char g_regressStart[8] = "all";                                              // 0.8 [Regress] List
 volatile LONG g_inputTrace = 1;                                              // 0.8.1 [Log] InputTrace
@@ -6955,13 +6996,15 @@ void LabelTscText(DWORD inst, char *o, size_t n, ImU32 *colour) {
 }
 
 // one label: background box, anchor dot, two text lines above the anchor
-void LabelDraw(ImDrawList *dl, ImVec2 at, const char *line1, const char *line2, ImU32 colour) {
+// 0.22.37: alpha < 1 = a label behind geometry ([Debug] Occlusion 1, the uber labels)
+void LabelDraw(ImDrawList *dl, ImVec2 at, const char *line1, const char *line2, ImU32 colour, float alpha = 1.0f) {
     const float fs = ImGui::GetFontSize();
     ImVec2 s1 = ImGui::CalcTextSize(line1);
     ImVec2 s2 = line2[0] ? ImGui::CalcTextSize(line2) : ImVec2(0.0f, 0.0f);
     float w = (s1.x > s2.x ? s1.x : s2.x) + 8.0f, h = line2[0] ? 2.0f * fs + 6.0f : fs + 4.0f;
     ImVec2 box(at.x - w * 0.5f, at.y - h - 8.0f);
-    dl->AddRectFilled(box, ImVec2(box.x + w, box.y + h), IM_COL32(0, 0, 0, 150), 3.0f);
+    colour = P5Fade(colour, alpha);
+    dl->AddRectFilled(box, ImVec2(box.x + w, box.y + h), P5Fade(IM_COL32(0, 0, 0, 150), alpha), 3.0f);
     dl->AddLine(ImVec2(at.x, at.y - 8.0f), at, colour, 1.5f);
     dl->AddCircleFilled(at, 3.0f, colour, 8);
     dl->AddText(ImVec2(box.x + 4.0f, box.y + 2.0f), colour, line1);
@@ -6985,7 +7028,7 @@ void DrawLabels() {
     if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) return;
     g_lblSnapOk = LabelTsc();
     const bool enemiesOn = M20EnemiesOn();
-    const float r2 = g_lblRadius * g_lblRadius;
+    const float lblRad = P5Radius(g_lblRadius), r2 = lblRad * lblRad;   // 0.22.37: draw distance per area
     int count = 0;
     DWORD inst = 0;
     ReadDword(kFirstInstance, &inst);
@@ -7002,7 +7045,7 @@ void DrawLabels() {
                 // 0.22.36: the 0.21 collected / hidden check and Lara's gear (LabelFilter, shared with dbg.names)
                 int reason = 0;
                 const int rule = kind != 3 ? LabelFilter("dbg.labels", inst, player, &reason) : 0;
-                if (rule == 2) { ++hidden; kind = 3; }
+                if (rule == 2 || rule == 4) { ++hidden; kind = 3; }   // 0.22.37: 4 = co_ / fx_ (HideCo / HideFx)
                 else if (rule == 3) { ++gear; kind = 3; }
                 if (kind != 3) {
                     ++g_lblInRadius;
@@ -7056,7 +7099,7 @@ void DrawLabels() {
         char st[64];
         EsStateText(c.inst, c.kind == 1 ? brain : 0, st, sizeof(st));   // 0.20.1: thrall behaviour state
         Out(line1, sizeof(line1), "%s %ld | %.0f%s%s%s", name, static_cast<LONG>(intro), sqrtf(c.dist2), hp, st,
-            c.grey ? LabelCollectedText() : "");
+            c.grey ? (P5IsReward(c.inst) ? LabelCollectedText() : LabelHiddenText()) : "");   // 0.22.37: hidden != collected
         ImU32 colour = IM_COL32(235, 235, 235, 255);
         LabelTscText(c.inst, line2, sizeof(line2), &colour);
         if (c.grey) colour = IM_COL32(150, 150, 150, 255);   // 0.22.36: [Debug] LabelCollected 1
@@ -7305,8 +7348,12 @@ bool UberNameMatch(const char *name) {
 struct UbCand { DWORD inst, state; float pos[3], dist2; };
 UbCand g_ubCand[33];
 // the nearest uber / matching instances within UberRadius of Lara (count = filled), *found = uber states in the radius
-int UberCollect(UbCand *out, int max, const float *lara, DWORD player, int *found) {
-    const float r2 = g_ubRadius * g_ubRadius;
+// 0.22.37 (owner live 13.11., dlc_watertunnel: UberMatch 'switch,lever' hid the sewer gate puzzle): roomOnly = only
+// instances of Lara's room ([Debug] RoomOnly), radius at least 50000 (the room bounds it), and every _uo_ / _ei_ / _pt_
+// puzzle object of the room besides the uber states and UberMatch
+bool P5PrefixHidden(DWORD inst);             // section "0.22.37 debug view P5"
+int UberCollect(UbCand *out, int max, const float *lara, DWORD player, int *found, bool roomOnly = false) {
+    const float rad = roomOnly && g_ubRadius < 50000.0f ? 50000.0f : g_ubRadius, r2 = rad * rad;
     int count = 0;
     *found = 0;
     DWORD inst = 0;
@@ -7316,15 +7363,20 @@ int UberCollect(UbCand *out, int max, const float *lara, DWORD player, int *foun
         float p[3];
         if (inst != player && ReadFloats(inst + kInstancePosition, p, 3)) {
             const float dx = p[0] - lara[0], dy = p[1] - lara[1], dz = p[2] - lara[2], d2 = dx * dx + dy * dy + dz * dz;
-            if (d2 <= r2) {                  // the radius first: four reads only for instances near Lara
+            if (d2 <= r2 && !(roomOnly && P5RoomOnlyDrops(inst))) {   // the radius first: four reads only near Lara
                 const DWORD b = UberStateOf(inst);
                 bool take = b != 0;
                 if (b) ++*found;
-                else if (g_ubMatch[0]) {
+                else if (g_ubMatch[0] || roomOnly) {
                     DWORD object = 0, oid = 0;
                     char name[64];
-                    take = ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid) &&
-                           ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name)) && UberNameMatch(name);
+                    const bool named = ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid) &&
+                                       ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name));
+                    take = named && g_ubMatch[0] && UberNameMatch(name);
+                    if (named && roomOnly && !take) {
+                        _strlwr_s(name, sizeof(name));
+                        take = (strstr(name, "_uo_") || strstr(name, "_ei_") || strstr(name, "_pt_")) && !P5PrefixHidden(inst);
+                    }
                 }
                 if (take) {
                     int at = count;
@@ -7362,13 +7414,19 @@ void DrawUberLabels() {
     float lara[3];
     if (!ReadDword(kPlayerPtr, &player) || !player || !ReadFloats(player + kInstancePosition, lara, 3)) return;
     const int max = g_ubMax < 1 ? 1 : g_ubMax > 32 ? 32 : g_ubMax;
-    const int count = UberCollect(g_ubCand, max, lara, player, &g_ubFound);
+    if (g_p5RoomOnly) DvUnitsRead();          // 0.22.37: owner units for [Debug] RoomOnly (cheap: the stream table)
+    const int count = UberCollect(g_ubCand, max, lara, player, &g_ubFound, g_p5RoomOnly != 0);
     const bool de = g_qbLang == 0;
     ImDrawList *dl = ImGui::GetForegroundDrawList();
+    int roomDropped = 0, behind = 0;
     for (int i = 0; i < count; ++i) {
         const UbCand &c = g_ubCand[i];
         ImVec2 at;
         if (!Project(v, c.pos, &at)) continue;
+        if (P5RoomOnlyDrops(c.inst)) { ++roomDropped; continue; }   // 0.22.37: only Lara's room
+        const float pa[3] = {c.pos[0], c.pos[1], c.pos[2] + 60.0f};
+        const float occl = P5OcclFactor(c.inst, pa);   // 0.22.37: behind geometry dim / none ([Debug] Occlusion)
+        if (occl <= 0.0f) { ++behind; continue; }
         DWORD object = 0, oid = 0, intro = 0;
         ReadDword(c.inst + 0x10, &object);
         if (object) ReadDword(object + 0x14, &oid);
@@ -7378,7 +7436,17 @@ void DrawUberLabels() {
         strncpy_s(low, sizeof(low), name, _TRUNCATE);
         _strlwr_s(low, sizeof(low));
         const bool gate = strstr(low, "gate") != nullptr;
-        Out(line1, sizeof(line1), "%s %ld | %.0f", name, static_cast<LONG>(intro), sqrtf(c.dist2));
+        const char *readable = P5Readable(name);   // 0.22.37: "Wandschalter (einmalig)", with the node: "Kanaltor, verschlossen"
+        char node[48] = "";
+        if (c.state) {
+            DWORD nodeK = 0;
+            ReadDword(c.state + 0x84, &nodeK);
+            UberNodeName(c.state, static_cast<LONG>(nodeK), node, sizeof(node));
+        }
+        const char *word = node[0] ? P5NodeWord(node) : nullptr;
+        char rd[96] = "";
+        if (readable) Out(rd, sizeof(rd), " (%s%s%s)", readable, word ? ", " : "", word ? word : "");
+        Out(line1, sizeof(line1), "%s %ld%s | %.0f", name, static_cast<LONG>(intro), rd, sqrtf(c.dist2));
         if (!c.state) Out(line2, sizeof(line2), "%s", de ? "(kein Uber-Zustand)" : "(no uber state)");
         else if (!UberIsGoo(oid) || !UberGooText(c.state, de, line2, sizeof(line2)))   // 0.21.9 goo drips first
             UberText(c.state, gate, de, line2, sizeof(line2));
@@ -7387,11 +7455,11 @@ void DrawUberLabels() {
             Out(t, sizeof(t), "%s: %s", de ? "Tor" : "Gate", line2);
             strncpy_s(line2, sizeof(line2), t, _TRUNCATE);
         }
-        LabelDraw(dl, at, line1, line2, c.state ? IM_COL32(255, 210, 90, 255) : IM_COL32(200, 200, 200, 255));
+        LabelDraw(dl, at, line1, line2, c.state ? IM_COL32(255, 210, 90, 255) : IM_COL32(200, 200, 200, 255), occl);
         ++g_ubShown;
     }
-    Out(g_ubState, sizeof(g_ubState), "%d shown, %d uber states in %.0f units (UberMatch '%s')", g_ubShown, g_ubFound,
-        g_ubRadius, g_ubMatch);
+    Out(g_ubState, sizeof(g_ubState), "%d shown, %d uber states in %.0f units (UberMatch '%s'); 0.22.37: %d outside Lara's "
+        "room (RoomOnly), %d behind geometry hidden", g_ubShown, g_ubFound, g_ubRadius, g_ubMatch, roomDropped, behind);
 }
 void ValUber(char *o, size_t n) { Out(o, n, "%ld (%s)", g_ubOn, g_ubState); }
 bool RunUber(const char *arg, char *o, size_t n) {
@@ -8789,6 +8857,7 @@ enum DvLayer {
     kDvDeath = 0, kDvFire, kDvCheckpoint, kDvWater, kDvSound, kDvVolume, kDvPlane, kDvUnknown, kDvKinds,
     kDvPortals = kDvKinds, kDvCheckpoints, kDvTrgLabels, kDvLegend, kDvNames, kDvSlide, kDvEnemyColl,
     kDvCollect, kDvEnemies,                  // 0.20: collectibles / enemies (section "0.20 collectibles")
+    kDvKeyItems,                             // 0.22.37: key items, targets, switches, doors (section "0.22.37 debug view P5")
     kDvCount
 };
 // 0.17 brief: the legend's short English term (owner wish 2026-11-06 after the 0.16 live run: the legend was too long -
@@ -8812,6 +8881,7 @@ const DvLayerDef kDvLayers[kDvCount] = {
     {"enemycoll", "EnemyColl", "Gegner-Kollision", "enemy-only collision", IM_COL32(190, 80, 255, 255), "Enemy collision"},
     {"collect", "Collect", "Sammelgegenst\303\244nde", "collectibles", IM_COL32(255, 210, 40, 255), "Collectibles"},
     {"enemies", "Enemies", "Gegner", "enemies", IM_COL32(255, 90, 90, 255), "Enemies"},
+    {"keyitems", "KeyItems", "Schl\303\274sselgegenst\303\244nde", "key items", IM_COL32(255, 240, 120, 255), "Key items"},
 };
 float g_m20Radius = 15000.0f;                // 0.20 [Debug] MarkRadius (collectibles / enemies, from the camera)
 int g_m20Max = 24;                           // 0.20 [Debug] MarkMax (per layer and frame)// object name part -> kind (first match wins, so "deathfiretriggervolume" is death)
@@ -8904,9 +8974,11 @@ void DebugViewCheck() {
 // the check a layer needs (true = usable)
 bool RcLayerOk(const char **why);            // 0.15, below: the collision overlay checks (precheck_015.txt 4 .. 6)
 bool M20LayerOk(int layer, const char **why);   // 0.20, below: collectibles / enemies
+bool P5LayerOk(const char **why);            // 0.22.37, below: key items
 bool DvLayerOk(int layer, const char **why) {
     if (layer == kDvSlide || layer == kDvEnemyColl) return RcLayerOk(why);
     if (layer == kDvCollect || layer == kDvEnemies) return M20LayerOk(layer, why);
+    if (layer == kDvKeyItems) return P5LayerOk(why);
     bool ok = layer < kDvKinds || layer == kDvTrgLabels ? g_dvTrgOk : layer == kDvPortals ? g_dvPortalOk
             : layer == kDvCheckpoints ? g_dvCpOk : layer == kDvNames ? g_dvBaseOk : true;
     *why = layer < kDvKinds || layer == kDvTrgLabels ? g_dvTrgWhy : layer == kDvPortals ? g_dvPortalWhy
@@ -9014,6 +9086,31 @@ bool DvCamToScreen(const DvCam &c, const float *q, ImVec2 *out) {
     out->y = y;
     return true;
 }
+// 0.22.37 (P5), section "0.22.37 debug view P5" below: symbols, style per layer, room names, draw distance, occlusion,
+// co_ / fx_ filter, key items layer (dbg.keyitems), reward bits
+enum P5Sym { kSymArtifact = 0, kSymTreasure, kSymRelic, kSymJar, kSymMedipack, kSymSwitch, kSymDoor, kSymKeyItem,
+             kSymTarget, kSymGrapple, kSymCheckpoint, kSymPortal, kSymCount };
+enum { kStyleName = 0, kStyleSymbol = 1, kStyleBoth = 2 };
+extern int g_p5Style[];                      // per debug view layer ([Debug] Style*)
+extern int g_p5Room, g_p5Metres, g_p5Occl, g_p5HideCo, g_p5HideFx;
+extern float g_p5Cap;                        // this frame's draw distance cap (0 = none)
+extern int g_p5SymDrawn[kSymCount];          // symbols drawn this frame (legend)
+void P5DrawSymbol(ImDrawList *dl, int sym, ImVec2 c, float s, ImU32 col);
+float P5Radius(float r);                     // min(r, draw distance of Lara's area)
+float P5OcclFactor(DWORD key, const float *p);   // 1 visible / unknown, dim factor or 0 when hidden behind geometry
+ImU32 P5Fade(ImU32 c, float a);
+bool P5ShowSym(int layer);
+bool P5ShowName(int layer);
+const char *P5RoomName(const char *unit);    // readable room name (bar language) or nullptr
+const char *DvOwnerUnitAny(DWORD inst);      // below (0.16 owner units): the owner unit also when it is Lara's
+int P5SymOfName(const char *name);           // object name -> symbol (-1 none)
+int P5SymOfCollect(int kind, DWORD rewardIndex);   // 0.20 collectible kind (+ reward table) -> symbol
+int P5Collected(DWORD inst);                 // 1 = the game's reward bit of the instance's reward index is set
+void P5FrameBegin();                         // DrawDebugView: cap, probes of the last frame into the depth buffer
+void P5KeyDraw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_t *used);   // dbg.keyitems
+void P5KeyLabels(ImDrawList *dl);
+int P5LegendRows(char (*lines)[112], char (*counts)[24], ImU32 *colours, bool *square, int *sym, int n, int max);
+void P5MenuControls(char *o, size_t n);      // menu page Debug view, group Object names
 // ---- 0.16 readability (owner feedback 2026-11-06 from the first live run in the Croft Manor prologue) ----
 // Workspace docs\Befund-TruMenu-Lesbarkeit-0611.md; the new byte checks are pinned in work\asi\menu016\precheck_016.txt.
 // Style: every 0.14 / 0.15 overlay colour goes through DvTint - [Debug] LineAlpha (global opacity), LineBright
@@ -9082,7 +9179,11 @@ ImU32 DvFillTint(ImU32 colour, float dist2, float extra) {
 struct DpLine { float a[3], b[3]; ImU32 colour; float thick; int dashed; };
 struct DpTri { float v[3][3]; ImU32 colour; };
 const int kDpLineMax = 16384, kDpTriMax = 16384;
-struct DpBuf { LONG frame; int lines, tris, dropped; DpLine line[kDpLineMax]; DpTri tri[kDpTriMax]; };
+// 0.22.37 (P5 occlusion): label anchors tested against the scene depth with D3D9 occlusion queries (section P5)
+struct DpProbe { float p[3]; DWORD key; };
+const int kDpProbeMax = 96;
+struct DpBuf { LONG frame; int lines, tris, dropped; DpLine line[kDpLineMax]; DpTri tri[kDpTriMax]; int probes;
+               DpProbe probe[kDpProbeMax]; };
 DpBuf g_dpBuf[3];
 volatile LONG g_dpPub = -1, g_dpRead = -1;   // published buffer / the one the scene hook reads (-1 none)
 DpBuf *g_dpFill = nullptr;                   // Present: the buffer DrawDebugView fills now (nullptr = ImGui path)
@@ -9337,7 +9438,7 @@ void DvCollect(const DvCam &c, bool planes, DvCount *k) {
         t.extent = !known ? 60.0f : planes ? sqrtf(t.ext[0] * t.ext[0] + t.ext[2] * t.ext[2])
                  : t.shape == 2 ? fabsf(t.radius) : sqrtf(t.ext[0] * t.ext[0] + t.ext[1] * t.ext[1] + t.ext[2] * t.ext[2]);
         if (!DvVisible(c, t.pos, t.extent, &t.dist2)) { ++k->behind; continue; }
-        if (t.dist2 > g_dvRadius * g_dvRadius) { ++k->far_; continue; }
+        if (t.dist2 > P5Radius(g_dvRadius) * P5Radius(g_dvRadius)) { ++k->far_; continue; }   // 0.22.37: per area
         DvTrigInsert(t);
     }
 }
@@ -9469,6 +9570,7 @@ struct DvTag {
     LONG idMin, idMax;                       // intro ids (triggers), -1 = text only
     char full[96], brief[48], sufFull[24], sufBrief[16];
     char unit[40];                           // owner unit when it is not Lara's ("" = Lara's / unknown)
+    int sym, layer;                          // 0.22.37: symbol (-1 none) and debug view layer (style per layer)
 };
 // 0.16 (live finding 2026-11-06: a fire volume of a neighbour unit looked near, was ~6100 units away): every label
 // shows the distance to Lara (+0x20) and the height difference in game units, and the owner unit of the instance
@@ -9537,20 +9639,40 @@ const char *DvOwnerUnit(DWORD inst) {
             return DvIsLaraUnit(g_dvUnits[i].name) ? "" : g_dvUnits[i].name;
     return "";
 }
-// " 6100u v1500u [mansion_exterior_afterburn]": distance to Lara, height (^ above / v below, from 50 units), owner unit
-void DvDistText(const float *p, const char *unit, char *o, size_t n) {
+// the owner unit's name of an instance, also when it is Lara's (0.22.37: rooms always), "" = unknown
+const char *DvOwnerUnitAny(DWORD inst) {
+    DWORD intro = 0;
+    if (!g_dvUnitN || !ReadDword(inst + 0x100, &intro) || !intro) return "";
+    for (int i = 0; i < g_dvUnitN; ++i)
+        if (intro >= g_dvUnits[i].lo && intro < g_dvUnits[i].hi) return g_dvUnits[i].name;
+    return "";
+}
+// " 6100u v1500u [mansion_exterior_afterburn]": distance to Lara, height (^ above / v below, from 50 units), owner unit;
+// 0.22.37 (P5): [Debug] DistMetres 1 = " 61.0m v15.0m" (100 units = 1 m); [Debug] LabelRoom 1 = the readable room name
+// (P5RoomName, bar language; fallback the unit name) - and with always = true (collectibles, key items, object names)
+// the room also when it is Lara's own unit
+void DvDistText(const float *p, const char *unit, char *o, size_t n, bool always = false) {
     size_t used = 0;
     o[0] = 0;
     if (g_dvLaraPosOk) {
         float dx = p[0] - g_dvLaraPos[0], dy = p[1] - g_dvLaraPos[1], dz = p[2] - g_dvLaraPos[2];
-        LONG d = static_cast<LONG>(sqrtf(dx * dx + dy * dy + dz * dz) / 10.0f + 0.5f) * 10;
-        LabelAdd(o, n, &used, " %ldu", d);
-        if (fabsf(dz) >= 50.0f) LabelAdd(o, n, &used, " %c%ldu", dz > 0.0f ? '^' : 'v',
-                                         static_cast<LONG>(fabsf(dz) / 10.0f + 0.5f) * 10);
+        const float dist = sqrtf(dx * dx + dy * dy + dz * dz);
+        if (g_p5Metres) {
+            LabelAdd(o, n, &used, " %.1fm", static_cast<double>(dist / 100.0f));
+            if (fabsf(dz) >= 50.0f) LabelAdd(o, n, &used, " %c%.1fm", dz > 0.0f ? '^' : 'v', static_cast<double>(fabsf(dz) / 100.0f));
+        } else {
+            LONG d = static_cast<LONG>(dist / 10.0f + 0.5f) * 10;
+            LabelAdd(o, n, &used, " %ldu", d);
+            if (fabsf(dz) >= 50.0f) LabelAdd(o, n, &used, " %c%ldu", dz > 0.0f ? '^' : 'v',
+                                             static_cast<LONG>(fabsf(dz) / 10.0f + 0.5f) * 10);
+        }
     }
     const char *lara = g_dvLaraUnit[0] ? g_dvLaraUnit : g_dvLaraUnit2;   // 0.18: case-insensitive, second name
-    if (unit && unit[0] && !DvIsLaraUnit(unit))
-        LabelAdd(o, n, &used, " [%s]", unit + (lara[0] ? DvCommonPrefix(unit, lara) : 0));
+    const bool other = unit && unit[0] && !DvIsLaraUnit(unit);
+    if (!other && !(always && g_p5Room && unit && unit[0])) return;
+    const char *room = g_p5Room ? P5RoomName(unit) : nullptr;
+    if (room) LabelAdd(o, n, &used, " [%s]", room);
+    else LabelAdd(o, n, &used, " [%s]", unit + (lara[0] && other ? DvCommonPrefix(unit, lara) : 0));
 }
 const int kDvTagMax = 160;
 DvTag g_dvTag[kDvTagMax];
@@ -9575,9 +9697,11 @@ void DvRectTake(const DvRect &r) {
 }
 // one label candidate: full / brief text (+ suffixes appended after the id), merge kind and intro id (triggers)
 void DvTagAdd(ImVec2 at, float dist2, const float *centre, ImU32 colour, int kind, LONG id, const char *full,
-              const char *brief, const char *sufFull, const char *sufBrief, const char *unit) {
+              const char *brief, const char *sufFull, const char *sufBrief, const char *unit, int sym = -1, int layer = -1) {
     if (g_dvTagN >= kDvTagMax) return;
     DvTag &t = g_dvTag[g_dvTagN++];
+    t.sym = sym;                             // 0.22.37: checkpoint / portal symbol, the layer's style decides
+    t.layer = layer;
     strncpy_s(t.unit, sizeof(t.unit), unit ? unit : "", _TRUNCATE);
     t.at = at;
     t.dist2 = dist2;
@@ -9656,6 +9780,17 @@ void DvTagsDraw(ImDrawList *dl) {
         // 0.17 (live 2026-11-06: off-screen boxes had their labels pinned to the screen edges): a label whose anchor is
         // outside the screen is skipped; an anchor on screen still keeps its box inside the screen (clamp below)
         if (!(t.at.x >= 0.0f && t.at.x <= ds.x && t.at.y >= 0.0f && t.at.y <= ds.y)) { ++g_dvTagOff; continue; }
+        // 0.22.37 (P5): occlusion (the anchor behind geometry: dim / none) and the symbol of a checkpoint / portal tag
+        const float occl = P5OcclFactor(0x80000000u ^ (static_cast<DWORD>(static_cast<LONG>(t.centre[0])) * 73856093u) ^
+                                        (static_cast<DWORD>(static_cast<LONG>(t.centre[1])) * 19349663u) ^
+                                        (static_cast<DWORD>(static_cast<LONG>(t.centre[2])) * 83492791u), t.centre);
+        if (occl <= 0.0f) { ++g_dvTagSkipped; continue; }
+        const bool symOn = t.sym >= 0 && t.layer >= 0 && P5ShowSym(t.layer);
+        if (symOn) {
+            P5DrawSymbol(dl, t.sym, t.at, fs * 0.55f, P5Fade(t.colour | 0xff000000u, occl));
+            ++g_p5SymDrawn[t.sym];
+            if (!P5ShowName(t.layer)) { ++g_dvTagShown; first = false; continue; }   // symbol only
+        }
         bool full = !g_dvShort || first || i == aim;
         first = false;
         char text[160], dist[64];
@@ -9684,10 +9819,10 @@ void DvTagsDraw(ImDrawList *dl) {
         if (!placed) { ++g_dvTagSkipped; continue; }
         DvRectTake(pick);
         ImU32 lead = (t.colour & 0x00ffffff) | (170u << 24);
-        dl->AddLine(ImVec2(t.at.x, pick.y1 < t.at.y ? pick.y1 : pick.y0), t.at, lead, 1.2f);
-        dl->AddCircleFilled(t.at, 2.5f, t.colour, 8);
-        dl->AddRectFilled(ImVec2(pick.x0, pick.y0), ImVec2(pick.x1, pick.y1), IM_COL32(0, 0, 0, 170), 3.0f);
-        dl->AddText(ImVec2(pick.x0 + 4.0f, pick.y0 + 2.0f), t.colour | 0xff000000u, text);
+        dl->AddLine(ImVec2(t.at.x, pick.y1 < t.at.y ? pick.y1 : pick.y0), t.at, P5Fade(lead, occl), 1.2f);
+        if (!symOn) dl->AddCircleFilled(t.at, 2.5f, P5Fade(t.colour, occl), 8);
+        dl->AddRectFilled(ImVec2(pick.x0, pick.y0), ImVec2(pick.x1, pick.y1), P5Fade(IM_COL32(0, 0, 0, 170), occl), 3.0f);
+        dl->AddText(ImVec2(pick.x0 + 4.0f, pick.y0 + 2.0f), P5Fade(t.colour | 0xff000000u, occl), text);
         ++g_dvTagShown;
         if (t.kind >= 0 && t.kind < kDvKinds) ++g_dvTagTrg;
     }
@@ -9739,8 +9874,8 @@ DvName g_dvNames[65];
 // flying), at most [Debug] NameMax within NameRadius; text size NameScale, colour NameColour. 0.22.36: the 0.21
 // collected / hidden check and Lara's gear as dbg.labels (LabelFilter; [Debug] LabelCollected / LabelLaraGear)
 void DvDrawNames(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_t *used) {
-    int count = 0, found = 0, walked = 0, hidden = 0, gear = 0, greyN = 0;
-    const float r2 = g_dvNameRadius * g_dvNameRadius;
+    int count = 0, found = 0, walked = 0, hidden = 0, gear = 0, greyN = 0, prefix = 0, occluded = 0, symN = 0;
+    const float rad = P5Radius(g_dvNameRadius), r2 = rad * rad;   // 0.22.37: draw distance per area
     DWORD inst = 0, player = 0;
     ReadDword(kPlayerPtr, &player);
     ReadDword(kFirstInstance, &inst);
@@ -9761,6 +9896,7 @@ void DvDrawNames(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, 
             const int rule = hit ? LabelFilter("dbg.names", inst, player, &reason) : 0;
             if (rule == 2) { ++hidden; hit = false; }
             else if (rule == 3) { ++gear; hit = false; }
+            else if (rule == 4) { ++prefix; hit = false; }   // 0.22.37: co_ / fx_ ([Debug] HideCo / HideFx)
             if (hit) {
                 ++found;
                 if (DvVisible(c, p, 100.0f, &d2) && d2 <= r2) {
@@ -9798,18 +9934,33 @@ void DvDrawNames(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, 
         if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
         ReadDword(d.inst + 0x58, &intro);
         char dist[64];                        // 0.16: distance / height to Lara, owner unit when not Lara's
-        DvDistText(d.pos, DvOwnerUnit(d.inst), dist, sizeof(dist));
-        const char *tail = d.grey ? LabelCollectedText() : "";   // 0.22.36: [Debug] LabelCollected 1
-        if (g_dvNameIds) Out(line, sizeof(line), "%s %ld%s%s", name, static_cast<LONG>(intro), dist, tail);
-        else Out(line, sizeof(line), "%s%s%s", name, dist, tail);
-        const ImU32 col = d.grey ? IM_COL32(150, 150, 150, 255) : colour;
+        DvDistText(d.pos, DvOwnerUnitAny(d.inst), dist, sizeof(dist), true);   // 0.22.37: room always (LabelRoom)
+        // 0.22.36: [Debug] LabelCollected 1; 0.22.37: "eingesammelt" only for a real collectible, else "versteckt"
+        const char *tail = d.grey ? (P5IsReward(d.inst) ? LabelCollectedText() : LabelHiddenText()) : "";
+        const char *readable = P5Readable(name);   // 0.22.37: "Wandschalter (einmalig)" (kP5Readable)
+        char rd[64] = "";
+        if (readable) Out(rd, sizeof(rd), " (%s)", readable);
+        if (g_dvNameIds) Out(line, sizeof(line), "%s %ld%s%s%s", name, static_cast<LONG>(intro), rd, dist, tail);
+        else Out(line, sizeof(line), "%s%s%s%s", name, rd, dist, tail);
+        // 0.22.37 (P5): behind geometry dim / none ([Debug] Occlusion), symbol by the object name ([Debug] StyleNames)
+        const float pa[3] = {d.pos[0], d.pos[1], d.pos[2] + 60.0f};
+        const float occl = P5OcclFactor(d.inst, pa);
+        if (occl <= 0.0f) { ++occluded; continue; }
+        const ImU32 col = P5Fade(d.grey ? IM_COL32(150, 150, 150, 255) : colour, occl);
+        const int sym = P5ShowSym(kDvNames) ? P5SymOfName(name) : -1;
+        if (sym >= 0) {
+            P5DrawSymbol(dl, sym, at, size * 0.55f, col);
+            ++g_p5SymDrawn[sym];
+            ++symN;
+            if (!P5ShowName(kDvNames)) { if (d.grey) ++greyN; ++drawn; continue; }   // symbol only
+        }
         ImVec2 s = font->CalcTextSizeA(size, FLT_MAX, 0.0f, line);
-        ImVec2 box(at.x - s.x * 0.5f - 3.0f, at.y - s.y - 8.0f);
+        ImVec2 box(at.x - s.x * 0.5f - 3.0f, at.y - s.y - 8.0f - (sym >= 0 ? size * 0.5f : 0.0f));
         const DvRect r = {box.x, box.y, box.x + s.x + 6.0f, box.y + s.y + 2.0f};
         if (!DvRectFree(r)) { ++skipped; continue; }   // 0.16: no name over a label / another name / the legend
         DvRectTake(r);
-        dl->AddRectFilled(box, ImVec2(box.x + s.x + 6.0f, box.y + s.y + 2.0f), IM_COL32(0, 0, 0, 165), 3.0f);
-        dl->AddCircleFilled(at, 2.5f, col, 8);
+        dl->AddRectFilled(box, ImVec2(box.x + s.x + 6.0f, box.y + s.y + 2.0f), P5Fade(IM_COL32(0, 0, 0, 165), occl), 3.0f);
+        if (sym < 0) dl->AddCircleFilled(at, 2.5f, col, 8);
         dl->AddText(font, size, ImVec2(box.x + 3.0f, box.y + 1.0f), col, line);
         if (d.grey) ++greyN;
         ++drawn;
@@ -9817,8 +9968,9 @@ void DvDrawNames(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, 
     g_dvListed[kDvNames] = found;
     g_dvDrawn[kDvNames] = drawn;
     LabelAdd(state, stateSize, used, "names %d drawn of %d matching '%s' (%d instances, radius %.0f, max %d, %d skipped: "
-             "overlap; 0.22.36: %d grey, %d collected / hidden + %d gear without label); ", drawn, found,
-             g_dvNameMatch[0] ? g_dvNameMatch : "*", walked, g_dvNameRadius, g_dvNameMax, skipped, greyN, hidden, gear);
+             "overlap; 0.22.36: %d grey, %d collected / hidden + %d gear without label; 0.22.37: %d co_ / fx_ hidden, %d "
+             "behind geometry hidden, %d symbols); ", drawn, found, g_dvNameMatch[0] ? g_dvNameMatch : "*", walked, rad,
+             g_dvNameMax, skipped, greyN, hidden, gear, prefix, occluded, symN);
 }
 
 // 0.15, below: the collision overlay (stage R2) - slide faces / enemy-only collision groups of the loaded units
@@ -9872,6 +10024,7 @@ void DrawDebugView() {
         g_dvTestPt[2] += kDvTestLift;
     }
     DvUnitsRead();                           // 0.16: owner units of the labelled instances
+    P5FrameBegin();                          // 0.22.37: draw distance of Lara's area, last frame's occlusion probes
     // triggers
     DvCount k = {};
     g_dvTrigCount = 0;
@@ -9985,7 +10138,7 @@ void DrawDebugView() {
                 if (DvCamToScreen(c, cq, &at)) {     // 0.16: a label candidate (short: "-> main_bedroom")
                     Out(full, sizeof(full), "%s -> %s", unit, name);
                     Out(brief, sizeof(brief), "-> %s", name + DvCommonPrefix(unit, name));
-                    DvTagAdd(at, dist2, centre, base, kDvPortals, -1, full, brief, "", "", "");
+                    DvTagAdd(at, dist2, centre, base, kDvPortals, -1, full, brief, "", "", "", kSymPortal, kDvPortals);
                 }
             }
         }
@@ -10074,7 +10227,8 @@ void DrawDebugView() {
             if (DvCamToScreen(c, q, &at)) {      // 0.16: a label candidate
                 char line[64];
                 Out(line, sizeof(line), "CP %ld%s", static_cast<LONG>(intro), isActive ? " ACTIVE" : "");
-                DvTagAdd(at, m.dist2, m.pos, base, -1, -1, line, line, "", "", DvOwnerUnit(m.inst));
+                DvTagAdd(at, m.dist2, m.pos, base, -1, -1, line, line, "", "", DvOwnerUnit(m.inst), kSymCheckpoint,
+                         kDvCheckpoints);   // 0.22.37: checkpoint symbol
             }
             if (isActive) ++activeSeen;
         }
@@ -10086,6 +10240,7 @@ void DrawDebugView() {
     }
     if (g_dvOn[kDvSlide] || g_dvOn[kDvEnemyColl]) RcDraw(dl, c, g_dvState, sizeof(g_dvState), &used);   // 0.15 R2
     if (g_dvOn[kDvCollect] || g_dvOn[kDvEnemies]) M20Draw(dl, c, g_dvState, sizeof(g_dvState), &used);   // 0.20
+    if (g_dvOn[kDvKeyItems]) P5KeyDraw(dl, c, g_dvState, sizeof(g_dvState), &used);   // 0.22.37 key items + links
     // 0.16: the world buffer is complete - the scene hook draws it inside the next frame; labels stay on top (ImGui)
     DWORD sinkDrop = 0;
     if (g_dpFill) {
@@ -10095,6 +10250,7 @@ void DrawDebugView() {
     g_dpFill = nullptr;
     DvTagsDraw(dl);                          // trigger / portal / checkpoint labels: nearest first, no overlap
     M20Labels(dl);                           // 0.20: collectible / enemy labels (only what M20Draw left this frame)
+    if (g_dvOn[kDvKeyItems]) P5KeyLabels(dl);   // 0.22.37: key item labels (only what P5KeyDraw left this frame)
     g_dvListed[kDvTrgLabels] = labels;
     g_dvDrawn[kDvTrgLabels] = g_dvTagTrg;
     if (g_dvTagN) LabelAdd(g_dvState, sizeof(g_dvState), &used, "labels %d shown of %d candidates (%d merged, %d skipped: "
@@ -10117,10 +10273,12 @@ void DrawDebugLegend() {
     ImGuiIO &io = ImGui::GetIO();
     ImDrawList *dl = ImGui::GetForegroundDrawList();
     const float fs = ImGui::GetFontSize(), pad = 8.0f, sq = 11.0f, gap = 14.0f, rowH = fs + 3.0f;
-    const int kRows = kDvCount + 26;         // 0.20: + up to 13 kind rows of collectibles / enemies
+    const int kRows = kDvCount + 26 + kSymCount;   // 0.20: + up to 13 kind rows; 0.22.37: + the symbol rows
     char lines[kRows][112], counts[kRows][24];
     ImU32 colours[kRows];
     bool square[kRows];
+    int sym[kRows];                          // 0.22.37: >= 0 = this symbol instead of the colour square
+    for (int i = 0; i < kRows; ++i) sym[i] = -1;
     int n = 0;
     // 0.17 (owner, live 2026-11-06): short English terms only, no explanations - the counts and squares stay
     Out(lines[n], sizeof(lines[n]), "Debug view");
@@ -10135,7 +10293,8 @@ void DrawDebugLegend() {
         colours[n] = kDvLayers[i].colour;
         square[n++] = true;
     }
-    n = M20Legend(lines, counts, colours, square, n, kRows - 12);   // 0.20: the kinds seen (keeps 12 rows for the rest)
+    n = M20Legend(lines, counts, colours, square, n, kRows - 12 - kSymCount);   // 0.20: the kinds seen (12 rows for the rest)
+    n = P5LegendRows(lines, counts, colours, square, sym, n, kRows - 12);   // 0.22.37: the symbols drawn this frame
     if (DvAnyTrigger()) {
         Out(lines[n], sizeof(lines[n]), "Test point");
         counts[n][0] = 0;
@@ -10208,8 +10367,10 @@ void DrawDebugLegend() {
         dl->PopClipRect();
         if (counts[i][0]) dl->AddText(ImVec2(countRight - ImGui::CalcTextSize(counts[i]).x, y), colours[i] | 0xff000000u,
                                       counts[i]);
-        if (square[i]) dl->AddRectFilled(ImVec2(sqX, y + (fs - sq) * 0.5f + 1.0f), ImVec2(sqX + sq, y + (fs + sq) * 0.5f + 1.0f),
-                                         colours[i] | 0xff000000u, 2.0f);
+        if (sym[i] >= 0) P5DrawSymbol(dl, sym[i], ImVec2(sqX + sq * 0.5f, y + fs * 0.5f + 1.0f), sq * 0.6f,
+                                      colours[i] | 0xff000000u);   // 0.22.37: the symbol explained in this row
+        else if (square[i]) dl->AddRectFilled(ImVec2(sqX, y + (fs - sq) * 0.5f + 1.0f), ImVec2(sqX + sq, y + (fs + sq) * 0.5f + 1.0f),
+                                              colours[i] | 0xff000000u, 2.0f);
     }
 }
 
@@ -10237,7 +10398,7 @@ bool RunDvShow(const char *arg, char *o, size_t n) {
     int i = DvFind(name);
     if (i < 0) {
         Out(o, n, "usage: dbg.show <layer> [0|1] - death, fire, checkpoint, water, sound, volume, plane, unknown, portals, "
-            "checkpoints, trglabels, legend, names, slide, enemycoll, collect, enemies");
+            "checkpoints, trglabels, legend, names, slide, enemycoll, collect, enemies, keyitems");
         return false;
     }
     return DvSet(i, BoolArg(value ? value : "", g_dvOn[i] != 0), ShotSource("dbg.show"), o, n);
@@ -11586,6 +11747,7 @@ void DpBeginFill() {
     DpBuf &b = g_dpBuf[w];
     b.frame = g_dpFrame;
     b.lines = b.tris = b.dropped = 0;
+    b.probes = 0;                             // 0.22.37
     g_dpFillIndex = w;
     g_dpFill = &b;
 }
@@ -11740,6 +11902,8 @@ bool DpMapping(DWORD scene, const DvCam &c, char *why, size_t n) {
     }
     return false;                            // why = the last candidate's projection reason
 }
+void P5OcclIssue(IDirect3DDevice9 *dev, const DvCam &c, const DpBuf &b);   // 0.22.37 occlusion (section P5)
+void P5OcclRelease();
 bool DpVbReady(IDirect3DDevice9 *dev) {
     if (g_dpVb && g_dpVbDevice == dev) return true;
     if (g_dpVb) {
@@ -11762,6 +11926,7 @@ bool DpVbReady(IDirect3DDevice9 *dev) {
 }
 // Reset hook (before the game's Reset): the vertex buffer goes, the next depth frame creates it again
 void DpOnReset() {
+    P5OcclRelease();                          // 0.22.37: the occlusion queries go with the vertex buffer
     if (g_dpVb) {
         g_dpVb->Release();
         g_dpVb = nullptr;
@@ -11925,6 +12090,7 @@ void DpDrawBuffer(IDirect3DDevice9 *dev, const DvCam &c, const DpBuf &b, UINT w,
     for (int i = 0; i < b.tris; ++i) DpTriDraw(dev, c, b.tri[i]);       // faces first, the lines over them
     for (int i = 0; i < b.lines; ++i) DpLineDraw(dev, c, b.line[i], fw, fh);
     DpFlush(dev);
+    P5OcclIssue(dev, c, b);                   // 0.22.37: label anchors against the depth (no colour), states put back below
     sb->Apply();
     sb->Release();
     ++g_dpNow.drawn;
@@ -12051,7 +12217,7 @@ void DpSceneEnd(void *self) {
         InterlockedExchange(&g_dpRead, p);
         if (g_dpPub == p) break;
     }
-    if (p >= 0 && p <= 2 && frame - g_dpBuf[p].frame <= 3 && (g_dpBuf[p].lines || g_dpBuf[p].tris))
+    if (p >= 0 && p <= 2 && frame - g_dpBuf[p].frame <= 3 && (g_dpBuf[p].lines || g_dpBuf[p].tris || g_dpBuf[p].probes))
         DpDrawBuffer(dev, c, g_dpBuf[p], rd.Width, rd.Height);
     InterlockedExchange(&g_dpRead, -1);
 }
@@ -12480,6 +12646,7 @@ void PageDebugView() {
             ImGui::TextDisabled("(names + Thrall-Labels; last frame: %d / %d grey, %d collected / hidden, %d gear without "
                                 "label; gear check %s)", g_lblGreyN, g_lblShown, g_lblHidden, g_lblGearN, g_lgWhy);
         }
+        P5MenuControls(o, sizeof(o));        // 0.22.37: key items, styles, room, metres, draw distance, occlusion, co_ / fx_
         static char filter[sizeof(g_dvNameMatch)] = "";
         static bool filterInit = false;
         if (!filterInit) { strncpy_s(filter, sizeof(filter), g_dvNameMatch[0] ? g_dvNameMatch : "*", _TRUNCATE); filterInit = true; }
@@ -15736,6 +15903,10 @@ struct M20Mark {
     float top[3];
     DWORD childIntro;                        // 0.21: the placed intro this runtime child carries (0 = placed / none)
     float hp, hpMax;                         // 0.21.1: the health bar (hpMax <= 0 = none)
+    int sym;                                 // 0.22.37: symbol of a collectible (-1 none: enemies)
+    int layer;                               // 0.22.37: whose style decides (kDvCollect, kDvKeyItems)
+    bool grey;                               // 0.22.37: collected (reward bit) and [Debug] LabelCollected 1
+    char tag[16];                            // 0.22.37: short text next to the symbol in symbol-only mode ("#17")
 };
 M20Mark g_coMarks[65], g_enMarks[65];
 int LfNotDrawn(DWORD inst);                  // 0.21 labels, section "0.21 arachnophobia"
@@ -15747,7 +15918,8 @@ int g_coN = 0, g_enN = 0, g_coKindN[kCoKinds] = {}, g_enKindN[kEnKinds] = {};
 bool g_m20Fresh = false;                     // M20Draw ran this frame (M20Labels draws only then)
 DvCam g_m20Cam;                              // .. with this camera
 bool M20EnemiesOn() { return g_dvOn[kDvEnemies] != 0; }
-int M20Insert(M20Mark *arr, int count, DWORD inst, const float *p, float d2, int kind, DWORD childIntro = 0) {
+int M20Insert(M20Mark *arr, int count, DWORD inst, const float *p, float d2, int kind, DWORD childIntro = 0,
+              bool grey = false) {
     const int max = g_m20Max < 1 ? 1 : g_m20Max > 64 ? 64 : g_m20Max;
     int at = count;
     while (at > 0 && arr[at - 1].dist2 > d2) --at;
@@ -15760,6 +15932,10 @@ int M20Insert(M20Mark *arr, int count, DWORD inst, const float *p, float d2, int
     m.dist2 = d2;
     m.kind = kind;
     m.childIntro = childIntro;
+    m.sym = -1;                              // 0.22.37
+    m.layer = kDvCollect;
+    m.grey = grey;
+    m.tag[0] = 0;
     return count < max ? count + 1 : count;
 }
 // the reward index of a collectible / container: intro data +0x30 (0 = none / not readable)
@@ -15799,11 +15975,11 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
     DWORD player = 0, inst = 0;
     ReadDword(kPlayerPtr, &player);
     ReadDword(kFirstInstance, &inst);
-    const float r2 = g_m20Radius * g_m20Radius;
+    const float mrad = P5Radius(g_m20Radius), r2 = mrad * mrad;   // 0.22.37: draw distance per area
     // 0.21: the placed intros of the collectibles in this walk (a runtime child carrying one of them gets no label)
     static DWORD placedIntro[256];
     static int placedKind[256];
-    int placedN = 0, hidden = 0, dup = 0;
+    int placedN = 0, hidden = 0, dup = 0, bits = 0;
     for (int guard = 0; inst && guard < 4096; ++guard, ++walked) {
         DWORD next = 0, object = 0, oid = 0;
         float p[3], d2 = 0.0f;
@@ -15815,20 +15991,24 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
             if (ck >= 0) {
                 bool placed = true;
                 const DWORD intro = LfIntro(inst, &placed);
-                if (LfNotDrawn(inst)) {      // 0.21: picked up / hidden / being removed: no label, not counted
+                // 0.22.37 (P5): the game's own "collected" = the reward bit of the index (P5Collected); collected ones
+                // follow [Debug] LabelCollected (0 none, 1 grey) - a hidden instance without the bit stays out (0.21)
+                const int bit = P5Collected(inst), nd = LfNotDrawn(inst);
+                if (bit) ++bits;
+                if ((nd && !bit) || (bit && !g_lblCollected)) {   // 0.21: picked up / hidden / removed: no label
                     ++hidden;
                 } else {
                     // 0.21.1 (live 2026-11-07, DLC 1 pot without a label: the placed instance was the hidden template,
                     // the drawn one its runtime copy): only a DRAWN placed instance suppresses its copies - of template
                     // and copy the one the game draws gets the label
-                    if (intro && placed && placedN < 256) {
+                    if (intro && placed && !nd && placedN < 256) {
                         placedIntro[placedN] = intro;
                         placedKind[placedN++] = ck;
                     }
                     ++coFound;
                     ++g_coKindN[ck];
                     if (DvVisible(c, p, 150.0f, &d2) && d2 <= r2)
-                        g_coN = M20Insert(g_coMarks, g_coN, inst, p, d2, ck, placed ? 0 : intro);
+                        g_coN = M20Insert(g_coMarks, g_coN, inst, p, d2, ck, placed ? 0 : intro, bit != 0);
                 }
             } else if (ek >= 0) {
                 if (LfNotDrawn(inst)) {      // 0.21: a hidden / removed enemy gets no label either
@@ -15862,7 +16042,8 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
     for (int i = 0; i < g_coN; ++i) {
         M20Mark &m = g_coMarks[i];
         const M20Kind &k = kCoKindDefs[m.kind];
-        const ImU32 colour = DvTint(k.colour, m.dist2, 1.0f);
+        const ImU32 kc = m.grey ? IM_COL32(150, 150, 150, 255) : k.colour;   // 0.22.37: collected grey
+        const ImU32 colour = DvTint(kc, m.dist2, 1.0f);
         const bool pot = m.kind == kCoPot;
         const float base[3] = {m.pos[0], m.pos[1], m.pos[2]};
         const float mid[3] = {m.pos[0], m.pos[1], m.pos[2] + (pot ? 60.0f : 110.0f)};
@@ -15883,12 +16064,16 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
         if (pot && ri) Out(extra, sizeof(extra), " | enth\303\244lt Artefakt #%lu", ri);
         else if (pot) Out(extra, sizeof(extra), " | enth\303\244lt Artefakt");
         else if (ri) Out(extra, sizeof(extra), " | #%lu", ri);
-        DvDistText(m.pos, DvOwnerUnit(m.inst), dist, sizeof(dist));
-        Out(m.line1, sizeof(m.line1), "%s %ld%s%s%s", name, static_cast<LONG>(intro), extra, dist,
-            RkParked(m.inst) ? " | geparkt" : "");   // 0.21.1: a template in a resident (parked) unit
+        // 0.22.37 (P5): the room always ([Debug] LabelRoom), the symbol of the kind (relic from the game's reward table
+        // when it is loaded), "#n" next to a symbol-only jar / reward, grey "eingesammelt" by the reward bit
+        DvDistText(m.pos, DvOwnerUnitAny(m.inst), dist, sizeof(dist), true);
+        Out(m.line1, sizeof(m.line1), "%s %ld%s%s%s%s", name, static_cast<LONG>(intro), extra, dist,
+            RkParked(m.inst) ? " | geparkt" : "", m.grey ? LabelCollectedText() : "");   // 0.21.1: parked template
         if (pot && script) Out(m.line2, sizeof(m.line2), "Skript %lu (eigene Instanz)", script);
         else m.line2[0] = 0;
-        m.colour = k.colour;
+        m.sym = P5SymOfCollect(m.kind, ri);
+        if (ri) Out(m.tag, sizeof(m.tag), "#%lu", ri);
+        m.colour = kc;
         m.colour2 = IM_COL32(220, 220, 220, 255);
         m.top[0] = mid[0]; m.top[1] = mid[1]; m.top[2] = mid[2] + 75.0f;
     }
@@ -15939,6 +16124,7 @@ void M20Draw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size
     if (co) LabelAdd(state, stateSize, used, "collectibles %d of %d (radius %.0f, max %d; %d copies skipped); ", g_coN,
                      coFound, g_m20Radius, g_m20Max, g_lfDup);
     if (g_lfHidden) LabelAdd(state, stateSize, used, "%d hidden / collected without label; ", g_lfHidden);
+    if (co && bits) LabelAdd(state, stateSize, used, "0.22.37: %d with the reward bit set (collected); ", bits);
     if (en) LabelAdd(state, stateSize, used, "enemies %d of %d in %d instances; ", g_enN, enFound, walked);
 }
 // one label above the marker, nudged up once on overlap, else skipped
@@ -15950,6 +16136,19 @@ bool M20Label(ImDrawList *dl, const M20Mark &m) {
     if (!DvCamToScreen(g_m20Cam, q, &at) || at.x < 0.0f || at.y < 0.0f || at.x > io.DisplaySize.x || at.y > io.DisplaySize.y)
         return false;
     const float fs = ImGui::GetFontSize();
+    // 0.22.37 (P5): behind geometry dim / none ([Debug] Occlusion); a collectible's symbol ([Debug] StyleCollect)
+    const float occl = P5OcclFactor(m.inst, m.top);
+    if (occl <= 0.0f) return false;
+    const bool symOn = m.sym >= 0 && P5ShowSym(m.layer);
+    if (symOn) {
+        P5DrawSymbol(dl, m.sym, at, fs * 0.6f, P5Fade(m.colour | 0xff000000u, occl));
+        ++g_p5SymDrawn[m.sym];
+        if (!P5ShowName(m.layer)) {          // symbol only: "#n" / the intro id beside it
+            if (m.tag[0]) dl->AddText(ImVec2(at.x + fs * 0.75f, at.y - fs * 0.5f), P5Fade(m.colour | 0xff000000u, occl), m.tag);
+            return true;
+        }
+        at.y -= fs * 0.6f;                   // the box above the symbol
+    }
     const ImVec2 s1 = ImGui::CalcTextSize(m.line1), s2 = m.line2[0] ? ImGui::CalcTextSize(m.line2) : ImVec2(0.0f, 0.0f);
     const ImVec2 s3 = m.line3[0] ? ImGui::CalcTextSize(m.line3) : ImVec2(0.0f, 0.0f);   // 0.22.9
     const int lines = 1 + (m.line2[0] ? 1 : 0) + (m.line3[0] ? 1 : 0);
@@ -15963,13 +16162,13 @@ bool M20Label(ImDrawList *dl, const M20Mark &m) {
         if (!DvRectFree(r)) return false;
     }
     DvRectTake(r);
-    dl->AddLine(ImVec2(at.x, r.y1), at, (m.colour & 0x00ffffffu) | (170u << 24), 1.2f);
-    dl->AddRectFilled(ImVec2(r.x0, r.y0), ImVec2(r.x1, r.y1), IM_COL32(0, 0, 0, 170), 3.0f);
-    dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 2.0f), m.colour | 0xff000000u, m.line1);
-    if (m.line2[0]) dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 4.0f + fs), m.colour2 | 0xff000000u, m.line2);
+    dl->AddLine(ImVec2(at.x, r.y1), at, P5Fade((m.colour & 0x00ffffffu) | (170u << 24), occl), 1.2f);
+    dl->AddRectFilled(ImVec2(r.x0, r.y0), ImVec2(r.x1, r.y1), P5Fade(IM_COL32(0, 0, 0, 170), occl), 3.0f);
+    dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 2.0f), P5Fade(m.colour | 0xff000000u, occl), m.line1);
+    if (m.line2[0]) dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 4.0f + fs), P5Fade(m.colour2 | 0xff000000u, occl), m.line2);
     if (m.line3[0])                          // 0.22.9: below line 2 (or line 1 when there is none)
         dl->AddText(ImVec2(r.x0 + 4.0f, r.y0 + 2.0f + static_cast<float>(lines - 1) * (fs + 2.0f)),
-                    IM_COL32(180, 220, 255, 255), m.line3);
+                    P5Fade(IM_COL32(180, 220, 255, 255), occl), m.line3);
     if (m.hpMax > 0.0f) {                    // 0.21.1: health bar above the label, green -> red, the number in it
         float f = m.hp / m.hpMax;
         f = f < 0.0f ? 0.0f : f > 1.0f ? 1.0f : f;
@@ -22425,7 +22624,8 @@ bool LgIsLaraGear(DWORD inst, DWORD player) {
         if (g_lgSet[i] == inst) return true;
     return false;
 }
-const char *const kLfReasons[5] = {"drawn", "hide bit 0x800", "kill flag 0x20", "scene entity off", "draw masks -1"};
+const char *const kLfReasons[6] = {"drawn", "hide bit 0x800", "kill flag 0x20", "scene entity off", "draw masks -1",
+                                   "reward bit +0x3ed90 set (0.22.37)"};
 // one TruMenu.log line per instance that loses its label (picked up / collected / gear), at most 20 per 10 s
 void LgNote(const char *layer, DWORD inst, int what, int reason) {
     for (DWORD s : g_lgSeen)
@@ -22447,20 +22647,1093 @@ void LgNote(const char *layer, DWORD inst, int what, int reason) {
     g_lgDropped = 0;
     Log(1, "labels: %s %s %ld (0x%08lx, parent 0x%08lx) %s - %s%s", layer, name, static_cast<LONG>(intro), inst, parent,
         what == 3 ? "no label" : what == 2 ? "grey label" : "no label",
-        what == 3 ? "Lara's gear ([Debug] LabelLaraGear 0)" : kLfReasons[reason < 0 || reason > 4 ? 0 : reason], more);
+        what == 3 ? "Lara's gear ([Debug] LabelLaraGear 0)" : kLfReasons[reason < 0 || reason > 5 ? 0 : reason], more);
 }
 // the label rule of dbg.labels / dbg.names: 0 = label, 1 = grey label "eingesammelt" ([Debug] LabelCollected 1),
 // 2 = none (not drawn by the game, LabelCollected 0), 3 = none (Lara's gear, LabelLaraGear 0); *reason = LfNotDrawn's code
+// 0.22.37 (P5): 4 = none, a co_ / fx_ object ([Debug] HideCo / HideFx, P5PrefixHidden); *reason 5 = the game's reward
+// bit of the instance's reward index is set (P5Collected) although the game still draws it
+bool P5PrefixHidden(DWORD inst);             // section "0.22.37 debug view P5"
 int LabelFilter(const char *layer, DWORD inst, DWORD player, int *reason) {
     *reason = 0;
     if (!g_lblGear && LgIsLaraGear(inst, player)) { LgNote(layer, inst, 3, 0); return 3; }
+    if (P5PrefixHidden(inst)) return 4;
     *reason = LfNotDrawn(inst);
+    if (!*reason && P5Collected(inst)) *reason = 5;
     if (!*reason) return 0;
     LgNote(layer, inst, g_lblCollected ? 2 : 1, *reason);
     return g_lblCollected ? 1 : 2;
 }
 // the grey label's suffix (bar language [Quick] Language)
 const char *LabelCollectedText() { return g_qbLang == 0 ? " | eingesammelt" : " | collected"; }
+
+// ======================================================================================================================
+// ---- 0.22.37 debug view P5 (owner 12.11. Paket R, Q119 / Q120; workspace docs\Befund-P5-Debugansicht-1311.md) ----
+// * Style per layer ([Debug] StyleCollect / StyleKeyItems / StyleNames / StyleCheckpoints / StylePortals = name | symbol
+//   | both, item dbg.style): symbols drawn with ImGui primitives (no texture files) - artifact, treasure, relic, reward
+//   jar ("#n" beside it), medipack, switch / lever, door / gate, key item, key-item target, grapple point, checkpoint,
+//   portal; the legend explains every symbol drawn this frame. An object the name test does not place keeps its name.
+// * Distance, height, room ([Debug] LabelRoom / DistMetres): collectible, key-item and object-name labels name the room
+//   always - readable DE / EN from kRoomNames (work\b_nav_1211\q105_order_table.py ROOMS -> q105_room_names.txt; a
+//   reading of the unit name, the game has no room names), fallback the unit name; DistMetres 1 = metres (100 units).
+// * Collected (the game's own flag, P1 docs\Befund-P1-Mittelmeer-Objekte-1311.md 2.1): the reward pickup 0x5db6a0(index)
+//   sets bit (index & 31) of [[0xc59264] + 0x3ed90 + (index >> 5) * 4] once; index = intro data +0x30 (CoRewardIndex).
+//   Relic / treasure from the game's reward table T = [0xe7f338] (generalbank DTP 36; 0 until the first pickup of the
+//   session, then entry [T+4] + index * 8 (+4 record r), record [T+0x14] + r * 16 (+0 kind: 1 treasure, 2 relic)).
+//   Collectibles, key items and the name labels follow [Debug] LabelCollected (0 no label, 1 grey "eingesammelt").
+// * Key items (layer dbg.keyitems, [Debug] KeyItems): carryable parts (_pt_ without weightbreak / reward, *puzzle_piece*,
+//   *_key*), switches / levers / pressure plates, doors / gates, grapple points, and the part -> target links of P1
+//   (script members read from the unit data, kP5Links: unit + intro ids only) as a world line part -> target. State:
+//   the save block's link parent id inst+0x228 (save writer 0x555422; != 0 shown as "carried?" - meaning not proven
+//   live), not drawn = "inserted / gone", the uber node of the instance (UberStateOf / UberNodeName, the 0.21.7 path;
+//   node names open / solved / destroyed / done / broken / dead / activated = "done", green).
+// * Draw distance ([Debug] DrawDistance, 0 = off; TruMenu.debugview.txt next to tru.exe: "<unit> <units>" or
+//   "<prefix>* <units>" per line, written by dbg.drawdist here): caps the radii of triggers, collectibles / enemies, key
+//   items, object names and Thrall labels for Lara's area (P5Radius).
+// * Occlusion ([Debug] Occlusion 0 off / 1 faded (default) / 2 hidden): no engine ray is called (the targeter's sight
+//   ray 0x713200 -> 0x4935f0 -> 0x493330 is game-thread code with a query record; the labels are drawn at Present) -
+//   instead each label anchor is tested against the scene's own depth buffer with a D3D9 occlusion query inside the 0.16
+//   depth pass (DpDrawBuffer, same mapping DpDepth, same pulled depth): 5 x 5 pixels, no colour written; the result of
+//   1 .. 3 frames ago dims or drops the label. Needs [Debug] Depth 1 / 2 and a usable depth mapping, else labels as before.
+// * co_ / fx_ ([Debug] HideCo / HideFx, default 1): name labels and key items leave out co_* (cutscene objects - P1: 39
+//   of 43 in a scene's cast; co_rock* stays) and fx_* (effects; *_grab_prompt stays).
+// Render thread (Present / the scene hook of the same thread), read only - nothing is written into tru.exe memory.
+// ======================================================================================================================
+const DvCheck kP5Checks[] = {
+    {0x005db6aa, "83e11f 8bc6 51 c1e805"},                                       // pickup: bit = index & 31, word = index >> 5
+    {0x005db6c1, "8b0d6492c500 83c40c 85948190ed0300 0f85a3010000 09948190ed0300"},   // [0xc59264]+0x3ed90: test, set once
+    {0x005db6df, "8b3d38f3e700 85ff"},                                           // reward table T = [0xe7f338] (lazy)
+    {0x005db712, "8b5704 8d04f2 8b7004 0fb700 c1e604 037714"},                   // entry [T+4]+i*8 (+4 r), record [T+0x14]+r*16
+    {0x005db730, "8b0e 8b156492c500 c1e104"},                                    // record +0 = kind (counter kind * 16 + c)
+    {0x00555422, "8b8028020000 894610"},                                         // save block 3 +0x10 = link parent inst+0x228
+};
+bool g_p5Ok = false;
+char g_p5Why[96] = "not checked";
+int g_p5Style[kDvCount] = {};                // kStyleName / kStyleSymbol / kStyleBoth per layer
+int g_p5Room = 1, g_p5Metres = 0, g_p5Occl = 1, g_p5HideCo = 1, g_p5HideFx = 1;
+float g_p5DrawDist = 0.0f, g_p5Cap = 0.0f;   // [Debug] DrawDistance; this frame's cap for Lara's area
+LONG g_p5CapFrame = -1;
+char g_p5CapUnit[48] = "", g_p5CapFrom[24] = "off";
+int g_p5SymDrawn[kSymCount] = {};
+const float kP5OcclDim = 0.3f;               // [Debug] Occlusion 1: opacity factor of a label behind geometry
+struct P5StyleKey { int layer; const char *key; };
+const P5StyleKey kP5StyleKeys[] = {{kDvCollect, "StyleCollect"}, {kDvKeyItems, "StyleKeyItems"}, {kDvNames, "StyleNames"},
+                                   {kDvCheckpoints, "StyleCheckpoints"}, {kDvPortals, "StylePortals"}};
+const int kP5StyleKeyN = static_cast<int>(sizeof(kP5StyleKeys) / sizeof(kP5StyleKeys[0]));
+const char *const kP5StyleNames[3] = {"name", "symbol", "both"};
+const char *const kP5StyleDe[3] = {"Name", "Symbol", "beides"};
+const char *const kP5OcclNames[3] = {"off", "faded", "hidden"};
+bool P5ShowSym(int layer) { return layer >= 0 && layer < kDvCount && g_p5Style[layer] != kStyleName; }
+bool P5ShowName(int layer) { return layer < 0 || layer >= kDvCount || g_p5Style[layer] != kStyleSymbol; }
+int P5StyleParse(const char *s) {
+    for (int i = 0; i < 3; ++i)
+        if (s && (!_stricmp(s, kP5StyleNames[i]) || !_stricmp(s, kP5StyleDe[i]))) return i;
+    if (s && (!strcmp(s, "0") || !strcmp(s, "1") || !strcmp(s, "2"))) return s[0] - '0';
+    return -1;
+}
+
+// ---- symbols ----
+struct P5SymDef { const char *en, *de; ImU32 colour; };
+const P5SymDef kP5Syms[kSymCount] = {
+    {"Artifact", "Artefakt", IM_COL32(255, 210, 40, 255)},
+    {"Treasure", "Schatz", IM_COL32(255, 130, 200, 255)},
+    {"Relic", "Relikt", IM_COL32(255, 150, 40, 255)},
+    {"Reward jar", "Krug mit Belohnung", IM_COL32(255, 70, 230, 255)},
+    {"Medipack", "Medipack", IM_COL32(70, 240, 220, 255)},
+    {"Switch / lever", "Schalter / Hebel", IM_COL32(120, 200, 255, 255)},
+    {"Door / gate", "T\303\274r / Tor", IM_COL32(215, 175, 120, 255)},
+    {"Key item", "Schl\303\274sselgegenstand", IM_COL32(255, 240, 120, 255)},
+    {"Key-item target", "Ziel", IM_COL32(120, 255, 140, 255)},
+    {"Grapple point", "Greifpunkt", IM_COL32(180, 180, 255, 255)},
+    {"Checkpoint", "Checkpoint", IM_COL32(150, 255, 190, 255)},
+    {"Portal", "Ladebereich", IM_COL32(255, 255, 255, 255)},
+};
+ImU32 P5Fade(ImU32 c, float a) {
+    if (a >= 1.0f) return c;
+    const float al = static_cast<float>((c >> 24) & 0xff) * (a < 0.0f ? 0.0f : a);
+    return (c & 0x00ffffffu) | (static_cast<ImU32>(al) << 24);
+}
+// one symbol around c, half size s, colour col (a dark disc behind it for contrast)
+void P5DrawSymbol(ImDrawList *dl, int sym, ImVec2 c, float s, ImU32 col) {
+    if (sym < 0 || sym >= kSymCount || s < 2.0f) return;
+    const ImU32 back = IM_COL32(0, 0, 0, static_cast<int>(((col >> 24) & 0xff) * 0.6f));
+    const float t = s > 8.0f ? 2.0f : 1.5f;
+    dl->AddCircleFilled(c, s * 1.3f, back, 16);
+    const float x = c.x, y = c.y;
+    switch (sym) {
+    case kSymArtifact:                       // diamond
+        dl->AddQuadFilled(ImVec2(x, y - s), ImVec2(x + s * 0.75f, y), ImVec2(x, y + s), ImVec2(x - s * 0.75f, y), col);
+        break;
+    case kSymTreasure:                       // coin: disc with an inner ring
+        dl->AddCircleFilled(c, s * 0.85f, col, 16);
+        dl->AddCircle(c, s * 0.5f, back, 16, t);
+        break;
+    case kSymRelic: {                        // five-pointed star (outline)
+        ImVec2 p[10];
+        for (int i = 0; i < 10; ++i) {
+            const float a = -1.5707963f + i * 0.6283185f, r = (i & 1) ? s * 0.42f : s;
+            p[i] = ImVec2(x + r * cosf(a), y + r * sinf(a));
+        }
+        for (int i = 0; i < 10; i += 2) dl->AddTriangleFilled(p[i], p[(i + 1) % 10], p[(i + 9) % 10], col);
+        dl->AddCircleFilled(c, s * 0.45f, col, 10);
+        break;
+    }
+    case kSymJar:                            // jar: body, neck, rim
+        dl->AddCircleFilled(ImVec2(x, y + s * 0.25f), s * 0.7f, col, 16);
+        dl->AddRectFilled(ImVec2(x - s * 0.3f, y - s * 0.75f), ImVec2(x + s * 0.3f, y - s * 0.2f), col);
+        dl->AddLine(ImVec2(x - s * 0.5f, y - s * 0.8f), ImVec2(x + s * 0.5f, y - s * 0.8f), col, t);
+        break;
+    case kSymMedipack:                       // box with a cross
+        dl->AddRectFilled(ImVec2(x - s * 0.8f, y - s * 0.65f), ImVec2(x + s * 0.8f, y + s * 0.65f), col, s * 0.15f);
+        dl->AddRectFilled(ImVec2(x - s * 0.15f, y - s * 0.5f), ImVec2(x + s * 0.15f, y + s * 0.5f), back);
+        dl->AddRectFilled(ImVec2(x - s * 0.5f, y - s * 0.15f), ImVec2(x + s * 0.5f, y + s * 0.15f), back);
+        break;
+    case kSymSwitch:                         // lever: base, handle, knob
+        dl->AddRectFilled(ImVec2(x - s * 0.7f, y + s * 0.45f), ImVec2(x + s * 0.7f, y + s * 0.8f), col);
+        dl->AddLine(ImVec2(x, y + s * 0.5f), ImVec2(x + s * 0.5f, y - s * 0.55f), col, t);
+        dl->AddCircleFilled(ImVec2(x + s * 0.5f, y - s * 0.6f), s * 0.28f, col, 10);
+        break;
+    case kSymDoor:                           // door / gate: frame with bars
+        dl->AddRect(ImVec2(x - s * 0.7f, y - s * 0.85f), ImVec2(x + s * 0.7f, y + s * 0.85f), col, 0.0f, 0, t);
+        dl->AddLine(ImVec2(x - s * 0.23f, y - s * 0.85f), ImVec2(x - s * 0.23f, y + s * 0.85f), col, t);
+        dl->AddLine(ImVec2(x + s * 0.23f, y - s * 0.85f), ImVec2(x + s * 0.23f, y + s * 0.85f), col, t);
+        break;
+    case kSymKeyItem:                        // key: ring, shaft, two teeth
+        dl->AddCircle(ImVec2(x - s * 0.45f, y), s * 0.38f, col, 12, t);
+        dl->AddLine(ImVec2(x - s * 0.07f, y), ImVec2(x + s * 0.85f, y), col, t);
+        dl->AddLine(ImVec2(x + s * 0.55f, y), ImVec2(x + s * 0.55f, y + s * 0.4f), col, t);
+        dl->AddLine(ImVec2(x + s * 0.8f, y), ImVec2(x + s * 0.8f, y + s * 0.3f), col, t);
+        break;
+    case kSymTarget:                         // target: rings + cross hair
+        dl->AddCircle(c, s * 0.85f, col, 16, t);
+        dl->AddCircleFilled(c, s * 0.3f, col, 10);
+        dl->AddLine(ImVec2(x - s, y), ImVec2(x - s * 0.5f, y), col, t);
+        dl->AddLine(ImVec2(x + s * 0.5f, y), ImVec2(x + s, y), col, t);
+        break;
+    case kSymGrapple:                        // hook: ring, shank, bend
+        dl->AddCircle(ImVec2(x, y - s * 0.7f), s * 0.22f, col, 10, t);
+        dl->AddLine(ImVec2(x, y - s * 0.5f), ImVec2(x, y + s * 0.3f), col, t);
+        dl->PathArcTo(ImVec2(x - s * 0.35f, y + s * 0.3f), s * 0.35f, 0.0f, 3.1415926f, 10);
+        dl->PathStroke(col, 0, t);
+        dl->AddLine(ImVec2(x - s * 0.7f, y + s * 0.3f), ImVec2(x - s * 0.55f, y), col, t);
+        break;
+    case kSymCheckpoint:                     // flag on a pole
+        dl->AddLine(ImVec2(x - s * 0.5f, y - s * 0.85f), ImVec2(x - s * 0.5f, y + s * 0.85f), col, t);
+        dl->AddTriangleFilled(ImVec2(x - s * 0.5f, y - s * 0.85f), ImVec2(x + s * 0.75f, y - s * 0.45f),
+                              ImVec2(x - s * 0.5f, y - s * 0.05f), col);
+        break;
+    case kSymPortal:                         // frame with an arrow through it
+        dl->AddRect(ImVec2(x - s * 0.35f, y - s * 0.8f), ImVec2(x + s * 0.35f, y + s * 0.8f), col, 0.0f, 0, t);
+        dl->AddLine(ImVec2(x - s, y), ImVec2(x + s * 0.85f, y), col, t);
+        dl->AddTriangleFilled(ImVec2(x + s, y), ImVec2(x + s * 0.55f, y - s * 0.35f), ImVec2(x + s * 0.55f, y + s * 0.35f), col);
+        break;
+    default:
+        break;
+    }
+}
+// object name -> symbol (first match), -1 = none (keeps its name)
+int P5SymOfName(const char *name) {
+    char low[64];
+    strncpy_s(low, sizeof(low), name ? name : "", _TRUNCATE);
+    _strlwr_s(low, sizeof(low));
+    if (strstr(low, "weightbreak") || (strstr(low, "_pt_") && strstr(low, "reward"))) return kSymJar;
+    if (strstr(low, "_rw_shard") || strstr(low, "healthpack")) return kSymMedipack;
+    if (strstr(low, "_rw_treasure")) return kSymTreasure;
+    if (strstr(low, "_rw_")) return kSymArtifact;
+    if (strstr(low, "checkpoint")) return kSymCheckpoint;
+    if (strstr(low, "grapple")) return kSymGrapple;
+    if (strstr(low, "switch") || strstr(low, "lever") || strstr(low, "press_plate")) return kSymSwitch;
+    if (strstr(low, "door") || strstr(low, "gate")) return kSymDoor;
+    if (strstr(low, "puzzle_piece") || strstr(low, "_key") || strstr(low, "_pt_")) return kSymKeyItem;
+    return -1;
+}
+
+// ---- reward bits (the game's "collected") and the reward table ----
+// 1 = the reward bit of the instance's reward index is set; only for reward objects (the 0.20 kinds: _rw_ / _pt_ reward)
+int CoKindOf(int id);                        // 0.20, section "0.20 collectibles"
+DWORD CoRewardIndex(DWORD inst, DWORD *script);
+int P5Collected(DWORD inst) {
+    DWORD object = 0, oid = 0, script = 0, data = 0, word = 0;
+    if (!g_p5Ok || !ReadDword(inst + 0x10, &object) || !object || !ReadDword(object + 0x14, &oid)) return 0;
+    if (CoKindOf(static_cast<int>(oid & 0xffff)) < 0) return 0;
+    const DWORD ri = CoRewardIndex(inst, &script);
+    if (!ri || ri > 4095 || !ReadDword(kDvGameData, &data) || !data) return 0;
+    if (!ReadDword(data + 0x3ed90 + (ri >> 5) * 4, &word)) return 0;
+    return (word >> (ri & 31)) & 1;
+}
+// the reward table's kind of an index: 1 treasure, 2 relic, 0 other, -1 unknown (table not loaded yet / no record)
+int P5RewardKind(DWORD ri) {
+    DWORD t = 0, count = 0, entries = 0, recs = 0, nrec = 0, r = 0, kind = 0;
+    if (!g_p5Ok || !ReadDword(0x00e7f338, &t) || !t || !ReadDword(t, &count) || ri >= count || count > 4096 ||
+        !ReadDword(t + 4, &entries) || !entries || !ReadDword(entries + ri * 8 + 4, &r) || static_cast<LONG>(r) < 0 ||
+        !ReadDword(t + 0x10, &nrec) || r >= nrec || !ReadDword(t + 0x14, &recs) || !recs || !ReadDword(recs + r * 16, &kind))
+        return -1;
+    return kind <= 2 ? static_cast<int>(kind) : -1;
+}
+int P5SymOfCollect(int kind, DWORD ri) {
+    if (ri && P5RewardKind(ri) == 2) return kSymRelic;   // the game's table: relic
+    switch (kind) {
+    case kCoTreasure: return kSymTreasure;
+    case kCoShard: return kSymMedipack;      // P1: *_rw_shard = health pack class 3924
+    case kCoPot: return kSymJar;
+    default: return kSymArtifact;
+    }
+}
+
+// ---- readable names (owner live 13.11.: "Wandschalter (einmalig)" next to ms_ei_switch_oneway_wall): object name
+// pattern (lower case part, first match wins - the specific ones first) -> DE / EN; a reading of the name, no game data ----
+struct P5ReadableRow { const char *part, *de, *en; };
+const P5ReadableRow kP5Readable[] = {
+    {"switch_oneway_wall", "Wandschalter (einmalig)", "wall switch (one-way)"},
+    {"resetting_switch", "Schalter (springt zur\303\274ck)", "switch (resets)"},
+    {"press_plate", "Druckplatte", "pressure plate"},
+    {"switch", "Schalter", "switch"},
+    {"lever", "Hebel", "lever"},
+    {"grapple_wall", "Greifwand", "grapple wall"},
+    {"grapple", "Greifpunkt", "grapple point"},
+    {"hpole", "Stange (waagrecht)", "pole (horizontal)"},
+    {"vpole", "Stange (senkrecht)", "pole (vertical)"},
+    {"ladder", "Leiter", "ladder"},
+    {"sewer_gate", "Kanaltor", "sewer gate"},
+    {"tombdoor", "Grabt\303\274r", "tomb door"},
+    {"tomb_gate", "Grabtor", "tomb gate"},
+    {"tomb_lock", "Grabschloss", "tomb lock"},
+    {"entrance_gate", "Eingangstor", "entrance gate"},
+    {"gate", "Tor", "gate"},
+    {"door", "T\303\274r", "door"},
+    {"eye_puzzle_piece_center", "Augen-R\303\244tsel: Mittelst\303\274ck", "eye puzzle: centre piece"},
+    {"eye_puzzle_piece", "Augen-R\303\244tsel: Drehteil", "eye puzzle: turning piece"},
+    {"puzzle_piece", "R\303\244tselteil", "puzzle piece"},
+    {"seafloor_key", "Schl\303\274ssel (Meeresgrund)", "key (sea floor)"},
+    {"_key", "Schl\303\274ssel", "key"},
+    {"weightbreak_reward", "Krug mit Belohnung", "jar with a reward"},
+    {"weightbreak", "Krug (zerbrechlich)", "jar (breakable)"},
+    {"_pt_weight", "Gewicht (tragbar)", "weight (portable)"},
+    {"ping_map", "Sonar-Ping", "sonar ping"},
+    {"sunsphere_chain", "Kette (abschie\303\237bar)", "chain (shootable)"},
+    {"sunsphere_plat", "Sonnenkugel-Plattform", "sun sphere platform"},
+    {"tentacle_gear", "Tentakel-Zahnrad", "tentacle gear"},
+    {"kraken_body", "Kraken", "kraken"},
+    {"wall_flint", "Feuerstein-Wand", "flint wall"},
+    {"_rw_artifact", "Artefakt", "artifact"},
+    {"_rw_treasure", "Schatz", "treasure"},
+    {"_rw_shard", "Medipack", "medipack"},
+    {"checkpoint_l1_going_in", "Checkpoint (hinein)", "checkpoint (way in)"},
+    {"checkpoint_l1_going_out", "Checkpoint (hinaus)", "checkpoint (way out)"},
+    {"_plat", "Plattform", "platform"},
+};
+const char *P5Readable(const char *name) {
+    char low[64];
+    strncpy_s(low, sizeof(low), name ? name : "", _TRUNCATE);
+    _strlwr_s(low, sizeof(low));
+    for (const P5ReadableRow &r : kP5Readable)
+        if (strstr(low, r.part)) return g_qbLang == 0 ? r.de : r.en;
+    return nullptr;
+}
+// the game's uber node names (UberNodeName) in the bar language - exact names, the node name itself when not listed
+const P5ReadableRow kP5NodeWords[] = {
+    {"locked", "verschlossen", "locked"}, {"unlocked", "entriegelt", "unlocked"}, {"open", "offen", "open"},
+    {"closed", "geschlossen", "closed"}, {"opening", "\303\266ffnet", "opening"}, {"closing", "schlie\303\237t", "closing"},
+    {"solved", "gel\303\266st", "solved"}, {"destroyed", "zerst\303\266rt", "destroyed"}, {"broken", "zerbrochen", "broken"},
+    {"default", "Grundstellung", "default"}, {"kicked", "getroffen", "kicked"}, {"pingable", "anpingbar", "pingable"},
+    {"on", "an", "on"}, {"off", "aus", "off"}, {"up", "oben", "up"}, {"down", "unten", "down"}, {"reset", "bereit", "reset"},
+    {"idle", "ruht", "idle"}, {"active", "aktiv", "active"}, {"activated", "aktiviert", "activated"},
+};
+const char *P5NodeWord(const char *node) {
+    for (const P5ReadableRow &r : kP5NodeWords)
+        if (!_stricmp(node, r.part)) return g_qbLang == 0 ? r.de : r.en;
+    return node;
+}
+// a real collectible (the 0.20 kinds: *_rw_* / *_pt_*reward*) - only these get "eingesammelt" when not drawn
+bool P5IsReward(DWORD inst) {
+    DWORD object = 0, oid = 0;
+    return ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid) &&
+           CoKindOf(static_cast<int>(oid & 0xffff)) >= 0;
+}
+const char *LabelHiddenText() { return g_qbLang == 0 ? " | versteckt" : " | hidden"; }
+// [Debug] RoomOnly (owner live 13.11.: "only the current room" for switches / levers / uber labels and key items):
+// the room = Lara's stream unit (the data has no finer room); an instance of an unknown unit stays
+int g_p5RoomOnly = 0;
+bool P5RoomOnlyDrops(DWORD inst) {
+    if (!g_p5RoomOnly) return false;
+    const char *unit = DvOwnerUnitAny(inst);
+    return unit[0] && !DvIsLaraUnit(unit);
+}
+
+// ---- co_ / fx_ filter ----
+signed char g_p5Prefix[4096];                // per object id: 0 unknown, 1 co_, 2 fx_, 3 neither / an exception
+bool P5PrefixHidden(DWORD inst) {
+    if (!g_p5HideCo && !g_p5HideFx) return false;
+    DWORD object = 0, oid = 0;
+    if (!ReadDword(inst + 0x10, &object) || !object || !ReadDword(object + 0x14, &oid)) return false;
+    const int id = static_cast<int>(oid & 0xffff);
+    int k = id > 0 && id < 4096 ? g_p5Prefix[id] : 0;
+    if (!k) {
+        char low[64];
+        k = 3;
+        if (ObjectName(id, low, sizeof(low))) {
+            _strlwr_s(low, sizeof(low));
+            if (!strncmp(low, "co_", 3) && strncmp(low, "co_rock", 7)) k = 1;
+            else if (!strncmp(low, "fx_", 3) && !strstr(low, "_grab_prompt")) k = 2;
+        }
+        if (id > 0 && id < 4096) g_p5Prefix[id] = static_cast<signed char>(k);
+    }
+    return (k == 1 && g_p5HideCo) || (k == 2 && g_p5HideFx);
+}
+
+// ---- rooms: readable names (generated: work\b_nav_1211\q105_order_table.py ... OUT_ROOMS = q105_room_names.txt) ----
+struct P5Room { const char *unit, *de, *en; };
+const P5Room kRoomNames[] = {
+    {"l1_seatop", "Meeresoberfl\303\244che (Boot)", "Sea surface (boat)"},
+    {"l1_seafloor", "Meeresgrund", "Sea floor"},
+    {"l1_norse_hallway_a", "Nordischer Gang", "Norse hallway"},
+    {"l1_kraken_entrance", "Kraken-Eingang", "Kraken entrance"},
+    {"l1_krakenstairs_a", "Kraken-Treppe A", "Kraken stairs A"},
+    {"l1_krakenstairs_b", "Kraken-Treppe B", "Kraken stairs B"},
+    {"l1_kraken_room", "Kraken-Raum", "Kraken room"},
+    {"l1_baldrsstairs_a", "Baldr-Treppe A", "Baldr stairs A"},
+    {"l1_baldrsstairs_b", "Baldr-Treppe B", "Baldr stairs B"},
+    {"l1_baldrs_tomb", "Baldrs Grab", "Baldr's tomb"},
+    {"l1_baldrs_sideroom", "Baldr-Nebenraum", "Baldr side room"},
+    {"l1_baldrs_hall", "Baldr-Halle", "Baldr hall"},
+    {"l1_cineseatop", "Meeresoberfl\303\244che (Szene)", "Sea surface (cutscene)"},
+    {"l1_ship_exterior", "Schiff au\303\237en", "Ship exterior"},
+    {"l1_ship_upper_hallway_a", "Schiff oberer Gang A", "Ship upper hallway A"},
+    {"l1_ship_upper_hallway_b", "Schiff oberer Gang B", "Ship upper hallway B"},
+    {"l1_ship_upper_hallway", "Schiff oberer Gang", "Ship upper hallway"},
+    {"l1_ship_engine_hall", "Schiff Maschinenhalle", "Ship engine hall"},
+    {"l1_ship_natla_room", "Schiff Natla-Raum", "Ship Natla room"},
+    {"l1_ship_lower_hallway", "Schiff unterer Gang", "Ship lower hallway"},
+    {"l1_ship_sinking_hall", "Schiff sinkende Halle", "Ship sinking hall"},
+    {"l1_cine_ship_sinking", "Schiff sinkt (Szene)", "Ship sinking (cutscene)"},
+    {"l1_rutlands_ship_m1", "Rutlands Schiff (nicht ladbar)", "Rutland's ship (not loadable)"},
+    {"l2_cliffclimb", "Klippe", "Cliff climb"},
+    {"l2_cliffhall", "Klippenhalle", "Cliff hall"},
+    {"l2_cliffhall_b", "Klippenhalle B", "Cliff hall B"},
+    {"l2_junglehub", "Dschungel-Knoten", "Jungle hub"},
+    {"l2_hubhall", "Knotenhalle", "Hub hall"},
+    {"l2_puzzleroom", "R\303\244tselraum", "Puzzle room"},
+    {"l2_norsehall", "Nordische Halle", "Norse hall"},
+    {"l2_norsehub", "Nordischer Knoten", "Norse hub"},
+    {"l2_towerconnector", "Turm-Verbindung", "Tower connector"},
+    {"l2_towerroom", "Turmraum", "Tower room"},
+    {"l2_upperhallway", "Oberer Gang", "Upper hallway"},
+    {"l2_shrineroom", "Schreinraum", "Shrine room"},
+    {"l2_maproom", "Kartenraum", "Map room"},
+    {"l2_flushtunnel", "Sp\303\274ltunnel", "Flush tunnel"},
+    {"l2_mapconnector", "Karten-Verbindung (nicht ladbar)", "Map connector (not loadable)"},
+    {"l2_puzzleconnector", "R\303\244tsel-Verbindung (nicht ladbar)", "Puzzle connector (not loadable)"},
+    {"l3_main_bedroom", "Schlafzimmer", "Main bedroom"},
+    {"l3_bedroom_hall", "Flur am Schlafzimmer", "Bedroom hall"},
+    {"l3_main_hall", "Eingangshalle", "Main hall"},
+    {"l3_mansion_exterior_afterburn", "Anwesen au\303\237en (nach dem Brand)", "Mansion exterior (after the fire)"},
+    {"l3_caverns_start", "H\303\266hlen-Start", "Caverns start"},
+    {"l3_chapel", "Kapelle", "Chapel"},
+    {"l3_stairhall", "Treppenhalle", "Stair hall"},
+    {"l3_secretchamber", "Geheimkammer", "Secret chamber"},
+    {"l3_chamberrockhall", "Felskammer-Halle", "Chamber rock hall"},
+    {"l4_trailstart", "Pfad-Start", "Trail start"},
+    {"l4_trailtube", "Pfad-R\303\266hre", "Trail tube"},
+    {"l4_ballcourt", "Ballspielplatz", "Ball court"},
+    {"l4_templepath", "Tempelpfad", "Temple path"},
+    {"l4_temple", "Tempel", "Temple"},
+    {"l4_staircase_upper", "Obere Treppe", "Upper staircase"},
+    {"l4_staircase_xibalba", "Xibalb\303\241-Treppe", "Xibalba staircase"},
+    {"l4_traprooms", "Fallenr\303\244ume", "Trap rooms"},
+    {"l4_staircase_mictlan", "Mictlan-Treppe", "Mictlan staircase"},
+    {"l4_ragnarok_room", "Ragnar\303\266k-Raum", "Ragnarok room"},
+    {"l4_pool", "Becken", "Pool"},
+    {"l5_startsnow", "Schnee-Start", "Snow start"},
+    {"l5_valgrind_tunnel", "Valgrind-Tunnel", "Valgrind tunnel"},
+    {"l5_valgrind", "Valgrind", "Valgrind"},
+    {"l5_valaskjalf_entry", "Valaskjalf-Eingang", "Valaskjalf entry"},
+    {"l5_valaskjalf_entryb", "Valaskjalf-Eingang B", "Valaskjalf entry B"},
+    {"l5_valaskjalf", "Valaskjalf", "Valaskjalf"},
+    {"l6_ship_exterior", "Schiff au\303\237en", "Ship exterior"},
+    {"l6_ship_upper_hallway_a", "Schiff oberer Gang A", "Ship upper hallway A"},
+    {"l6_ship_upper_hallway_b", "Schiff oberer Gang B", "Ship upper hallway B"},
+    {"l6_ship_upper_hallway", "Schiff oberer Gang", "Ship upper hallway"},
+    {"l6_ship_engine_hall", "Schiff Maschinenhalle", "Ship engine hall"},
+    {"l6_ship_natla_room", "Schiff Natla-Raum", "Ship Natla room"},
+    {"l7_thin_ice", "D\303\274nnes Eis", "Thin ice"},
+    {"l7_arctic_sea", "Arktisches Meer", "Arctic sea"},
+    {"l7_helheim_hall01", "Helheim-Halle 1", "Helheim hall 1"},
+    {"l7_helheim_hall02", "Helheim-Halle 2", "Helheim hall 2"},
+    {"l7_helheim01", "Helheim 1", "Helheim 1"},
+    {"l7_helheim02", "Helheim 2", "Helheim 2"},
+    {"l7_helheim03", "Helheim 3", "Helheim 3"},
+    {"l7_yggdrasil", "Yggdrasil", "Yggdrasil"},
+    {"l7_yggdrasil_hall01", "Yggdrasil-Halle 1", "Yggdrasil hall 1"},
+    {"l7_yggdrasil_hall02", "Yggdrasil-Halle 2", "Yggdrasil hall 2"},
+    {"l7_yggdrasil_end", "Yggdrasil-Ende", "Yggdrasil end"},
+    {"l7_monastery", "Kloster", "Monastery"},
+    {"l7_himalaya_end", "Himalaya (Ende)", "Himalaya (end)"},
+    {"dlc_level1_start", "DLC 1 Start", "DLC 1 start"},
+    {"dlc_caverns", "H\303\266hlen", "Caverns"},
+    {"dlc_caverns_hall", "H\303\266hlenhalle", "Caverns hall"},
+    {"dlc_water_wheel", "Wasserrad", "Water wheel"},
+    {"dlc_pillory", "Pranger", "Pillory"},
+    {"dlc_dungeonhalla", "Kerkerhalle A", "Dungeon hall A"},
+    {"dlc_dungeonhallb", "Kerkerhalle B", "Dungeon hall B"},
+    {"dlc_watertunnel", "Wassertunnel", "Water tunnel"},
+    {"dlc_dungeon", "Kerker", "Dungeon"},
+    {"dlc_treasureroom", "Schatzkammer", "Treasure room"},
+    {"dlc_level1_left", "DLC 1 links (ungenutzt)", "DLC 1 left (unused)"},
+    {"dlc_level1_right", "DLC 1 rechts (ungenutzt)", "DLC 1 right (unused)"},
+    {"dlc_level2_start", "DLC 2 Start", "DLC 2 start"},
+    {"dlc_yggdrasil_hall01", "Yggdrasil-Halle 1", "Yggdrasil hall 1"},
+    {"dlc_yggdrasil_hall02", "Yggdrasil-Halle 2", "Yggdrasil hall 2"},
+    {"dlc_yggdrasil_end", "Yggdrasil-Ende", "Yggdrasil end"},
+    {"dlc2_ceremony_room", "Zeremonienraum", "Ceremony room"},
+    {"dlc2_hall_machine_ceremony", "Gang Maschine - Zeremonie", "Hall machine - ceremony"},
+    {"dlc2_machine_room", "Maschinenraum", "Machine room"},
+    {"dlc2_hall_goo_machine", "Gang Schleim - Maschine", "Hall goo - machine"},
+    {"dlc2_goo_room", "Schleimraum", "Goo room"},
+    {"dlc2_hall_ceremony_goo", "Gang Zeremonie - Schleim", "Hall ceremony - goo"},
+    {"dlc2_treasure_room_cine", "Schatzkammer (Szene)", "Treasure room (cutscene)"},
+    {"dlc_level3_start", "DLC 3 Start (ungenutzt)", "DLC 3 start (unused)"},
+    {"dlc_level4_start", "DLC 4 Start (ungenutzt)", "DLC 4 start (unused)"},
+    {"dlc_level5_start", "DLC 5 Start (ungenutzt)", "DLC 5 start (unused)"},
+    {"dlc_level6_start", "DLC 6 Start (ungenutzt)", "DLC 6 start (unused)"},
+};
+// the readable room name of a unit (case-insensitive: "L3_main_bedroom"), bar language; nullptr = not in the table
+const char *P5RoomName(const char *unit) {
+    if (!unit || !unit[0]) return nullptr;
+    for (const P5Room &r : kRoomNames)
+        if (!_stricmp(r.unit, unit)) return g_qbLang == 0 ? r.de : r.en;
+    return nullptr;
+}
+
+// ---- draw distance per area: [Debug] DrawDistance + TruMenu.debugview.txt ("<unit> <units>" / "<prefix>* <units>") ----
+struct P5Dist { char name[48]; float dist; bool prefix; };
+P5Dist g_p5Dist[64];
+int g_p5DistN = 0;
+char g_p5DistPath[MAX_PATH] = "";
+char g_p5DistWhy[96] = "not read";
+void P5DistPath() {                         // next to tru.exe (as TruMenu.radial.txt / TruMenu.switches.txt)
+    if (g_p5DistPath[0] || !g_exeDir[0]) return;
+    _snprintf_s(g_p5DistPath, sizeof(g_p5DistPath), _TRUNCATE, "%sTruMenu.debugview.txt", g_exeDir);
+}
+void P5DistRead() {
+    P5DistPath();
+    g_p5DistN = 0;
+    FILE *f = nullptr;
+    if (!g_p5DistPath[0] || fopen_s(&f, g_p5DistPath, "r") || !f) { Out(g_p5DistWhy, sizeof(g_p5DistWhy), "no TruMenu.debugview.txt"); return; }
+    char line[160];
+    int bad = 0;
+    while (fgets(line, sizeof(line), f)) {
+        char name[64] = "";
+        float d = 0.0f;
+        if (line[0] == '#' || line[0] == ';' || line[0] == '\r' || line[0] == '\n') continue;
+        if (sscanf_s(line, "%63s %f", name, static_cast<unsigned>(sizeof(name)), &d) != 2 || !(d >= 0.0f && d <= 200000.0f)) {
+            ++bad;
+            continue;
+        }
+        if (g_p5DistN >= 64) { ++bad; continue; }
+        P5Dist &e = g_p5Dist[g_p5DistN++];
+        size_t len = strlen(name);
+        e.prefix = len && name[len - 1] == '*';
+        if (e.prefix) name[len - 1] = 0;
+        strncpy_s(e.name, sizeof(e.name), name, _TRUNCATE);
+        e.dist = d;
+    }
+    fclose(f);
+    Out(g_p5DistWhy, sizeof(g_p5DistWhy), "%d row(s)%s", g_p5DistN, bad ? ", some lines not understood" : "");
+    g_p5CapFrame = -1;
+}
+bool P5DistWrite() {
+    P5DistPath();
+    FILE *f = nullptr;
+    if (!g_p5DistPath[0] || fopen_s(&f, g_p5DistPath, "w") || !f) return false;
+    fprintf(f, "# TruMenu debug view draw distance per unit (0.22.37, dbg.drawdist): '<unit> <game units>' or "
+               "'<prefix>* <game units>'\n# 0 = no cap in that unit; a unit without a row uses [Debug] DrawDistance\n");
+    for (int i = 0; i < g_p5DistN; ++i)
+        fprintf(f, "%s%s %.0f\n", g_p5Dist[i].name, g_p5Dist[i].prefix ? "*" : "", static_cast<double>(g_p5Dist[i].dist));
+    fclose(f);
+    return true;
+}
+// the cap of a unit: its own row, else the longest prefix row, else [Debug] DrawDistance; *from = where it came from
+float P5CapFor(const char *unit, const char **from) {
+    int best = -1;
+    size_t bestLen = 0;
+    for (int i = 0; i < g_p5DistN && unit && unit[0]; ++i) {
+        const P5Dist &e = g_p5Dist[i];
+        if (!e.prefix && !_stricmp(e.name, unit)) { *from = "unit row"; return e.dist; }
+        const size_t len = strlen(e.name);
+        if (e.prefix && !_strnicmp(e.name, unit, len) && len >= bestLen) { best = i; bestLen = len; }
+    }
+    if (best >= 0) { *from = "prefix row"; return g_p5Dist[best].dist; }
+    *from = g_p5DrawDist > 0.0f ? "[Debug] DrawDistance" : "off";
+    return g_p5DrawDist;
+}
+void CurrentUnit(char *out, size_t size);    // 0.2, above
+void P5CapUpdate() {
+    if (g_p5CapFrame == g_dpFrame) return;
+    g_p5CapFrame = g_dpFrame;
+    char unit[48] = "";
+    if (g_dvLaraUnit[0]) strncpy_s(unit, sizeof(unit), g_dvLaraUnit, _TRUNCATE);
+    else CurrentUnit(unit, sizeof(unit));
+    const char *from = "off";
+    g_p5Cap = P5CapFor(unit, &from);
+    strncpy_s(g_p5CapUnit, sizeof(g_p5CapUnit), unit, _TRUNCATE);
+    strncpy_s(g_p5CapFrom, sizeof(g_p5CapFrom), from, _TRUNCATE);
+}
+float P5Radius(float r) {
+    P5CapUpdate();
+    return g_p5Cap > 0.0f && g_p5Cap < r ? g_p5Cap : r;
+}
+
+// ---- occlusion: D3D9 occlusion queries against the scene depth (inside DpDrawBuffer) ----
+const int kP5QMax = 48;
+struct P5Query { IDirect3DQuery9 *q; DWORD key; LONG frame; bool busy; };
+P5Query g_p5Q[kP5QMax];
+IDirect3DDevice9 *g_p5QDevice = nullptr;
+bool g_p5QFailed = false;
+struct P5OcclRes { DWORD key; LONG frame; DWORD pixels; };
+P5OcclRes g_p5Res[256];
+DpProbe g_p5Pending[kDpProbeMax];            // this frame's label anchors (pushed into the next frame's depth buffer)
+int g_p5PendingN = 0;
+LONG g_p5Issued = 0, g_p5Answered = 0, g_p5Hidden = 0, g_p5Faded = 0, g_p5Unknown = 0;
+void P5OcclRelease() {
+    for (P5Query &x : g_p5Q) {
+        if (x.q) x.q->Release();
+        x.q = nullptr;
+        x.busy = false;
+    }
+    g_p5QDevice = nullptr;
+}
+void P5OcclStore(DWORD key, DWORD pixels) {
+    const int h = static_cast<int>((key * 2654435761u) >> 24);   // 256 slots
+    for (int k = 0; k < 8; ++k) {
+        P5OcclRes &r = g_p5Res[(h + k) & 255];
+        if (r.key == key || !r.key || g_dpFrame - r.frame > 60) { r.key = key; r.frame = g_dpFrame; r.pixels = pixels; return; }
+    }
+    P5OcclRes &r = g_p5Res[h & 255];
+    r.key = key;
+    r.frame = g_dpFrame;
+    r.pixels = pixels;
+}
+int P5OcclLookup(DWORD key) {                // 1 visible, 0 hidden, -1 unknown / too old
+    const int h = static_cast<int>((key * 2654435761u) >> 24);
+    for (int k = 0; k < 8; ++k) {
+        const P5OcclRes &r = g_p5Res[(h + k) & 255];
+        if (r.key == key) return g_dpFrame - r.frame <= 30 ? (r.pixels ? 1 : 0) : -1;
+    }
+    return -1;
+}
+float P5OcclFactor(DWORD key, const float *p) {
+    if (!g_p5Occl || !key) return 1.0f;
+    if (g_p5PendingN < kDpProbeMax) {
+        DpProbe &q = g_p5Pending[g_p5PendingN++];
+        q.p[0] = p[0]; q.p[1] = p[1]; q.p[2] = p[2];
+        q.key = key;
+    }
+    const int v = P5OcclLookup(key);
+    if (v < 0) { ++g_p5Unknown; return 1.0f; }
+    if (v) return 1.0f;
+    if (g_p5Occl == 2) { ++g_p5Hidden; return 0.0f; }
+    ++g_p5Faded;
+    return kP5OcclDim;
+}
+// DpDrawBuffer (render thread, inside the frame, device states captured): poll the queries, issue new ones
+void P5OcclIssue(IDirect3DDevice9 *dev, const DvCam &c, const DpBuf &b) {
+    if (!g_p5Occl || g_p5QFailed) return;
+    if (g_p5QDevice != dev) { P5OcclRelease(); g_p5QDevice = dev; }
+    for (P5Query &x : g_p5Q) {
+        if (!x.busy || !x.q) continue;
+        DWORD px = 0;
+        const HRESULT hr = x.q->GetData(&px, sizeof(px), 0);
+        if (hr == S_OK) { P5OcclStore(x.key, px); x.busy = false; ++g_p5Answered; }
+        else if (FAILED(hr) || g_dpFrame - x.frame > 30) x.busy = false;   // lost / too old: issue again
+    }
+    if (!b.probes) return;
+    dev->SetRenderState(D3DRS_COLORWRITEENABLE, 0);
+    dev->SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    dev->SetRenderState(D3DRS_ZFUNC, g_dpLess ? D3DCMP_LESSEQUAL : D3DCMP_GREATEREQUAL);
+    const int start = static_cast<int>(g_dpFrame % b.probes);
+    for (int n = 0; n < b.probes; ++n) {
+        const DpProbe &p = b.probe[(start + n) % b.probes];
+        bool inFlight = false;
+        int free = -1;
+        for (int k = 0; k < kP5QMax; ++k) {
+            if (g_p5Q[k].busy && g_p5Q[k].key == p.key) inFlight = true;
+            if (!g_p5Q[k].busy && free < 0) free = k;
+        }
+        if (inFlight) continue;
+        if (free < 0) break;
+        P5Query &x = g_p5Q[free];
+        if (!x.q && (FAILED(dev->CreateQuery(D3DQUERYTYPE_OCCLUSION, &x.q)) || !x.q)) {
+            x.q = nullptr;
+            g_p5QFailed = true;
+            Log(1, "0.22.37 occlusion: CreateQuery(D3DQUERYTYPE_OCCLUSION) failed - labels are drawn as before (no occlusion)");
+            return;
+        }
+        float q[3];
+        ImVec2 s;
+        DvToCam(c, p.p, q);
+        if (q[2] < kDvNear || !DvCamToScreen(c, q, &s)) continue;
+        const float z = DpDepth(q[2]), rhw = 1.0f / q[2];
+        const DpVtx v[6] = {DpV(s.x - 2.5f, s.y - 2.5f, z, rhw, 0), DpV(s.x + 2.5f, s.y - 2.5f, z, rhw, 0),
+                            DpV(s.x - 2.5f, s.y + 2.5f, z, rhw, 0), DpV(s.x + 2.5f, s.y - 2.5f, z, rhw, 0),
+                            DpV(s.x + 2.5f, s.y + 2.5f, z, rhw, 0), DpV(s.x - 2.5f, s.y + 2.5f, z, rhw, 0)};
+        x.q->Issue(D3DISSUE_BEGIN);
+        dev->DrawPrimitiveUP(D3DPT_TRIANGLELIST, 2, v, sizeof(DpVtx));
+        x.q->Issue(D3DISSUE_END);
+        x.busy = true;
+        x.key = p.key;
+        x.frame = g_dpFrame;
+        ++g_p5Issued;
+    }
+}
+
+// ---- key items: P1's part -> target links (unit + intro ids; docs\Befund-P1-Mittelmeer-Objekte-1311.md "Folgepunkte") ----
+struct P5Link { const char *unit; LONG part, target; };
+const P5Link kP5Links[] = {
+    {"l1_seafloor", 232, 231}, {"l1_seafloor", 233, 231}, {"l1_seafloor", 231, 234},   // eye pieces -> centre -> CP 234
+    {"l1_seafloor", 970, 976}, {"l1_seafloor", 970, 978}, {"l1_seafloor", 971, 976}, {"l1_seafloor", 971, 978},   // keys
+    {"l1_kraken_room", 498, 497},                                                      // switch 498 -> tomb door 497
+    {"l1_kraken_room", 30, 27}, {"l1_kraken_room", 30, 61}, {"l1_kraken_room", 30, 62},   // switch 30 -> platform, chains
+    {"l1_kraken_room", 55, 36}, {"l1_kraken_room", 57, 32}, {"l1_kraken_room", 55, 33}, {"l1_kraken_room", 57, 33},
+    {"l1_kraken_room", 353, 326},                                                      // hint trigger -> grapple wall
+    {"l1_kraken_entrance", 748, 743}, {"l1_kraken_entrance", 748, 746}, {"l1_kraken_entrance", 748, 747},   // wall switch
+    {"l1_baldrs_tomb", 42, 45}, {"l1_baldrs_tomb", 42, 69}, {"l1_baldrs_tomb", 42, 70},   // scene 51 -> gate, locks
+    {"l1_baldrs_tomb", 42, 66}, {"l1_baldrs_tomb", 42, 67}, {"l1_baldrs_tomb", 42, 68},   // .. and the sonar pings
+};
+const int kP5LinkN = static_cast<int>(sizeof(kP5Links) / sizeof(kP5Links[0]));
+// role of an intro of a unit in kP5Links: bit 1 part, bit 2 target
+int P5LinkRole(const char *unit, LONG intro) {
+    int role = 0;
+    for (const P5Link &l : kP5Links) {
+        if (_stricmp(l.unit, unit)) continue;
+        if (l.part == intro) role |= 1;
+        if (l.target == intro) role |= 2;
+    }
+    return role;
+}
+bool P5DoneNode(const char *node) {          // the game's node names that mean "done"
+    static const char *const kDone[] = {"open", "solved", "destroyed", "done", "broken", "dead", "activated", "complete"};
+    char low[48];
+    strncpy_s(low, sizeof(low), node, _TRUNCATE);
+    _strlwr_s(low, sizeof(low));
+    for (const char *d : kDone)
+        if (strstr(low, d)) return true;
+    return false;
+}
+struct P5KeyMark { DWORD inst; LONG intro; char unit[48]; float pos[3]; };
+P5KeyMark g_kiAt[65];                        // the marks of this frame (for the link lines)
+M20Mark g_kiMarks[65];                       // M20Insert keeps at most [Debug] MarkMax (<= 64)
+int g_kiN = 0, g_kiLinks = 0;
+bool g_kiFresh = false;
+extern DvCam g_m20Cam;
+extern bool g_m20Fresh;
+int M20Insert(M20Mark *arr, int count, DWORD inst, const float *p, float d2, int kind, DWORD childIntro, bool grey);
+bool M20Label(ImDrawList *dl, const M20Mark &m);
+void M20Diamond(ImDrawList *dl, const DvCam &c, const float *centre, float s, ImU32 colour, float thick);
+bool LgIsLaraGear(DWORD inst, DWORD player);
+void LgCollect();
+DWORD UberStateOf(DWORD inst);
+void UberNodeName(DWORD b, LONG k, char *o, size_t n);
+void P5KeyDraw(ImDrawList *dl, const DvCam &c, char *state, size_t stateSize, size_t *used) {
+    g_kiN = g_kiLinks = 0;
+    int found = 0, hidden = 0, walked = 0;
+    DWORD player = 0, inst = 0;
+    ReadDword(kPlayerPtr, &player);
+    ReadDword(kFirstInstance, &inst);
+    LgCollect();
+    const float rad = P5Radius(g_m20Radius), r2 = rad * rad;
+    for (int guard = 0; inst && guard < 4096; ++guard, ++walked) {
+        DWORD next = 0, object = 0, oid = 0, introId = 0;
+        float p[3], d2 = 0.0f;
+        char name[64];
+        if (inst != player && ReadDword(inst + 0x10, &object) && object && ReadDword(object + 0x14, &oid) &&
+            ReadFloats(inst + kInstancePosition, p, 3) && DvFinite(p, 3) && ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) {
+            ReadDword(inst + 0x58, &introId);
+            const char *unit = DvOwnerUnitAny(inst);
+            const int role = unit[0] ? P5LinkRole(unit, static_cast<LONG>(introId)) : 0;
+            const int sym = P5SymOfName(name);
+            const bool cls = sym == kSymKeyItem || sym == kSymSwitch || sym == kSymDoor || sym == kSymGrapple;
+            if ((role || cls) && !LgIsLaraGear(inst, player) && !(P5PrefixHidden(inst) && !role) &&
+                !P5RoomOnlyDrops(inst)) {   // 0.22.37 (owner live): [Debug] RoomOnly = Lara's room only
+                const bool nd = LfNotDrawn(inst) != 0;
+                if (nd && !g_lblCollected) {
+                    ++hidden;
+                } else {
+                    ++found;
+                    if (DvVisible(c, p, 150.0f, &d2) && d2 <= r2)   // nearest MarkMax (kind = link role)
+                        g_kiN = M20Insert(g_kiMarks, g_kiN, inst, p, d2, role, 0, nd);
+                }
+            }
+        }
+        if (!ReadDword(inst + 8, &next)) break;
+        inst = next;
+    }
+    // world: a post with a small diamond, the link lines part -> target (both found this frame)
+    const bool de = g_qbLang == 0;
+    for (int i = 0; i < g_kiN; ++i) {
+        M20Mark &m = g_kiMarks[i];
+        P5KeyMark &k = g_kiAt[i];
+        k.inst = m.inst;
+        DWORD intro = 0;
+        ReadDword(m.inst + 0x58, &intro);
+        k.intro = static_cast<LONG>(intro);
+        strncpy_s(k.unit, sizeof(k.unit), DvOwnerUnitAny(m.inst), _TRUNCATE);
+        for (int a = 0; a < 3; ++a) k.pos[a] = m.pos[a];
+        char oname[64];
+        DWORD obj0 = 0, oid0 = 0;
+        ReadDword(m.inst + 0x10, &obj0);
+        if (obj0) ReadDword(obj0 + 0x14, &oid0);
+        const int nsym = ObjectName(static_cast<int>(oid0 & 0xffff), oname, sizeof(oname)) ? P5SymOfName(oname) : -1;
+        // symbol: a link target that is no door = target; a link part without a class = key item; else the name's class
+        m.sym = (m.kind & 2) && !(m.kind & 1) && nsym != kSymDoor ? kSymTarget : nsym >= 0 ? nsym : kSymKeyItem;
+        m.layer = kDvKeyItems;
+        const ImU32 base = m.grey ? IM_COL32(150, 150, 150, 255) : kP5Syms[m.sym].colour;
+        const float top[3] = {m.pos[0], m.pos[1], m.pos[2] + 120.0f};
+        DvLine(dl, c, m.pos, top, DvTint(base, m.dist2, 1.0f), 1.8f);
+        M20Diamond(dl, c, top, 25.0f, DvTint(base, m.dist2, 1.0f), 1.8f);
+        m.top[0] = top[0]; m.top[1] = top[1]; m.top[2] = top[2] + 40.0f;
+        m.colour = base;
+        m.colour2 = IM_COL32(220, 220, 220, 255);
+        m.line3[0] = 0;
+        m.hpMax = 0.0f;
+        // label: name, intro, role, state, distance / height / room
+        DWORD object = 0, oid = 0;
+        char name[64], dist[64], st[96] = "", node[48] = "";
+        ReadDword(m.inst + 0x10, &object);
+        if (object) ReadDword(object + 0x14, &oid);
+        if (!ObjectName(static_cast<int>(oid & 0xffff), name, sizeof(name))) Out(name, sizeof(name), "obj %lu", oid & 0xffff);
+        DvDistText(m.pos, k.unit, dist, sizeof(dist), true);
+        const int role = m.kind;
+        DWORD parent = 0;
+        ReadDword(m.inst + 0x228, &parent);
+        const DWORD b = UberStateOf(m.inst);
+        bool done = false;
+        if (b) {
+            DWORD nodeK = 0;
+            ReadDword(b + 0x84, &nodeK);
+            UberNodeName(b, static_cast<LONG>(nodeK), node, sizeof(node));
+            done = node[0] && P5DoneNode(node);
+        }
+        size_t su = 0;
+        if (m.grey) LabelAdd(st, sizeof(st), &su, "%s", de ? "eingesetzt / weg" : "inserted / gone");
+        else if ((role & 1) && parent) LabelAdd(st, sizeof(st), &su, de ? "getragen? (Eltern-Id %lu)" : "carried? (parent id %lu)", parent);
+        else if (role & 1) LabelAdd(st, sizeof(st), &su, "%s", de ? "liegt" : "lies");
+        if (node[0]) LabelAdd(st, sizeof(st), &su, "%s%s %s%s", su ? " | " : "", de ? "Zustand" : "node", node,
+                              done ? (de ? " = erledigt" : " = done") : "");
+        const char *roleText = role == 3 ? (de ? " | Teil + Ziel" : " | part + target") : role == 1 ? (de ? " | Teil" : " | part")
+                             : role == 2 ? (de ? " | Ziel" : " | target") : "";
+        const char *readable = P5Readable(name);   // "Wandschalter (einmalig)"
+        Out(m.line1, sizeof(m.line1), "%s %ld%s%s%s%s%s%s", name, k.intro, readable ? " (" : "", readable ? readable : "",
+            readable ? ")" : "", roleText, dist, m.grey ? (P5IsReward(m.inst) ? LabelCollectedText() : LabelHiddenText()) : "");
+        Out(m.line2, sizeof(m.line2), "%s", st);
+        if (done) m.colour2 = IM_COL32(120, 255, 140, 255);
+        Out(m.tag, sizeof(m.tag), "%ld", k.intro);
+    }
+    for (const P5Link &l : kP5Links) {
+        int a = -1, t = -1;
+        for (int i = 0; i < g_kiN; ++i) {
+            if (_stricmp(g_kiAt[i].unit, l.unit)) continue;
+            if (g_kiAt[i].intro == l.part) a = i;
+            if (g_kiAt[i].intro == l.target) t = i;
+        }
+        if (a < 0 || t < 0) continue;
+        const float pa[3] = {g_kiAt[a].pos[0], g_kiAt[a].pos[1], g_kiAt[a].pos[2] + 120.0f};
+        const float pt[3] = {g_kiAt[t].pos[0], g_kiAt[t].pos[1], g_kiAt[t].pos[2] + 120.0f};
+        DvLine(dl, c, pa, pt, DvTint(kP5Syms[kSymKeyItem].colour, g_kiMarks[a].dist2, 0.8f), 1.5f);
+        ++g_kiLinks;
+    }
+    g_dvListed[kDvKeyItems] = found;
+    g_m20Cam = c;
+    g_kiFresh = true;
+    LabelAdd(state, stateSize, used, "key items %d of %d (radius %.0f; %d link line(s) of %d known; %d hidden / gone without "
+             "label; %d instances); ", g_kiN, found, rad, g_kiLinks, kP5LinkN, hidden, walked);
+}
+void P5KeyLabels(ImDrawList *dl) {
+    if (!g_kiFresh) return;
+    g_kiFresh = false;
+    int shown = 0;
+    for (int i = 0; i < g_kiN; ++i) shown += M20Label(dl, g_kiMarks[i]) ? 1 : 0;
+    g_dvDrawn[kDvKeyItems] = shown;
+}
+// legend rows: the symbols drawn this frame
+int P5LegendRows(char (*lines)[112], char (*counts)[24], ImU32 *colours, bool *square, int *sym, int n, int max) {
+    for (int s = 0; s < kSymCount && n < max; ++s) {
+        if (!g_p5SymDrawn[s]) continue;
+        Out(lines[n], 112, "  %s", kP5Syms[s].en);
+        Out(counts[n], 24, "%d", g_p5SymDrawn[s]);
+        colours[n] = kP5Syms[s].colour;
+        square[n] = true;
+        sym[n++] = s;
+    }
+    return n;
+}
+// DrawDebugView, once per frame after DvUnitsRead: the cap of Lara's area, last frame's anchors into the depth buffer
+void P5FrameBegin() {
+    memset(g_p5SymDrawn, 0, sizeof(g_p5SymDrawn));
+    g_p5CapFrame = -1;
+    P5CapUpdate();
+    if (g_dpFill && g_p5Occl) {
+        const int n = g_p5PendingN < kDpProbeMax ? g_p5PendingN : kDpProbeMax;
+        memcpy(g_dpFill->probe, g_p5Pending, n * sizeof(DpProbe));
+        g_dpFill->probes = n;
+    }
+    g_p5PendingN = 0;
+    g_p5Hidden = g_p5Faded = g_p5Unknown = 0;
+}
+bool P5LayerOk(const char **why) {
+    *why = !g_dvBaseOk ? g_dvBaseWhy : !g_lfOk ? "needs the 0.21 label checks" : "ok";
+    return g_dvBaseOk && g_lfOk;
+}
+// [Debug] keys of P5 (ReadOptions)
+void P5ReadOptions(const char *ini) {
+    for (int i = 0; i < kDvCount; ++i) g_p5Style[i] = kStyleName;
+    for (const P5StyleKey &k : kP5StyleKeys) {
+        char v[32];
+        OptString(ini, "Debug", k.key, v, sizeof(v));
+        DvTrim(v);
+        const int s = P5StyleParse(v);
+        g_p5Style[k.layer] = s >= 0 ? s : P5StyleParse(OptDefault("Debug", k.key));
+    }
+    g_p5Room = OptInt(ini, "Debug", "LabelRoom") != 0 ? 1 : 0;
+    g_p5Metres = OptInt(ini, "Debug", "DistMetres") != 0 ? 1 : 0;
+    const int occl = OptInt(ini, "Debug", "Occlusion");
+    g_p5Occl = occl >= 0 && occl <= 2 ? occl : atoi(OptDefault("Debug", "Occlusion"));
+    g_p5HideCo = OptInt(ini, "Debug", "HideCo") != 0 ? 1 : 0;
+    g_p5HideFx = OptInt(ini, "Debug", "HideFx") != 0 ? 1 : 0;
+    g_p5RoomOnly = OptInt(ini, "Debug", "RoomOnly") != 0 ? 1 : 0;
+    char v[32];
+    OptString(ini, "Debug", "DrawDistance", v, sizeof(v));
+    const float d = static_cast<float>(atof(v));
+    g_p5DrawDist = v[0] && d >= 0.0f && d <= 200000.0f ? d : static_cast<float>(atof(OptDefault("Debug", "DrawDistance")));
+}
+// load (after M20Check): byte checks, the draw distance file, the layer at the start
+void P5Check() {
+    DWORD at = 0;
+    g_p5Ok = g_dvBaseOk && g_coOk && DvChecks(kP5Checks, sizeof(kP5Checks) / sizeof(kP5Checks[0]), &at);
+    if (g_p5Ok) Out(g_p5Why, sizeof(g_p5Why), "ok");
+    else if (!g_dvBaseOk || !g_coOk) Out(g_p5Why, sizeof(g_p5Why), "needs the 0.14 / 0.20 checks");
+    else Out(g_p5Why, sizeof(g_p5Why), "reward / save code differs at 0x%08lx", at);
+    memset(g_p5Prefix, 0, sizeof(g_p5Prefix));
+    P5DistRead();
+    int on = 0;
+    const char *why = "";
+    if (g_debugEnabled && (g_dvAtStart[kDvKeyItems] || (g_dvViewAtStart && !DvViewSkips(kDvKeyItems))) &&
+        DvLayerOk(kDvKeyItems, &why)) {
+        InterlockedExchange(&g_dvOn[kDvKeyItems], 1);
+        ++on;
+    }
+    Log(g_p5Ok ? 1 : 0, "0.22.37 debug view P5: reward bits / table + link parent %s (%d checks); key items layer %s%s; "
+        "styles collect %s, keyitems %s, names %s, checkpoints %s, portals %s; LabelRoom %d, DistMetres %d, Occlusion %s, "
+        "HideCo %d, HideFx %d, RoomOnly %d, DrawDistance %.0f, TruMenu.debugview.txt %s; %d link(s) of P1, %d readable "
+        "name pattern(s)", g_p5Why,
+        static_cast<int>(sizeof(kP5Checks) / sizeof(kP5Checks[0])), on ? "on" : "off", g_lfOk ? "" : " (0.21 checks failed)",
+        kP5StyleNames[g_p5Style[kDvCollect]], kP5StyleNames[g_p5Style[kDvKeyItems]], kP5StyleNames[g_p5Style[kDvNames]],
+        kP5StyleNames[g_p5Style[kDvCheckpoints]], kP5StyleNames[g_p5Style[kDvPortals]], g_p5Room, g_p5Metres,
+        kP5OcclNames[g_p5Occl], g_p5HideCo, g_p5HideFx, g_p5RoomOnly, g_p5DrawDist, g_p5DistWhy, kP5LinkN,
+        static_cast<int>(sizeof(kP5Readable) / sizeof(kP5Readable[0])));
+}
+
+// ---- items ----
+void ValDvKeyItems(char *o, size_t n) {
+    const char *why = "";
+    Out(o, n, "%d (%d drawn of %d; %d link line(s)%s%s)", g_dvOn[kDvKeyItems] ? 1 : 0, g_dvDrawn[kDvKeyItems],
+        g_dvListed[kDvKeyItems], g_kiLinks, P5LayerOk(&why) ? "" : "; checks failed: ", P5LayerOk(&why) ? "" : why);
+}
+bool RunDvKeyItems(const char *arg, char *o, size_t n) { return DvRunOne(kDvKeyItems, "dbg.keyitems", arg, o, n); }
+void ValDvLabelStyle(char *o, size_t n) {
+    size_t used = 0;
+    o[0] = 0;
+    for (const P5StyleKey &k : kP5StyleKeys)
+        LabelAdd(o, n, &used, "%s%s %s", used ? ", " : "", kDvLayers[k.layer].name, kP5StyleNames[g_p5Style[k.layer]]);
+}
+// dbg.labelstyle <layer> name|symbol|both (layer: collect, keyitems, names, checkpoints, portals; "all" = every one)
+bool RunDvLabelStyle(const char *arg, char *o, size_t n) {
+    char a[64] = "", layer[32] = "", value[16] = "";
+    strncpy_s(a, sizeof(a), arg ? arg : "", _TRUNCATE);
+    const int words = sscanf_s(a, "%31s %15s", layer, static_cast<unsigned>(sizeof(layer)), value, static_cast<unsigned>(sizeof(value)));
+    const int s = words == 2 ? P5StyleParse(value) : -1;
+    const bool all = !_stricmp(layer, "all");
+    int done = 0;
+    for (const P5StyleKey &k : kP5StyleKeys) {
+        if (s < 0 || (!all && _stricmp(layer, kDvLayers[k.layer].name))) continue;
+        g_p5Style[k.layer] = s;
+        if (g_dvPersist && g_iniPath[0]) WritePrivateProfileStringA("Debug", k.key, kP5StyleNames[s], g_iniPath);
+        ++done;
+    }
+    if (!done) {
+        Out(o, n, "usage: dbg.labelstyle <collect|keyitems|names|checkpoints|portals|all> <name|symbol|both>");
+        return false;
+    }
+    Log(1, "dbg.labelstyle %s %s (src=%s)", layer, kP5StyleNames[s], ShotSource("dbg.labelstyle"));
+    ValDvLabelStyle(o, n);
+    return true;
+}
+void ValDvRoom(char *o, size_t n) { Out(o, n, "%d (%s)", g_p5Room, g_p5Room ? "room name always" : "unit only when not Lara's"); }
+bool RunDvRoom(const char *arg, char *o, size_t n) { return DvRunFlag(&g_p5Room, "dbg.room", "LabelRoom", arg, o, n); }
+void ValDvMetres(char *o, size_t n) { Out(o, n, "%d (%s)", g_p5Metres, g_p5Metres ? "metres" : "game units"); }
+bool RunDvMetres(const char *arg, char *o, size_t n) { return DvRunFlag(&g_p5Metres, "dbg.metres", "DistMetres", arg, o, n); }
+void ValDvHideCo(char *o, size_t n) { Out(o, n, "%d (co_* %s, co_rock* stays)", g_p5HideCo, g_p5HideCo ? "hidden" : "labelled"); }
+bool RunDvHideCo(const char *arg, char *o, size_t n) { return DvRunFlag(&g_p5HideCo, "dbg.hideco", "HideCo", arg, o, n); }
+void ValDvHideFx(char *o, size_t n) { Out(o, n, "%d (fx_* %s, *_grab_prompt stays)", g_p5HideFx, g_p5HideFx ? "hidden" : "labelled"); }
+bool RunDvHideFx(const char *arg, char *o, size_t n) { return DvRunFlag(&g_p5HideFx, "dbg.hidefx", "HideFx", arg, o, n); }
+void ValDvRoomOnly(char *o, size_t n) {
+    Out(o, n, "%d (%s; Lara's unit '%s')", g_p5RoomOnly, g_p5RoomOnly ? "uber labels + key items of Lara's room only" :
+        "every room in the radius", g_dvLaraUnit[0] ? g_dvLaraUnit : g_dvLaraUnit2);
+}
+bool RunDvRoomOnly(const char *arg, char *o, size_t n) { return DvRunFlag(&g_p5RoomOnly, "dbg.roomonly", "RoomOnly", arg, o, n); }
+void ValDvOcclusion(char *o, size_t n) {
+    Out(o, n, "%s (%s; last frame %ld faded, %ld hidden, %ld unknown; queries issued %ld, answered %ld)",
+        kP5OcclNames[g_p5Occl], g_p5QFailed ? "queries not available" : DpUsable() ? "depth usable" : "waits for the depth "
+        "mapping ([Debug] Depth 1 / 2)", g_p5Faded, g_p5Hidden, g_p5Unknown, g_p5Issued, g_p5Answered);
+}
+// dbg.occlusion off|faded|hidden (0 / 1 / 2)
+bool RunDvOcclusion(const char *arg, char *o, size_t n) {
+    char a[16] = "";
+    strncpy_s(a, sizeof(a), arg ? arg : "", _TRUNCATE);
+    DvTrim(a);
+    int v = -1;
+    for (int i = 0; i < 3; ++i)
+        if (!_stricmp(a, kP5OcclNames[i]) || (a[0] == '0' + i && !a[1])) v = i;
+    if (!_stricmp(a, "aus")) v = 0;
+    if (!_stricmp(a, "blass")) v = 1;
+    if (!_stricmp(a, "weg")) v = 2;
+    if (v < 0) { Out(o, n, "usage: dbg.occlusion off|faded|hidden (0 / 1 / 2); now %s", kP5OcclNames[g_p5Occl]); return false; }
+    if (!DvGate("dbg.occlusion", o, n)) return false;
+    g_p5Occl = v;
+    DvPersistInt("Occlusion", v);
+    Log(1, "dbg.occlusion %s (src=%s)", kP5OcclNames[v], ShotSource("dbg.occlusion"));
+    Out(o, n, "dbg.occlusion %s", kP5OcclNames[v]);
+    return true;
+}
+void ValDvDrawDist(char *o, size_t n) {
+    P5CapUpdate();
+    Out(o, n, "%.0f now for '%s' (%s); [Debug] DrawDistance %.0f; TruMenu.debugview.txt %s", g_p5Cap, g_p5CapUnit[0] ?
+        g_p5CapUnit : "-", g_p5CapFrom, g_p5DrawDist, g_p5DistWhy);
+}
+// dbg.drawdist <units>|off - [Debug] DrawDistance; dbg.drawdist here <units>|clear - a row for Lara's unit in
+// TruMenu.debugview.txt (written at once); dbg.drawdist reload - read the file again
+bool RunDvDrawDist(const char *arg, char *o, size_t n) {
+    char a[64] = "", w1[24] = "", w2[24] = "";
+    strncpy_s(a, sizeof(a), arg ? arg : "", _TRUNCATE);
+    const int words = sscanf_s(a, "%23s %23s", w1, static_cast<unsigned>(sizeof(w1)), w2, static_cast<unsigned>(sizeof(w2)));
+    if (words >= 1 && !_stricmp(w1, "reload")) { P5DistRead(); ValDvDrawDist(o, n); return true; }
+    if (words >= 1 && !_stricmp(w1, "here")) {
+        P5CapUpdate();
+        char unit[48];
+        strncpy_s(unit, sizeof(unit), g_p5CapUnit, _TRUNCATE);
+        if (!unit[0]) { Out(o, n, "dbg.drawdist here: Lara's unit is not known (in a level only)"); return false; }
+        const bool clear = words == 2 && !_stricmp(w2, "clear");
+        const float d = words == 2 ? static_cast<float>(atof(w2)) : -1.0f;
+        if (!clear && !(d >= 0.0f && d <= 200000.0f)) { Out(o, n, "usage: dbg.drawdist here <0 .. 200000>|clear"); return false; }
+        int k = -1;
+        for (int i = 0; i < g_p5DistN; ++i)
+            if (!g_p5Dist[i].prefix && !_stricmp(g_p5Dist[i].name, unit)) k = i;
+        if (clear) {
+            if (k >= 0) { g_p5Dist[k] = g_p5Dist[g_p5DistN - 1]; --g_p5DistN; }
+        } else {
+            if (k < 0 && g_p5DistN < 64) {
+                k = g_p5DistN++;
+                strncpy_s(g_p5Dist[k].name, sizeof(g_p5Dist[k].name), unit, _TRUNCATE);
+                g_p5Dist[k].prefix = false;
+            }
+            if (k < 0) { Out(o, n, "dbg.drawdist here: 64 rows already"); return false; }
+            g_p5Dist[k].dist = d;
+        }
+        const bool wrote = P5DistWrite();
+        g_p5CapFrame = -1;
+        Log(1, "dbg.drawdist here %s for %s (src=%s): TruMenu.debugview.txt %s", clear ? "clear" : w2, unit,
+            ShotSource("dbg.drawdist"), wrote ? "written" : "NOT written");
+        Out(g_p5DistWhy, sizeof(g_p5DistWhy), "%d row(s)%s", g_p5DistN, wrote ? "" : ", write failed");
+        ValDvDrawDist(o, n);
+        return wrote;
+    }
+    if (words >= 1 && (!_stricmp(w1, "off") || !_stricmp(w1, "aus"))) w1[0] = '0', w1[1] = 0;
+    char *end = nullptr;
+    const float d = static_cast<float>(strtod(w1, &end));
+    if (words < 1 || !end || *end || !(d >= 0.0f && d <= 200000.0f)) {
+        Out(o, n, "usage: dbg.drawdist <0 .. 200000>|off | here <units>|clear | reload; now: ");
+        size_t len = strlen(o);
+        ValDvDrawDist(o + len, n - len);
+        return false;
+    }
+    g_p5DrawDist = d;
+    g_p5CapFrame = -1;
+    if (g_dvPersist && g_iniPath[0]) {
+        char v[24];
+        Out(v, sizeof(v), "%.0f", static_cast<double>(d));
+        WritePrivateProfileStringA("Debug", "DrawDistance", v, g_iniPath);
+    }
+    Log(1, "dbg.drawdist %.0f (src=%s)", static_cast<double>(d), ShotSource("dbg.drawdist"));
+    ValDvDrawDist(o, n);
+    return true;
+}
+// menu page Debug view, group Object names: the P5 switches
+void P5MenuControls(char *o, size_t n) {
+    ImGui::Separator();
+    ImGui::TextUnformatted("0.22.37 symbols / rooms / draw distance / occlusion");
+    {
+        const DvLayerDef &d = kDvLayers[kDvKeyItems];
+        ImGui::ColorButton("##dvckey", ImGui::ColorConvertU32ToFloat4(d.colour), ImGuiColorEditFlags_NoTooltip, ImVec2(14.0f, 14.0f));
+        ImGui::SameLine();
+        bool v = g_dvOn[kDvKeyItems] != 0;
+        char label[128];
+        Out(label, sizeof(label), "%s / %s  [dbg.keyitems]  %d / %d###dvkey", d.en, d.de, g_dvDrawn[kDvKeyItems],
+            g_dvListed[kDvKeyItems]);
+        if (TmCheckbox(label, &v)) DvSet(kDvKeyItems, v, "menu", o, n);
+    }
+    for (const P5StyleKey &k : kP5StyleKeys) {   // name / symbol / both per layer
+        ImGui::Text("%s:", kDvLayers[k.layer].name);
+        for (int s = 0; s < 3; ++s) {
+            char label[64], arg[48];
+            Out(label, sizeof(label), "%s / %s###dvst%d_%d", kP5StyleNames[s], kP5StyleDe[s], k.layer, s);
+            ImGui::SameLine();
+            if (ImGui::RadioButton(label, g_p5Style[k.layer] == s)) {
+                Out(arg, sizeof(arg), "%s %s", kDvLayers[k.layer].name, kP5StyleNames[s]);
+                RunDvLabelStyle(arg, o, n);
+            }
+        }
+    }
+    bool room = g_p5Room != 0, metres = g_p5Metres != 0, co = g_p5HideCo != 0, fx = g_p5HideFx != 0;
+    bool only = g_p5RoomOnly != 0;
+    if (TmCheckbox("only Lara's room (uber labels, key items) / nur aktueller Raum  [dbg.roomonly]###dvronly", &only))
+        RunDvRoomOnly(only ? "1" : "0", o, n);
+    if (TmCheckbox("room always / Raum immer  [dbg.room]###dvroom", &room)) RunDvRoom(room ? "1" : "0", o, n);
+    if (TmCheckbox("distances in metres / Entfernung in Metern  [dbg.metres]###dvmetres", &metres)) RunDvMetres(metres ? "1" : "0", o, n);
+    if (TmCheckbox("hide co_ (cutscene objects) / co_ ausblenden  [dbg.hideco]###dvhco", &co)) RunDvHideCo(co ? "1" : "0", o, n);
+    if (TmCheckbox("hide fx_ (effects) / fx_ ausblenden  [dbg.hidefx]###dvhfx", &fx)) RunDvHideFx(fx ? "1" : "0", o, n);
+    ImGui::TextUnformatted("behind walls / hinter W\303\244nden  [dbg.occlusion]:");
+    for (int i = 0; i < 3; ++i) {
+        static const char *const kDe[3] = {"zeigen", "blass", "weg"};
+        char label[48];
+        Out(label, sizeof(label), "%s / %s###dvoc%d", kP5OcclNames[i], kDe[i], i);
+        ImGui::SameLine();
+        if (ImGui::RadioButton(label, g_p5Occl == i)) RunDvOcclusion(kP5OcclNames[i], o, n);
+    }
+    P5CapUpdate();
+    static float here = 0.0f;
+    static char hereUnit[48] = "";
+    if (_stricmp(hereUnit, g_p5CapUnit)) {   // the slider follows Lara's area
+        strncpy_s(hereUnit, sizeof(hereUnit), g_p5CapUnit, _TRUNCATE);
+        here = g_p5Cap;
+    }
+    char label[160];
+    Out(label, sizeof(label), "draw distance here / Sichtweite hier (%s, 0 = none)  [dbg.drawdist here]###dvdd",
+        g_p5CapUnit[0] ? g_p5CapUnit : "-");
+    ImGui::SliderFloat(label, &here, 0.0f, 50000.0f, "%.0f");
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        char a[48];
+        Out(a, sizeof(a), "here %.0f", static_cast<double>(here));
+        RunDvDrawDist(a, o, n);
+    }
+    if (TmButton("remove the row / Zeile entfernen###dvddclr")) RunDvDrawDist("here clear", o, n);
+    ImGui::SameLine();
+    if (TmButton("read the file again / Datei neu lesen###dvddrl")) RunDvDrawDist("reload", o, n);
+    char v[200];
+    ValDvDrawDist(v, sizeof(v));
+    ImGui::TextDisabled("%s", v);
+    ValDvOcclusion(v, sizeof(v));
+    ImGui::TextDisabled("occlusion: %s", v);
+}
+// ---- end of 0.22.37 debug view P5 ----
 
 // ---- ai.remove (game thread, queued) ----
 const DWORD kAdSenseMgr = 0x00fadfac, kAdSenseRemove = 0x0071dcb0, kAdHandle = 0x005b39d0, kAdGenRecord = 0x00616f50,
@@ -29420,6 +30693,7 @@ void PageAchievements() {
 // 0x433fb0), at most 2 kinds of TruMenu at a time (~70 MB; heap size unknown), a volumetric kind (tree 2: bat, sharks)
 // only with a loaded unit that has a 3D navigation image ([[Level+0x68]] = 1), every DRM present (the game's FileExists
 // 0x5bf7b0). A level change forgets the list (nothing dumped; what the engine does with the extra reference: open).
+// 0.22.37: a level change releases the references first (QlForget, see there); a portal move keeps the list.
 // kQlKinds = work\k_menu_1211\ar_kinds_table.py from the Q83 catalog (enemy_catalog.tsv / enemy_deps.txt).
 struct QlKind { int id; const char *name; int part, tree, drms, anims, mb; const char *children; };
 const QlKind kQlKinds[] = {                  // part 0 base, 1 DLC 1, 2 DLC 2; tree 0 soldier, 1 creature, 2 volumetric, 3 thrall
@@ -29476,7 +30750,7 @@ typedef void(__cdecl *QlDumpFn)(int id);
 struct QlReq { int kind, entry; DWORD start, readyAt; bool stalled; int total, ready, animMissing; char stuck[48]; };
 QlReq g_ql[kQlMax];
 volatile LONG g_qlN = 0;
-DWORD g_qlPlayer = 0, g_qlUnit = 0;          // the level of the requests (a change forgets the list)
+DWORD g_qlPlayer = 0, g_qlUnit = 0;          // the level of the requests (0.22.37: a level change releases the list)
 bool g_qlChecked = false, g_qlOk = false;
 char g_qlWhy[96] = "not checked";
 LONG g_qlLoads = 0, g_qlUnloads = 0;
@@ -29719,13 +30993,34 @@ bool RunArenaLoad(const char *arg, char *o, size_t n) {
     Log(1, "arena.load (src=%s): %s", ShotSource("arena.load"), o);
     return true;
 }
+bool QlDumpOne(int id);                      // below
+// 0.22.37 (P5, N-5 / K follow-up "Leck bis Spielende", docs\Befund-Gruppe-N-1211.md section 5): a level change no longer
+// forgets the list with the extra references inside the engine - the engine never drops a flag-1 reference (0x5c1900
+// releases one reference per intro of a dumped unit, the full dump 0x5c1a80 runs only at the game end). Safe point:
+// QlTick (Present = the game thread, between two game frames) sees the pending level change request (GameTracker+0xb9,
+// LevelChangePending) BEFORE the game loop runs STREAM_LevelLoadAndInit 0x5d30d0; there each request of TruMenu whose
+// tracker entry still carries its id gets STREAM_DumpObject 0x5c1790 exactly once - the same call and rule as
+// arena.unload (a request still loading is cancelled by it, 0x5c16f6; spawned instances hold their own references).
+// A change seen only afterwards (player / unit already new) releases in the same way at once.
 void QlForget(const char *why) {
     char list[200] = "";
+    int dumped = 0, gone = 0, failed = 0;
     for (int i = 0; i < g_qlN && i < kQlMax; ++i) {
+        const QlKind &q = kQlKinds[g_ql[i].kind];
+        const DWORD e = kObjectTable + static_cast<DWORD>(g_ql[i].entry) * 0x24;
+        WORD id = 0, status = 0;
+        const bool held = ReadWord(e + 0xc, &id) && static_cast<SHORT>(id) == q.id && ReadWord(e + 0xe, &status) && status;
+        const bool ok = held && QlDumpOne(q.id);
+        if (ok) ++dumped;
+        else if (held) ++failed;
+        else ++gone;
         strncat_s(list, sizeof(list), i ? ", " : "", _TRUNCATE);
-        strncat_s(list, sizeof(list), kQlKinds[g_ql[i].kind].name, _TRUNCATE);
+        strncat_s(list, sizeof(list), q.name, _TRUNCATE);
+        strncat_s(list, sizeof(list), ok ? " dumped" : held ? " EXCEPTION" : " (entry no longer holds it)", _TRUNCATE);
+        InterlockedIncrement(&g_qlUnloads);
     }
-    Log(1, "arena.load: %s - list forgotten (%s; nothing dumped, the references stay with the engine)", why, list);
+    Log(1, "arena.load: %s - 0.22.37: TruMenu's references released before the level change (%s; %d dumped with "
+        "0x5c1790, %d no longer held, %d failed)", why, list, dumped, gone, failed);
     InterlockedExchange(&g_qlN, 0);
 }
 bool QlDumpOne(int id) {                     // game thread: STREAM_DumpObject(id) inside __try
@@ -29768,23 +31063,30 @@ bool RunArenaUnload(const char *arg, char *o, size_t n) {
     Log(1, "arena.unload %s (src=%s): %s", a, ShotSource("arena.unload"), o);
     return true;
 }
-// Present hook (game thread): progress of the requests, ready / stalled lines, a level change forgets the list
+// Present hook (game thread): progress of the requests, ready / stalled lines, a level change releases the list (0.22.37)
 void QlTick() {
     if (!g_qlN) return;
+    char why[160];
+    // 0.22.37: the pending request every frame (not every 100 ms) - Paket R 12.11.: +0xb9 set 20:38:37.219, the old units
+    // dumped (state 4) 20:38:37.246, the load 20:38:37.532; the release happens in the first Present that sees it
+    if (LevelChangePending(why, sizeof(why))) { QlForget(why); return; }
     static DWORD last = 0;
     const DWORD now = GetTickCount();
     if (last && now - last < 100) return;
     last = now ? now : 1;
     DWORD player = 0, unit = 0;
-    char why[160];
     ReadDword(kPlayerPtr, &player);
     ReadDword(kUnitId, &unit);
-    if (LevelChangePending(why, sizeof(why))) { QlForget(why); return; }
-    if (player != g_qlPlayer || unit != g_qlUnit) {
+    if (player != g_qlPlayer) {
+        DWORD state = 0;                     // 0.22.37: a change seen only afterwards: release in a loaded level only
+        ReadDword(kMainState, &state);
+        if (!InLevel() || state != 1 || !player) return;   // (never during the load / loading screen)
         Out(why, sizeof(why), "level change (player 0x%08lx -> 0x%08lx, unit %lu -> %lu)", g_qlPlayer, player, g_qlUnit, unit);
         QlForget(why);
         return;
     }
+    // 0.22.37: a stream unit move (portal, same player instance) keeps the list - only a level change releases it
+    if (unit != g_qlUnit) g_qlUnit = unit;
     for (int i = 0; i < g_qlN && i < kQlMax; ++i) {
         QlReq &r = g_ql[i];
         if (r.readyAt) continue;
@@ -30173,6 +31475,23 @@ const Item kItems[] = {
                                    "none, 1 grey with 'eingesammelt'", false, ValLblCollected, RunLblCollected},
     {"dbg.labelgear", "bool", "0.22.36: name labels of Lara's own gear (born by Lara / in her weapon manager): 0 none, 1 "
                               "shown", false, ValLblGear, RunLblGear},
+    // 0.22.37 debug view P5 (section "0.22.37 debug view P5"; render thread, read only)
+    {"dbg.keyitems", "bool", "0.22.37: key items - carryable parts, switches, doors, grapple points, part -> target lines "
+                             "with state (lies / carried? / inserted, uber node)", false, ValDvKeyItems, RunDvKeyItems},
+    {"dbg.labelstyle", "action", "0.22.37 <collect|keyitems|names|checkpoints|portals|all> <name|symbol|both>: labels as "
+                                 "name, symbol or both", false, ValDvLabelStyle, RunDvLabelStyle},
+    {"dbg.room", "bool", "0.22.37: the room name always on collectible / key-item / name labels (readable, bar language)",
+     false, ValDvRoom, RunDvRoom},
+    {"dbg.metres", "bool", "0.22.37: label distances in metres (100 units = 1 m) instead of game units", false, ValDvMetres,
+     RunDvMetres},
+    {"dbg.drawdist", "action", "0.22.37 <units>|off | here <units>|clear | reload: draw distance cap ([Debug] "
+                               "DrawDistance, TruMenu.debugview.txt per unit)", false, ValDvDrawDist, RunDvDrawDist},
+    {"dbg.occlusion", "action", "0.22.37 off|faded|hidden: labels behind walls (scene depth, occlusion queries)", false,
+     ValDvOcclusion, RunDvOcclusion},
+    {"dbg.hideco", "bool", "0.22.37: no labels at co_* cutscene objects (co_rock* stays)", false, ValDvHideCo, RunDvHideCo},
+    {"dbg.hidefx", "bool", "0.22.37: no labels at fx_* effects (*_grab_prompt stays)", false, ValDvHideFx, RunDvHideFx},
+    {"dbg.roomonly", "bool", "0.22.37: uber labels (dbg.uber) and key items only in Lara's room (her stream unit)", false,
+     ValDvRoomOnly, RunDvRoomOnly},
     // 0.21.7 uber labels (section "0.21.7 uber labels"; read only, drawn at Present in a loaded level)
     {"dbg.uber", "bool", "0.21.7: uber labels - gates / platforms / switches near Lara with their state-graph node and the "
                          "time left ('Tor: oben, noch 12 s'; [Debug] UberRadius / UberMax / UberMatch)", false, ValUber,
@@ -34625,6 +35944,22 @@ const QbRow kQbRender[] = {
     // 0.22.36 label filter of dbg.names / dbg.labels ([Debug] LabelCollected / LabelLaraGear)
     {"Namen: Eingesammeltes grau", "Names: collected in grey", "dbg.labelcollected", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
     {"Namen: Laras Ausr\303\274stung", "Names: Lara's gear", "dbg.labelgear", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
+    // 0.22.37 debug view P5: co_ / fx_, room, metres, behind walls, symbols, draw distance
+    {"Namen: co_ ausblenden", "Names: hide co_", "dbg.hideco", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
+    {"Namen: fx_ ausblenden", "Names: hide fx_", "dbg.hidefx", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
+    {"Nur aktueller Raum", "Current room only", "dbg.roomonly", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
+    {"Raum immer zeigen", "Room always", "dbg.room", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
+    {"Entfernung in Metern", "Distance in metres", "dbg.metres", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0},
+    {"Hinter W\303\244nden: blass", "Behind walls: faded", "dbg.occlusion", "faded", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
+    {"Hinter W\303\244nden: weg", "Behind walls: hidden", "dbg.occlusion", "hidden", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
+    {"Hinter W\303\244nden: zeigen", "Behind walls: shown", "dbg.occlusion", "off", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
+    {"Symbole + Namen", "Symbols + names", "dbg.labelstyle", "all both", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
+    {"Nur Symbole", "Symbols only", "dbg.labelstyle", "all symbol", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
+    {"Nur Namen", "Names only", "dbg.labelstyle", "all name", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
+    {"Sichtweite hier 3000", "Draw distance here 3000", "dbg.drawdist", "here 3000", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
+    {"Sichtweite hier 8000", "Draw distance here 8000", "dbg.drawdist", "here 8000", kQbAction, -1, kQcNone, 0, kQbWhite, 0},
+    {"Sichtweite hier: Vorgabe", "Draw distance here: default", "dbg.drawdist", "here clear", kQbAction, -1, kQcNone, 0,
+     kQbWhite, 0},
     {"Markup", "Markup", "draw.markup", "", kQbBool, -1, kQcMarkup, 0, kQbMarkup},
     {"Nur Kanten", "Ledges only", "draw.ledges", "", kQbBool, -1, kQcNone, 0, kQbMarkup},
     // 0.21.1 (ChunkDoll crash, docs\Befund-ChunkDoll-Absturz-0711.md): physics bodies used / 405, read only
@@ -34679,6 +36014,7 @@ const QbRow kQbLevel[] = {
     {"Checkpoints", "Checkpoints", "dbg.checkpoints", "", kQbBool, kDvCheckpoints, kQcLayer, 0, 0},
     {"Trigger-Namen", "Labels", "dbg.show", "trglabels", kQbBool, kDvTrgLabels, kQcTrgLabels, 0, 0},
     {"Sammelgegenst\303\244nde", "Collectibles", "dbg.collect", "", kQbBool, kDvCollect, kQcLayer, 0, 0},   // 0.20
+    {"Schl\303\274sselgegenst\303\244nde", "Key items", "dbg.keyitems", "", kQbBool, kDvKeyItems, kQcLayer, 0, 0},   // 0.22.37
     // 0.21.7 uber labels (gates / platforms: node + time left), read only
     {"Tore / Plattformen (Zustand)", "Gates / platforms (state)", "dbg.uber", "", kQbBool, -1, kQcNone, 0, kQbCheat, 0},
     {"Tore / Plattformen ins Log", "Gates / platforms to log", "uber.dump", "", kQbAction, -1, kQcNone, 0, kQbCheat, 0},
@@ -35259,6 +36595,17 @@ const QbHelp kQbHelp[] = {
     {"dbg.labelcollected", "", "Aufgehobenes: aus = kein Name, an = grau|Picked up: off = no label, on = grey label"},
     {"dbg.labelgear", "", "Namen an Laras eigener Ausr\303\274stung (Waffen, Ger\303\244te)|Labels on Lara's own gear "
                           "(weapons, tools)"},
+    // 0.22.37 debug view P5
+    {"dbg.keyitems", "", "Teile, Schalter, T\303\274ren, Greifpunkte, Linie Teil -> Ziel|Parts, switches, doors, grapple "
+                         "points, part -> target"},
+    {"dbg.hideco", "", "Keine Namen an co_-Objekten (Szenen), co_rock bleibt|No labels at co_ objects (cutscenes)"},
+    {"dbg.hidefx", "", "Keine Namen an fx_-Effekten, Greif-Hinweise bleiben|No labels at fx_ effects, grab prompts stay"},
+    {"dbg.roomonly", "", "Schalter / Tore / Teile nur in Laras Raum|Switches / gates / parts in Lara's room only"},
+    {"dbg.room", "", "Raum immer am Etikett (Kraken-Raum)|Room always on the label (Kraken room)"},
+    {"dbg.metres", "", "Entfernung und H\303\266he in Metern|Distance and height in metres"},
+    {"dbg.occlusion", "*", "Etiketten hinter W\303\244nden: zeigen / blass / weg|Labels behind walls: shown / faded / hidden"},
+    {"dbg.labelstyle", "*", "Etiketten als Name, Symbol oder beides|Labels as name, symbol or both"},
+    {"dbg.drawdist", "*", "Sichtweite f\303\274r Laras Gebiet (Datei)|Draw distance for Lara's area (file)"},
     {"dbg.show", "trglabels", "Namen an den Triggern (Objekt, Intro-Id, Form)|Trigger names (object, intro id, shape)"},
     {"dbg.show", "unknown", "Trigger, deren Art TruMenu nicht kennt (grau)|Triggers of a kind TruMenu does not know (grey)"},
     {"dbg.portals", "", "Lade-Bereiche zwischen den Abschnitten (wei\303\237)|Loading areas between the units (white)"},
@@ -39255,7 +40602,8 @@ QbRow g_chapRow[kQbViewMax];                 // the unit rows of this frame (lev
 // SetChapterUIData(level, chapter) (work\b_nav_1211\q105_chapter_calls.txt: owner intro + constant arguments), the
 // checkpoint intros (object 'checkpoint') of each unit in the order of their +0x52 index. head = an optional heading
 // row "DE|EN" shown before the unit (chapter start, loop note); base-game checkpoint rows jump with cp.jump ... force.
-struct ChapOrder { const char *group, *unit; bool ring; const char *cps, *head; };   // cps: intro ids, space separated
+// 0.22.37 (P5): visit = 2 on a return visit of a unit already listed (Paket R) - its own row, "Rueckweg" on the page
+struct ChapOrder { const char *group, *unit; bool ring; const char *cps, *head; int visit; };   // cps: ids, space separated
 const ChapOrder kChapOrder[] = {
     {"DLC 2", "dlc_level2_start", false, "9400 11277 9733 11278"},
     {"DLC 2", "dlc_yggdrasil_hall01", false, "10626"},
@@ -39287,22 +40635,35 @@ const ChapOrder kChapOrder[] = {
     // (entry portal -> exit portal along the proven level chain, work\q113_chain_1211\q113_chain.py ->
     // q113_cp_order.txt; +0x52 is no walking order, group J), loop headings with their direction (cutscene numbers),
     // the l4_temple side trip and the second pass of the prologue units - same generator, same 84 units / 303 ids
+    // 0.22.37 (P5, Paket R 12.11., docs\Befund-PaketR-Mittelmeer-1211.md): same generator with PAKET_R_FWD / _RET - CP 76
+    // on the return visit of l1_kraken_room, the saving cinematics 84 / 696 / 160 / 42 and checkpoint_l1_going_in (672 /
+    // 673 / 781) on the way in, _going_out (674 / 675 / 782) on the way back; the 7 return visits as rows of their own
+    // (visit 2, "Rueckweg" on page Kapitel); every id proven to be a save intro of its unit, no checkpoint id lost
     {"Base game l1", "l1_seatop", false, "1000", "Kapitel 1.1 Der Weg nach Avalon|Chapter 1.1 The Path to Avalon"},
     {"Base game l1", "l1_seafloor", false, "234", nullptr},
-    {"Base game l1", "l1_norse_hallway_a", false, "779 780", nullptr},
-    {"Base game l1", "l1_kraken_entrance", false, "", "Kapitel 1.2 Niflheim|Chapter 1.2 Niflheim"},
+    {"Base game l1", "l1_norse_hallway_a", false, "779 780 781", nullptr},
+    {"Base game l1", "l1_kraken_entrance", false, "672 673 696", "Kapitel 1.2 Niflheim|Chapter 1.2 Niflheim"},
     {"Base game l1", "l1_krakenstairs_a", false, "633 634", nullptr},
     {"Base game l1", "l1_krakenstairs_b", false, "593 594", nullptr},
-    {"Base game l1", "l1_kraken_room", false, "75 76 56 58 77 78 74 73 46", nullptr},
+    {"Base game l1", "l1_kraken_room", false, "75 84 56 58 77 78 74 73 46", nullptr},
     {"Base game l1", "l1_baldrsstairs_a", false, "270 271",
      "Rundweg ab l1_kraken_room: Treppen -> Grab -> Seitenraum -> Halle -> zur\303\274ck (Szenen 45 / 49 / 50, "
      "gefolgert)|Loop from l1_kraken_room: stairs -> tomb -> side room -> hall -> back (cutscenes 45 / 49 / 50, "
      "inferred)"},
     {"Base game l1", "l1_baldrsstairs_b", false, "239 240", nullptr},
-    {"Base game l1", "l1_baldrs_tomb", false, "140 72 141",
+    {"Base game l1", "l1_baldrs_tomb", false, "140 72 160 42 141",
      "Kapitel 1.3 Das Nordische \303\204quivalent|Chapter 1.3 The Norse Connection"},
     {"Base game l1", "l1_baldrs_sideroom", false, "91 92", nullptr},
     {"Base game l1", "l1_baldrs_hall", false, "5 6", nullptr},
+    {"Base game l1", "l1_kraken_room", false, "76 75",
+     "R\303\274ckweg zum Boot (Paket R): Kraken-Raum -> Treppen -> Eingang -> Gang -> Meeresgrund -> Boot|Return to the "
+     "boat (Paket R): kraken room -> stairs -> entrance -> hallway -> sea floor -> boat", 2},
+    {"Base game l1", "l1_krakenstairs_b", false, "594 593", nullptr, 2},
+    {"Base game l1", "l1_krakenstairs_a", false, "634 633", nullptr, 2},
+    {"Base game l1", "l1_kraken_entrance", false, "675 674", nullptr, 2},
+    {"Base game l1", "l1_norse_hallway_a", false, "782 779", nullptr, 2},
+    {"Base game l1", "l1_seafloor", false, "234", nullptr, 2},
+    {"Base game l1", "l1_seatop", false, "", nullptr, 2},
     {"Base game l1", "l1_cineseatop", false, "", "Kapitel 1.4 Gott des Donners|Chapter 1.4 God of Thunder"},
     {"Base game l1", "l1_ship_exterior", false, "1554 1555 1556 1557 1558 1560 1559 1561 1562", nullptr},
     {"Base game l1", "l1_ship_upper_hallway_a", false, "1524 1525", nullptr},
@@ -39397,7 +40758,8 @@ const ChapOrder kChapOrder[] = {
     {"Base game l7", "l7_monastery", false, "", nullptr},
     {"Base game l7", "l7_himalaya_end", false, "", nullptr},
 };
-int g_chapCpOpen = -1;                       // 0.21.9: the kUnits index whose checkpoints are shown (-1 = none)
+int g_chapCpOpen = -1;                       // 0.21.9: the kUnits index whose checkpoints are shown (-1 = none);
+                                             // 0.22.37: a kChapOrder row as kChapRowKey + row index (return visits)
 char g_chapCpArg[kQbViewMax][72];            // 0.21.9: the cp.jump arguments of this frame's checkpoint rows
 const ChapOrder *ChapOrderOf(int unit) {
     if (unit < 0 || unit >= kUnitCount) return nullptr;
@@ -39405,32 +40767,51 @@ const ChapOrder *ChapOrderOf(int unit) {
         if (!_stricmp(c.unit, kUnits[unit].unit)) return &c;
     return nullptr;
 }
+// 0.22.37 (P5): a unit row's key - its kChapOrder row (a unit may have two: the return visit) or the kUnits index
+const int kChapRowKey = 10000;
+const int kChapOrderN = static_cast<int>(sizeof(kChapOrder) / sizeof(kChapOrder[0]));
+int ChapRowKey(int unit, const ChapOrder *co) { return co ? kChapRowKey + static_cast<int>(co - kChapOrder) : unit; }
+const ChapOrder *ChapRowOfKey(const char *key, int unit) {
+    const int k = key && key[0] ? atoi(key) : -1;
+    if (k >= kChapRowKey && k - kChapRowKey < kChapOrderN) return &kChapOrder[k - kChapRowKey];
+    return ChapOrderOf(unit);
+}
 int ChapCpCount(const ChapOrder *c) {
     int count = 0;
     for (const char *p = c ? c->cps : ""; *p; ++p)
         if (*p != ' ' && (p == c->cps || p[-1] == ' ')) ++count;
     return count;
 }
-// the units of group g in page order: kChapOrder first (play order), then the group's other units of kUnits
-int ChapUnits(int g, int *out, int max) {
+// the units of group g in page order: kChapOrder first (play order), then the group's other units of kUnits;
+// 0.22.37 (P5): rows[] = the kChapOrder row of each entry (a unit with a return visit comes twice, one per row)
+int ChapUnits(int g, int *out, int max, const ChapOrder **rows = nullptr) {
     const char *key = kChapGroups[g].key;
     int n = 0;
     for (const ChapOrder &c : kChapOrder) {
         const int i = strcmp(c.group, key) ? -1 : UnitIndexOf(c.unit);
-        if (i >= 0 && !strcmp(kUnits[i].group, key) && n < max) out[n++] = i;
+        if (i >= 0 && !strcmp(kUnits[i].group, key) && n < max) {
+            if (rows) rows[n] = &c;
+            out[n++] = i;
+        }
     }
     for (int i = 0; i < kUnitCount && n < max; ++i) {
         if (strcmp(kUnits[i].group, key)) continue;
         bool have = false;
         for (int j = 0; j < n && !have; ++j) have = out[j] == i;
-        if (!have) out[n++] = i;
+        if (!have) {
+            if (rows) rows[n] = ChapOrderOf(i);
+            out[n++] = i;
+        }
     }
     if (!strcmp(key, kUnitsNoDataGroup))     // 0.21.10: the unused-slot group also lists left / right (they stay in DLC 1)
         for (const char *u : kUnitsNoData) {
             const int i = UnitIndexOf(u);
             bool have = i < 0;
             for (int j = 0; j < n && !have; ++j) have = out[j] == i;
-            if (!have && n < max) out[n++] = i;
+            if (!have && n < max) {
+                if (rows) rows[n] = ChapOrderOf(i);
+                out[n++] = i;
+            }
         }
     return n;
 }
@@ -39453,8 +40834,9 @@ int QbChapRows(QbView *v, QbDyn *d, int max, bool de) {
     int n = 0, rows = 0;
     n += QbPzRows(v, d, max, de);            // 0.22.31 (Q106): group "Raetsel" (uber objects of the loaded units) first
     for (int g = 0; g < kChapGroupN && n < max; ++g) {
-        int order[kUnitCount];               // 0.21.9: play order for DLC 1 / DLC 2 (kChapOrder)
-        const int count = ChapUnits(g, order, kUnitCount);
+        int order[kUnitCount + 16];          // 0.21.9: play order for DLC 1 / DLC 2 (kChapOrder); 0.22.37: + return visits
+        const ChapOrder *orderRow[kUnitCount + 16];
+        const int count = ChapUnits(g, order, kUnitCount + 16, orderRow);
         const bool open = g_chapOpen == g;
         QbView &w = v[n];
         QbDyn &q = d[n];
@@ -39478,7 +40860,7 @@ int QbChapRows(QbView *v, QbDyn *d, int max, bool de) {
         bool ringShown = false;
         for (int j = 0; j < count && n < max && rows < kQbViewMax; ++j) {
             const int i = order[j];
-            const ChapOrder *co = ChapOrderOf(i);   // 0.21.9: ring mark, checkpoints
+            const ChapOrder *co = orderRow[j];   // 0.21.9: ring mark, checkpoints (0.22.37: the row, not the unit's first)
             if (co && co->ring && !ringShown) {  // 0.21.9: the loop's units under one heading
                 QbDynLabel(&v[n], &d[n], de ? "Rundweg (Richtung nicht in den Daten)" : "Loop (direction not in the data)");
                 ringShown = true;
@@ -39504,10 +40886,12 @@ int QbChapRows(QbView *v, QbDyn *d, int max, bool de) {
             const bool noDrm = UnitNoDrm(i);     // 0.21.9: grey, not loadable
             const bool unused = UnitUnused(i);   // 0.21.10: one of the six slots without data (17p / 17s)
             const int cps = ChapCpCount(co);
-            const bool cpOpen = cps > 0 && g_chapCpOpen == i;
+            const int rowKey = ChapRowKey(i, co);   // 0.22.37: one row of a unit with a return visit opens alone
+            const bool cpOpen = cps > 0 && g_chapCpOpen == rowKey;
             char more[48] = "";
             if (cps) Out(more, sizeof(more), "  %s %d CP", cpOpen ? "[-]" : "[+]", cps);
-            Out(x.name, sizeof(x.name), "  %s%s%s", kUnits[i].unit, co && co->ring ? (de ? " (Rundweg)" : " (loop)") : "", more);
+            Out(x.name, sizeof(x.name), "  %s%s%s%s", kUnits[i].unit, co && co->ring ? (de ? " (Rundweg)" : " (loop)") : "",
+                co && co->visit > 1 ? (de ? " (R\303\274ckweg)" : " (return)") : "", more);
             Out(x.state, sizeof(x.state), "%s", unused ? (de ? "ungenutzt" : "unused") : noDrm ? (de ? "keine .drm" : "no .drm")
                                                 : armed ? (de ? "nochmal rechts!" : "right again!")
                                                 : cps ? (de ? "rechts 2x, links: CP" : "right 2x, left: CP") : (de ? "rechts 2x" : "right 2x"));
@@ -39523,6 +40907,7 @@ int QbChapRows(QbView *v, QbDyn *d, int max, bool de) {
             y.intro = rows++;
             y.loaded = note;
             strncpy_s(y.unit, sizeof(y.unit), kUnits[i].unit, _TRUNCATE);
+            Out(y.arg, sizeof(y.arg), "%d", rowKey);   // 0.22.37: QbChapAct / ChapFootHint find the row again
             ++n;
             if (!cpOpen) continue;
             // 0.21.9: the open unit's checkpoints - cp.jump <unit> <intro> (backup, unit.go, wait.unit, dbg.cpgo), right 2x
@@ -39570,7 +40955,7 @@ bool ChapFootHint(const QbDyn &q, bool de, char *o, size_t n) {
     else if (q.kind != kQdChap) return false;
     else if (UnitUnused(u)) t = de ? "ungenutzt - keine Daten (17p/17s), nicht ladbar" : "unused - no data (17p/17s), not loadable";
     else if (UnitNoDrm(u)) t = de ? "keine .drm in mods - nicht ladbar" : "no .drm in mods - not loadable";
-    else if (ChapCpCount(ChapOrderOf(u))) t = de ? "rechts 2x: Sicherung + laden   links: Checkpoints auf / zu"
+    else if (ChapCpCount(ChapRowOfKey(q.arg, u))) t = de ? "rechts 2x: Sicherung + laden   links: Checkpoints auf / zu"
                                                  : "right 2x: backup + load   left: checkpoints open / close";
     else return false;
     Out(o, n, "%s", t);
@@ -39612,9 +40997,10 @@ void QbChapAct(const QbDyn &q, int dir) {
                 QbResult(true, "%s: %s", q.unit, de ? "keine .drm in mods - nicht ladbar" : "no .drm in mods - not loadable");
             return;
         }
-        if (dir == -1 && ChapCpCount(ChapOrderOf(u))) {
-            const bool open = g_chapCpOpen != u;
-            g_chapCpOpen = open ? u : -1;    // one unit's checkpoints at a time
+        if (dir == -1 && ChapCpCount(ChapRowOfKey(q.arg, u))) {
+            const int key = q.arg[0] ? atoi(q.arg) : u;   // 0.22.37: the row key (return visits open alone)
+            const bool open = g_chapCpOpen != key;
+            g_chapCpOpen = open ? key : -1;  // one unit's checkpoints at a time
             QbResult(false, "%s: %s", q.unit, open ? (de ? "Checkpoints auf (rechts 2x = hin)" : "checkpoints open (right 2x = go)")
                                                    : (de ? "Checkpoints zu" : "checkpoints closed"));
             return;
@@ -42354,6 +43740,7 @@ void ReadOptions(const char *dir) {
     g_dvViewAtStart = OptInt(ini, "Debug", "View") != 0 ? 1 : 0;
     g_dvTrgAtStart = OptInt(ini, "Debug", "Triggers") != 0 ? 1 : 0;
     for (int i = 0; i < kDvCount; ++i) g_dvAtStart[i] = OptInt(ini, "Debug", kDvLayers[i].key) != 0 ? 1 : 0;
+    P5ReadOptions(ini);                      // 0.22.37 styles, room, metres, occlusion, co_ / fx_, draw distance
     {                                        // 0.20 collectibles / enemies
         char radius[32];
         OptString(ini, "Debug", "MarkRadius", radius, sizeof(radius));
@@ -42818,6 +44205,8 @@ void Start(HMODULE self) {
     M201Check();                              // 0.20.1 sound list + FMOD music mute (precheck_0201.txt; after M20Check)
     SgCheck();                                // 0.21.8 sound group sliders (precheck_0218_sndgroups.txt; after M201Check)
     M21Check();                               // 0.21 arachnophobia / camera / labels / ai.remove (precheck_021.txt)
+    P5Check();                                // 0.22.37 debug view P5 (precheck_02237.txt; after M20Check / M21Check:
+                                              // needs the intro data and label checks)
     // 0.10: radial menu (after DevRead: entries may name dev.<slug> rows) and the stage R2 spawn path
     g_spawnOk = SpawnCheck();
     M211Check();                              // 0.21.1 ai.kill / sticky / room check / physics / spawn (precheck_0211.txt;
