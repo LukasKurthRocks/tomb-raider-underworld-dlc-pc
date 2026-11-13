@@ -155,14 +155,14 @@ def xbox_analysis(xblob, K, samp, log):
     c1e = c2s if c2s is not None else i1
     def is_light(rd, lit):
         return any((t == 'c' and n in LX) or (t == 's' and n in LSAMP_X) or (t == 't' and any((n, c) in lit for c in ls)) for t, n, ls in rd)
-    lit = set(); hoist = []; lit2 = None
+    lit = set(); hoist = []; lit2 = None; hoist_lanes = {}
     for k in range(i0, i1):
         if k == c1s: lit2 = set(lit)
         i = B[k]; w = writes(i); lr = lane_reads(i, st); clean = False
         for (r_, c_) in w:
             if is_light(lr[c_], lit): lit.add((r_, c_))
             else: lit.discard((r_, c_)); clean = True
-        if clean: hoist.append(k)
+        if clean: hoist.append(k); hoist_lanes[k] = {l for l in w if l not in lit}
     # chunk 1 classification
     flag = {l: {'O'} for l in lit2}
     pos = {(n, c) for t, n, ls in reads(B[c1s], st) if t == 't' for c in ls}
@@ -201,7 +201,7 @@ def xbox_analysis(xblob, K, samp, log):
     log.append('X block [%d,%d), chunk 1 [%d,%d): geo %d, brdf %d, tail %d, hoisted (block) %d; L lanes %s, brdf inputs %d, '
                'outputs %s (first read %s), first tail %d, tail pure reads %s' % (i0, i1, c1s, c1e, sum(1 for v in cls.values() if v == 'geo'), len(brdf), len(tail),
                                                    len(hoist), sorted(Lx), len(din), sorted(DS), DSat, ft, sorted(tail_pure)))
-    return dict(xprog=xprog, i0=i0, i1=i1, B=B, st=st, LX=LX, c1s=c1s, c1e=c1e, hoist=hoist, brdf=brdf, tail=tail, Lx=sorted(Lx), Lfirst=Lfirst,
+    return dict(xprog=xprog, i0=i0, i1=i1, B=B, st=st, LX=LX, c1s=c1s, c1e=c1e, hoist=hoist, hoist_lanes=hoist_lanes, brdf=brdf, tail=tail, Lx=sorted(Lx), Lfirst=Lfirst,
                 din=sorted(din), DS=sorted(DS), tail_pure=sorted(tail_pure), lit=lit)
 
 
@@ -257,6 +257,39 @@ def x_tail_map(A, acc):
 
 
 # ------------------------------------------------------------------------------------------------ PC side + build
+def l_norm_track(i, sub):
+    """P4a (13.11., Xbox 2195 DLC 1 water, donor 1008): some base PC light sub-blocks normalise the light vector as
+    `dp3 rS.w, rV, rV` / `rsq rS.w, rS.w` / `mul rL.xyz, rV, rS.w` instead of `nrm` (1008 b0: rV = c178 - v4 = light
+    position - world position) and overwrite rL later (reflection vector). The build only knew `nrm`, so L stayed
+    None ('L None radiance'). Records the first such light-pure normalisation of the sub-block as sub['Lc'] =
+    (insert index after it, register); emit_insert uses it only when no nrm / sun-direction L was found (existing
+    builds unchanged). The sign / lane choice is proved like every L by the Xbox-lit VM reference (>= 0.999)."""
+    if not i.ops or not i.ops[0].isdst or i.ops[0].rtype != sm3asm.RT_TEMP: return
+    d = i.ops[0]; s = i.ops[1:]; wl = [c for c in range(4) if d.wm >> c & 1]
+    T_ = lambda o, mods=(0,): o.rtype == sm3asm.RT_TEMP and o.smod in mods and not o.rel
+    sq = sub.setdefault('sq', {}); rs = sub.setdefault('rs', {})
+    if i.op == 'dp3' and len(s) == 2 and T_(s[0]) and T_(s[1]) and s[0].num == s[1].num and (s[0].swz & 0x3f) == (s[1].swz & 0x3f):
+        for c in wl: sq[(d.num, c)] = (s[0].num, s[0].swz & 0x3f)
+    elif i.op == 'rsq' and len(s) == 1 and T_(s[0], (0, 11)) and (s[0].num, s[0].swz & 3) in sq:
+        for c in wl: rs[(d.num, c)] = sq[(s[0].num, s[0].swz & 3)]
+    elif i.op == 'mul' and len(s) == 2 and wl == [0, 1, 2] and not (d.mod & 1) and sub.get('Lc') is None:
+        for a, b in ((s[0], s[1]), (s[1], s[0])):
+            if T_(a) and T_(b) and b.swz in (0x00, 0x55, 0xAA, 0xFF) and rs.get((b.num, b.swz & 3)) == (a.num, a.swz & 0x3f):
+                sub['Lc'] = (len(sub['body']), d.num); break
+
+
+def narrow_hoisted(i, lanes):
+    """P4a (13.11., Xbox 2188 sluice gate): a componentwise instruction of the Xbox block can write light-free AND
+    light-dependent lanes at once (2188 `add r9, r8.xwyz, -r3.wxyz`: r9.x = specular constant, r9.yzw = reflection
+    vector 2N(N.L) - L from `dp2add r8.y/z/w` just before it). Hoisting the whole instruction before the block read
+    r8.yzw before any write (f4_lint 'r8.w / r8.y read, not written', uninitialised 3) - a translation artefact, the
+    Xbox code writes r8.yzw first. The hoisted copy keeps only its light-free lanes; the original stays in the block."""
+    if set(writes(i)) == set(lanes): return i
+    if i.op not in COMPWISE: raise Fail('hoist: mixed light / light-free lanes in a non-componentwise %s' % sm3asm.fmt_instr(i, 'ps'))
+    j = clone(i); j.ops[0].wm = sum(1 << c for r_, c in lanes)
+    return j
+
+
 def hoist_select(A):
     """Test 50h fix. The light-free instructions of the Xbox block are executed once before the new block (H). Moving
     ALL of them there (50a-50c) broke the order for those that stand AFTER light chunk 1 in the Xbox code: the Xbox
@@ -272,7 +305,7 @@ def hoist_select(A):
     need = {l for l in xout if l not in A['lit']}
     keep = []
     for k in reversed(post):
-        w = set(writes(B[k]))
+        w = set(A['hoist_lanes'][k])          # P4a: only the light-free lanes are hoisted (narrow_hoisted)
         if not (w & need): continue
         keep.append(k); need -= w
         lr = lane_reads(B[k], st)
@@ -288,7 +321,7 @@ def hoist_select(A):
                     if (n, c) not in wr and (n, c) not in Lx: first_read.setdefault((n, c), k)
         wr |= set(writes(B[k]))
     for k in H:
-        for l in writes(B[k]):
+        for l in A['hoist_lanes'][k]:
             if l in first_read and k > first_read[l]:
                 raise Fail('hoist hazard: %s writes BRDF input r%d.%s after its read at %d' % (sm3asm.fmt_instr(B[k], 'ps'), l[0], 'xyzw'[l[1]], first_read[l]))
     return H, len(post) - len(keep)
@@ -303,8 +336,10 @@ def build(xblob, pdblob, names, log):
     B, i0, i1 = A['B'], A['i0'], A['i1']
     Hk, ndrop = hoist_select(A)
     log.append('hoist: %d light-free instructions before the block, %d after chunk 1 dropped (not needed outside the light chain)' % (len(Hk), ndrop))
-    H = [B[k] for k in Hk]
-    xprog2 = sm3asm.Program(A['xprog'].kind, A['xprog'].major, A['xprog'].minor, F9.header(A['xprog']) + B[:i0] + H + B[i0:])
+    H = [narrow_hoisted(B[k], A['hoist_lanes'][k]) for k in Hk]
+    nn = sum(1 for k in Hk if set(writes(B[k])) != A['hoist_lanes'][k])
+    if nn: log.append('hoist: %d mixed instructions narrowed to their light-free lanes' % nn)
+    xprog2 =sm3asm.Program(A['xprog'].kind, A['xprog'].major, A['xprog'].minor, F9.header(A['xprog']) + B[:i0] + H + B[i0:])
     j0, j1 = i0 + len(H), i1 + len(H)
     xin, xout = F9.live_in_out(xprog2, j0, j1)
     acc = sorted(l for l in xout if l in A['lit'])
@@ -354,6 +389,9 @@ def build(xblob, pdblob, names, log):
     def emit_insert(sub):
         if not sub['body'] and sub['rad'] is None: return
         L = sub['L']; rad = sub['rad']
+        if L is None and sub.get('Lc'):          # P4a: L normalised as rsq + mul (no nrm), fallback only
+            idx, r = sub['Lc']
+            sub['body'].insert(idx, P('mov r%d.xyz, r%d.xyz' % (lsave, r))); L = sub['L'] = ['r%d.%s' % (lsave, w) for w in 'xyz']
         if L is None or rad is None: raise Fail('PC sub-block b%d: L %s radiance %s' % (sub['b'], L, rad))
         newB.extend(sub['body'])
         for (r, c), w in Lmap.items(): newB.append(P('mov r%d.%s, %s' % (xm[r], 'xyzw'[c], L[w])))
@@ -406,6 +444,7 @@ def build(xblob, pdblob, names, log):
             sub['body'].append(i)
             if i.op == 'nrm':
                 sub['body'].append(P('mov r%d.xyz, r%d.xyz' % (lsave, i.ops[0].num))); sub['L'] = ['r%d.%s' % (lsave, w) for w in 'xyz']
+            else: l_norm_track(i, sub)
             continue
         if i.op in ('mad', 'mul') and len(i.ops) >= 3:
             dl = [c for c in range(4) if i.ops[0].wm >> c & 1]

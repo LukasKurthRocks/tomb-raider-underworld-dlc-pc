@@ -34,6 +34,13 @@ Usage (from the repository root):
   ../bin/pyt -t 7200 tools/shader_translate.py run --layers L1,L2[,...] --out OUT_MODS [--plan docs/data/shader_step.tsv]
         [--apply-report <shaders>/shader_step_apply.json] [--store work/shader_store] [--xbox work/sg_audit_0511/xbox]
         [--work WORKDIR] [--ids-from 3600] [--only XLIB,XLIB] [--record FILE.tsv | --expect FILE.tsv] [--report FILE.json]
+        [--extra REL:MAT[,REL:MAT]] [--scope-gaps]   (P4a: material copies outside the plan; --scope-gaps adds every
+        pass-2 slot gap tools/shader_slot_gate.py finds in the input layers, e.g. water 20262 / Xbox 2057)
+        [--ids-recipe FILE.tsv]   (default: the --expect file) recorded builds keep their lib id, new builds never take one
+P4a (13.11.): tools/tu_perlight.py now hoists only the light-free lanes of a mixed Xbox instruction (2188 sluice gate,
+lint 'read, not written') and finds L normalised as rsq + mul (2195 water, 'L None radiance'); the step's gate
+tools/shader_slot_gate.py fails on a pass-2 slot gap and warns (never silently) for every refused copy that keeps a
+converter surrogate.
 Developer data (not in the repository, not on the player path yet): the lib store, the Xbox xdump folder, the base
 shader tables work/render/shaderlibs.pkl / shader map.
 """
@@ -217,6 +224,10 @@ def run(argv):
     ids_from = int(arg(argv, '--ids-from', '3600')); only = arg(argv, '--only')
     recp = arg(argv, '--record'); expp = arg(argv, '--expect'); rep = arg(argv, '--report')
     only = {int(x) for x in only.split(',')} if only else None
+    extra = arg(argv, '--extra')            # P4a: REL:MAT[,REL:MAT] outside the plan (e.g. slot gaps of shader_slot_gate)
+    extra = [(x.rsplit(':', 1)[0], int(x.rsplit(':', 1)[1])) for x in extra.split(',')] if extra else []
+    scope_gaps = '--scope-gaps' in argv
+    if scope_gaps: argv.remove('--scope-gaps')
     if not outm or not layers[0]: raise SystemExit('run: --layers and --out are needed')
     for L in layers:
         if not os.path.isdir(L): raise SystemExit('layer not found: %s' % L)
@@ -261,7 +272,15 @@ def run(argv):
         return None
     # ---- copies
     copies = []; listed = []
-    for rel, mat, occ, cls, why in scope_rows(planp, arep):
+    srows = scope_rows(planp, arep)
+    if scope_gaps:                          # P4a: every pass-2 slot gap of the input stack is in scope too
+        import shader_slot_gate as SG
+        extra += [(g['rel'], g['mat']) for g in SG.scan(layers, xdir, roles=False)[0] if g.get('missing')]
+    have = {(r_[0].lower(), r_[1]) for r_ in srows}; seen_x = set(); xrows = []
+    for r_, m_ in extra:
+        if (r_.lower(), m_) in have or (r_.lower(), m_) in seen_x: continue
+        seen_x.add((r_.lower(), m_)); xrows.append((r_, m_, 0, 'EXTRA', 'outside the plan (--extra / --scope-gaps)'))
+    for rel, mat, occ, cls, why in srows + xrows:
         e = dict(rel=rel, mat=mat, cls=cls, scope=why)
         f = eff.get(rel.lower()); xf = xfile(rel)
         if f is None: listed.append(dict(e, why='file not in the layers')); continue
@@ -292,7 +311,15 @@ def run(argv):
         sum(1 for r in REC if r[4] == 'ps'), sum(1 for r in REC if r[4] == 'vs'), time.time() - t0))
     # ---- per group: reuse / build, VS rule, lane rule, binding proof on every copy
     taken = FST.known_hashes(); nid = ids_from
-    plans = []                       # (group entry, {copy index: (new section, kept)}, ps (id, data), vs (id, data) or None)
+    # P4a: stable ids - a group the recipe (--expect / --ids-recipe) records as built keeps its recorded lib id; a NEW
+    # build never takes a recorded id (before: sequential ids, so one newly built group shifted every later id)
+    recipe = {}
+    idsp = arg(argv, '--ids-recipe') or expp
+    if idsp and os.path.isfile(idsp):
+        for r_ in read_tsv(idsp):
+            if r_['action'] == 'build' and r_['lib'].isdigit(): recipe[(r_['xlib'], r_['smap'], r_['dxn'], r_['copies'])] = int(r_['lib'])
+    rec_ids = set(recipe.values())
+    plans = []                     # (group entry, {copy index: (new section, kept)}, ps (id, data), vs (id, data) or None)
     gres = []
     for gi, (key, cs) in enumerate(groups.items()):
         xl, smap, dxn, unp = key
@@ -348,12 +375,17 @@ def run(argv):
             XP = TLT.mparams(X0[(10, c0['xmat'])], 'be'); pd = TB.SMAP.get(xl, {}).get('pc')
             try:
                 built = TB.build_group(xl, pd, dict(smap), set(dxn), XP, lit, os.path.join(wd, 'b', '%d_%d' % (xl, c0['mat'])), lg, list(unp))
-                while nid in used_ids: nid += 1
-                data = TB.pack_lib(built, nid, taken, len(built))
+                want = recipe.get((str(xl), json.dumps(g['smap'], sort_keys=True), json.dumps(g['dxn'], sort_keys=True),
+                                   json.dumps(g['copies'], sort_keys=True)))
+                if want is not None and want not in used_ids: lid_new = want
+                else:
+                    while nid in used_ids or nid in rec_ids: nid += 1
+                    lid_new = nid
+                data = TB.pack_lib(built, lid_new, taken, len(built))
                 res, w = prove(data)
                 if res is None: why.append('build: %s' % w)
                 else:
-                    chosen = ('build', nid, data, res, 'tu_batch.build_group donor %s' % pd); used_ids.add(nid); nid += 1
+                    chosen = ('build', lid_new, data, res, 'tu_batch.build_group donor %s' % pd); used_ids.add(lid_new)
             except Exception as ex:
                 why.append('build refused: %s %s' % (type(ex).__name__, str(ex)[:160]))
         if chosen is None:

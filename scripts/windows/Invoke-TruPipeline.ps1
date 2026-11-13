@@ -115,7 +115,10 @@
                compared with docs\data\shader_translate.tsv (--expect, exit 1 on any difference); then rule_owned apply
                (the ring rule last, <out>\shaders_rule\mods), rule_owned check over the stack, shader_form_gate
                (-ShaderGate) and tu_batch vcheck --strict (binding check of every translated pass-2 lib, exit 1 on a
-               problem) on both shader layers. <out> = -FixesOut DIR, else work\rebuild. tools\own_tree.py assemble
+               problem) on both shader layers; (P4a, 13.11.) shader_translate --scope-gaps also translates every
+               pass-2 slot gap of the stack, and tools\shader_slot_gate.py check over the whole stack fails (exit 1)
+               on a pass-2 permutation slot gap (class A exempt) and prints WARNING SURROGATE / SURR_ROLE for every
+               copy that keeps a converter surrogate. <out> = -FixesOut DIR, else work\rebuild. tools\own_tree.py assemble
                takes shaders, shaders_tr and shaders_rule as layers
       Costumes the three Xbox costume packs (2026-11-03; pack1 Wetsuit k / p, pack2 Classic a / h, pack20 Designer
                l / m), after Assemble (render tables) and Fixes' proof: verify_ids extend (adds the packs' ids to
@@ -550,13 +553,15 @@ $steps = @{
     Shaders = @(
         @('tools\shader_step.py', 'apply', '--layers', "$fix1,$fix2", '--out', "$shOut/mods", '--report', "$shOut/shader_step_apply.json"),
         @('tools\shader_translate.py', 'run', '--layers', "$fix1,$fix2,$shOut/mods", '--out', "$shTr/mods", '--apply-report', "$shOut/shader_step_apply.json",
-          '--work', "$shTr/work", '--expect', 'docs/data/shader_translate.tsv', '--report', "$shTr/shader_translate.json"),
+          '--work', "$shTr/work", '--scope-gaps', '--expect', 'docs/data/shader_translate.tsv', '--report', "$shTr/shader_translate.json"),
         @('tools\rule_owned.py', 'apply', "$shRule/mods", $fix1, $fix2, "$shOut/mods", "$shTr/mods"),
         @('tools\rule_owned.py', 'check', $fix1, $fix2, "$shOut/mods", "$shTr/mods", "$shRule/mods", '--report', "$shRule/rule_owned_check.json"),
         (@('tools\shader_form_gate.py', 'check', "$shOut/mods", '--list', '3', '--report', "$shOut/shader_form_check.json") + $sgEnforce),
         (@('tools\shader_form_gate.py', 'check', "$shTr/mods", '--list', '3', '--report', "$shTr/shader_form_check.json") + $sgEnforce),
         @('tools\tu_batch.py', 'vcheck', "$shOut/mods", 'work/sg_audit_0511/xbox', '--strict'),
-        @('tools\tu_batch.py', 'vcheck', "$shTr/mods", 'work/sg_audit_0511/xbox', '--strict')
+        @('tools\tu_batch.py', 'vcheck', "$shTr/mods", 'work/sg_audit_0511/xbox', '--strict'),
+        # P4a (2026-11-13): pass-2 slot gaps = ERROR (exit 1), refused copies with a surrogate = visible WARNING
+        @('tools\shader_slot_gate.py', 'check', '--layers', "$fix1,$fix2,$shOut/mods,$shTr/mods,$shRule/mods", '--report', "$shTr/shader_slot_gate.json")
     )
     Costumes = $costumeTools
     # DoppelCostume (Q23): recipe object id 857 -> 1031 on our doppelganger_casual (gate before writing), then re-check
