@@ -25,6 +25,16 @@ Each is small, evidence-driven, and listed in LINEAGE.md. Examples:
 * Cutscene command lists: `work/ws/cine/build_cine.py`, `cine_cmd.py` (106/106 base DTPs reproduced exactly).
 * Streamgroup names, ids, padshock, locals: `tools/streamname_fix.py`, `padshock_convert.py`, `locals*.py`.
 * Real audio: `tools/wave_swap.py` (8 227 Wave sections, in place, same size), `tools/mul_audio_batch.py` (XMA → IMA stereo for `.mul` streams).
+* Enemy AI records (0x390-byte records in level DTPs, DTP ids without relocation): `tools/aidata_fix.py` inside the converter.
+  Its table `work/generic/aidata_table.pkl` is **gitignored** and rebuilt by `../bin/pyt tools/aidata_fix.py learn`
+  (pipeline step Prep, seconds; inputs `work/generic/pairs.pkl` from step Cache and the base id map of the generic store
+  from step Ids; expected output `offsets 93 ambiguous/conflicting 0`, 450 base records). Since 2026-11-13 a missing or
+  empty table stops every caller with exit 1 (before it silently changed nothing: the 12 Nov run shipped 19 wrong
+  records). Gate on the output trees (step Fixes): `tools/scan_aidata_tree.py check TREE --pack PACK` (exit 1 on a wrong
+  id / count).
+* DLC 1 start: the retired rule `CINE_SKIP` (2026-10-09 .. 2026-11-13, skipped the intro cinematic) is off; gate
+  `tools/cine_call_gate.py check TREE` (step Fixes): script 20068 +0x6c4 must call Cinematic_Object 3523 +0x2410
+  (vtIndex 57 PlayCinematic). Old trees: `tools/dlc_patch.py --only=cine_play OUT SRC dlc_level1_start.drm`.
 
 ## Stage 3 — shaders and materials (the long tail)
 PC pixel shaders cannot be copied from Xbox microcode, so the Xbox shader libs are **translated**:

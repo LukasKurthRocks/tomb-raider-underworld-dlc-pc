@@ -20,7 +20,10 @@ counts AND ids, -> the crash) and u32 swaps without the id remap (wrong DTP: PC 
   learn(pairs, idm)     -> {offset: [n_evidence, set(classes)]} intersection over base Xbox/PC pairs
   fix(xd, rel, out, ids)-> words changed (pointers / id-ref words untouched; offsets without base evidence untouched)
 CLI: python3 -I tools/aidata_fix.py learn | validate | scan DIR[,DIR..] | patch OUTDIR SRCDIR[,SRCDIR..] name.drm ..
-Table: work/generic/aidata_table.pkl.
+Table: work/generic/aidata_table.pkl (gitignored, ~2 KB; 93 offsets, 0 ambiguous): built by 'learn' from work/generic/pairs.pkl
+(step Cache) and the base id map of the generic store (step Ids); pipeline step Prep runs it before Convert. Without the
+table every fix() caller stops with exit 1 (since 2026-11-13; before it silently changed nothing). Gate on output trees:
+tools/scan_aidata_tree.py check (0 wrong AI records).
 """
 import sys, os, struct, collections, pickle
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -84,9 +87,18 @@ def learn(pairs, idm, names=None):
 
 _T = None
 def table():
+    # 2026-11-13 (P4.2, workspace docs Befund-DLC1-Absturz-Spinne-1311.md): a missing table used to give {} and fix() then
+    # changed NOTHING without a word - the Q94 run of 2026-11-12 shipped 19 wrong AI records that way (DLC 1 small albino
+    # spider attack sound id 0x24910000 -> crash). Now a missing / empty table stops the calling tool with exit 1.
+    # (Re)build: ../bin/pyt tools/aidata_fix.py learn (pipeline step Prep; inputs work/generic/pairs.pkl + the base id map
+    # of the generic store; seconds; expect 'offsets 93 ambiguous/conflicting 0').
     global _T
     if _T is None:
-        _T = pickle.load(open(TABLE, 'rb')) if os.path.exists(TABLE) else {}
+        if not os.path.exists(TABLE):
+            raise SystemExit('aidata_fix: table %s missing - run: tools/aidata_fix.py learn (pipeline step Prep)' % TABLE)
+        _T = pickle.load(open(TABLE, 'rb'))
+        if not _T:
+            raise SystemExit('aidata_fix: table %s is empty - run: tools/aidata_fix.py learn' % TABLE)
     return _T
 
 def choose(e):

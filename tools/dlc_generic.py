@@ -526,11 +526,21 @@ def cine_nowait(xid, xd, out):
     out[a:a + 8] = struct.pack('<II', 0x04000001, 0x7d000000)
     return True
 
-# Skip the dlc_level1_start intro cinematic (user decision 2026-10-09: the cine never reaches ReadyToPlay on PC yet).
-# 20068 state-1 Run: 'get cine object (instanceref member 0x18), cast to class 23175, op 0x6a virtual call' through
-# Prototype 941@9232 (vtIndex 57 = PlayCinematic). Retarget that call to 23175's own Prototype @1528 (vtIndex 61, the
-# handler that prints 'warping lara to dlc_caverns checkpoint90001' and does gotostate 3 = state-3 Run: the warp).
-CINE_SKIP = {20068: dict(src=0x6c4, xb_target=(8, 941, 9232), new_target=(8, 23175, 1528), proto_vt=0x3d)}
+# RETIRED 2026-11-13 (decision of the project owner, P4.1; workspace docs Befund-DLC1-Startwarp-1311.md): CINE_SKIP is OFF (empty).
+# Origin: skip the dlc_level1_start intro cinematic (user decision 2026-10-09: "the cine never reaches ReadyToPlay on PC
+# yet" - the intro hung on PC then; cutscene command lists, ENGINE.md section 2).
+# Why off: the cinematic plays on PC today (old tree log: 127x 'StartCinematic called'). The skip warps Lara in the first
+# frames after the loading screen while she is still in the fall state (chart family [517]) -> she slides ~280 units
+# down, gameTracker +0xba = 2 -> SAVE_RestoreGame -> endless reload loop (live 13.11., 42 reloads in 4 min).
+# Xbox form (kept now): 20068 +0x6c4 -> Cinematic_Object 3523 Prototype +0x2410 (Xbox 941 +0x2410, vtIndex 57
+# PlayCinematic). Gate: tools/cine_call_gate.py check (pipeline step Fixes); repair of old trees: dlc_patch.py
+# --only=cine_play. CINE_NOWAIT above stays on.
+# The retired rule (for reference / old trees): 20068 state-1 Run: 'get cine object (instanceref member 0x18), cast to
+# class 23175, op 0x6a virtual call' through Prototype 941@9232 (vtIndex 57 = PlayCinematic). Retarget that call to
+# 23175's own Prototype @1528 (vtIndex 61, the handler that prints 'warping lara to dlc_caverns checkpoint90001' and
+# does gotostate 3 = state-3 Run: the warp).
+CINE_SKIP_RETIRED = {20068: dict(src=0x6c4, xb_target=(8, 941, 9232), new_target=(8, 23175, 1528), proto_vt=0x3d)}
+CINE_SKIP = {}      # off since 2026-11-13 (see above); do not refill without a live test of the DLC 1 start
 def cine_skip_reloc(xid, xsecs, reloc_le, k_of):
     """returns the patched LE reloc blob or None. k_of(type, xbox id) -> section index in the output DRM"""
     c = CINE_SKIP.get(xid)
@@ -853,7 +863,7 @@ def _convert_drm(xsecs, ids, store, media=None, T=None, use_pc_copy=True, use_te
                     XLATE_STATS['n'] += 1
                 ext.append((si, so, do))
             r.external = ext; sec.reloc = R.write(r, 'le')
-    for k, (_, t, xid, _, route) in enumerate(rep):    # skip the DLC1 intro cinematic (CINE_SKIP)
+    for k, (_, t, xid, _, route) in enumerate(rep):    # CINE_SKIP: empty since 2026-11-13 (retired, see above) = no-op
         if t == 8 and route == 'convert' and xid in CINE_SKIP:
             rl = cine_skip_reloc(xid, xsecs, out[k].reloc,
                                  lambda tt, xx: next((j for j, q in enumerate(xsecs) if (q['type'], q['id']) == (tt, xx)), None))

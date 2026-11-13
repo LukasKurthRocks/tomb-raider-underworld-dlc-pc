@@ -24,7 +24,9 @@
       Prep     generic_type0 save07 (type 0/7 tables), pc_vers_build (our reconstruction), model_point_fix learn +
                selftest, dtpid_evidence (rule inputs of Convert's --extra-fixes, learned from base pairs only)
                -> type0_table.pkl, type7_table.pkl, pc_vers.json, pc_vers_content.json,
-                  work\chain_aim\model_point_rules.pkl, work\generic\dtpid_evidence.pkl
+                  work\chain_aim\model_point_rules.pkl, work\generic\dtpid_evidence.pkl;
+               aidata_fix learn (2026-11-13, P4.2: enemy AI record table from pairs.pkl + the base id map, seconds)
+               -> work\generic\aidata_table.pkl (Convert / dlc_patch stop with exit 1 without it)
       Convert  dlc_convert_all --media --write --extra-fixes -> work\generic\out\pack10|pack11\*.drm
       Names    dlc_names (file names of unnamed DLC records) -> work\generic\dlc_names.txt (can run any time after Ids)
       Media    dlc_media_build (our reconstruction: DLC 1 tree in the B138 layout), locals build (with the text
@@ -98,6 +100,11 @@
                tools/script_clash_fix.py, ids in docs/data/script_clash_ids.json: DLC 2 thrall base 12433 -> 26884,
                16 DRMs; DLC 1: nothing); script_clash_fix check runs on each output tree (exit 1 on a clash left,
                report <tree>\script_clash_check.json).
+               P4 gates (2026-11-13, workspace docs Befund-P4s-Pipeline-1311.md): cine_call_gate check on the DLC 1
+               tree (dlc_level1_start script 20068 +0x6c4 -> Cinematic_Object 3523 +0x2410 vtIndex 57 PlayCinematic,
+               exit 1 on the retired CINE_SKIP form or a missing file, report <tree>\..\cine_call_check.json) and
+               scan_aidata_tree check on both trees (exit 1 on any wrong 0x390-byte AI record id / count, report
+               <tree>\..\aidata_check.json).
                -FixesOut DIR (relative to the repository) writes DIR\dlc1\mods and DIR\dlc2\mods instead of
                work\rebuild\asm_stage2b and dlc2_asm_stage2b (check runs that must not replace the usual outputs)
       Shaders  (2026-11-11, plan A2 stage 1, after Fixes; minutes) the recorded shader decisions on the Fixes output:
@@ -434,7 +441,9 @@ $steps = @{
         @('tools\pc_vers_build.py'),
         @('tools\model_point_fix.py', 'learn'),
         @('tools\model_point_fix.py', 'selftest'),
-        @('tools\dtpid_evidence.py')
+        @('tools\dtpid_evidence.py'),
+        # P4.2 (2026-11-13): the enemy AI record table (gitignored); without it aidata_fix stops the converter (exit 1)
+        @('tools\aidata_fix.py', 'learn')
     )
     # leading comma: a step with a single tool must stay a list of argument lists (PowerShell unrolls @(@(...)))
     Convert = @(
@@ -522,6 +531,9 @@ $steps = @{
         @('tools\chunkdoll_record_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $chunk1),
         @('tools\melee_link_record_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $melee1),
         @('tools\generator_intro_fix.py', 'scan', $fix1, '--pack', 'pack10', '--report', $gen1),
+        # P4 gates (2026-11-13): DLC 1 start calls PlayCinematic (no retired CINE_SKIP), no wrong enemy AI record
+        @('tools\cine_call_gate.py', 'check', $fix1, '--report', ((Split-Path -Parent $fix1) + '/cine_call_check.json')),
+        @('tools\scan_aidata_tree.py', 'check', $fix1, '--pack', 'pack10', '--report', ((Split-Path -Parent $fix1) + '/aidata_check.json')),
         # shader form gate (2026-11-08): the forms Windows' D3D9 or a GPU driver refuses (-ShaderGate)
         (@('tools\shader_form_gate.py', 'check', $fix1, '--list', '3', '--report', $sg1) + $sgEnforce),
         @('tools\compare_b138.py', $fix1, $cmp1),
@@ -543,6 +555,7 @@ $steps = @{
         @('tools\thrall_extension_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $thrall2),
         @('tools\melee_link_record_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $melee2),
         @('tools\generator_intro_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $gen2),
+        @('tools\scan_aidata_tree.py', 'check', $fix2, '--pack', 'pack11', '--report', ((Split-Path -Parent $fix2) + '/aidata_check.json')),
         # 2026-11-09: the end-level words the 0813 tree had wrong vs the installed tree (Level twin s32, unit root block
         # twin, uber TRANS +0x34 raw; DTP 24420 +0x6c only WARN) - exit 1 when one comes back
         @('tools\endlevel_word_judge.py', 'check', $fix2, '--report', ((Split-Path -Parent $fix2) + '/endlevel_words_check.json')),

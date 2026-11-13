@@ -4,6 +4,8 @@ in-game A/B test isolates the fixes; a full re-conversion would also pull in lat
   model   (dlc_generic.model_fix: model-DTP typed fields, HInfo counts)
   rebase  (dlc_generic.script_rebase: Scripts deriving from PC-grown base classes: size/member/sfi/code offsets)
   cine_nowait (dlc_generic.cine_nowait: dlc_level1_start script 20068 goes to its cine state without the TU loading-screen message)
+  cine_play (2026-11-13, cine_call_gate.restore: undoes the retired CINE_SKIP - 20068 +0x6c4 back to 3523 +0x2410 PlayCinematic;
+           the old fix 'cine_skip' is gone, dlc_generic.CINE_SKIP is empty)
   animfx  (animfx.fix: anim event-list DTPs: {u16 h, s16 frame} record headers + terminator as u16 pairs, payload / sound
            struct fields per base-pair classes; crash fix13 0x593659, NOTES 2026-10-10)
   aidata  (aidata_fix.fix: 0x390-byte enemy AI records of level DTPs: DTP ids w/o relocs + s32 fields; crash 0x54df84)
@@ -11,7 +13,7 @@ usage: dlc_patch.py [--only=fix1,fix2] OUTDIR SRCDIR[,SRCDIR..] name.drm [stream
        the file wins; --only restricts the fixes, e.g. --only=animfx for a clean A/B on top of the installed files)"""
 import sys, os, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import dlc_generic as DG, generic_store, drm_write as DW, drm_reloc as R, animfx, aidata_fix
+import dlc_generic as DG, generic_store, drm_write as DW, drm_reloc as R, animfx, aidata_fix, cine_call_gate as CG
 from generic_store import norm_hash
 from drm import cdrm_decode, sections_with_data
 from convert_dlc import raw_dlc
@@ -65,15 +67,14 @@ for name in argv[2:]:
             at = DG.CINE_NOWAIT[x]['at']
             if b[at:at + 8] != bytes.fromhex('010000040000007d') and DG.cine_nowait(x, s['data'], b):
                 o.data = bytes(b); hit['cine_nowait'] += 1
-    for k, o in enumerate(D.sections):          # skip the DLC1 intro cinematic (dlc_generic.CINE_SKIP)
-        if o.type == 8:
-            xid = next((q['id'] for q in xs if q['type'] == 8 and ids(8, q['id']) == o.id), None)
-            if xid in DG.CINE_SKIP and on('cine_skip'):
-                def k_of(tt, xx):
-                    nid = ids(tt, xx)
-                    return next((j for j, q in enumerate(D.sections) if (q.type, q.id) == (tt, nid)), None)
-                rl = DG.cine_skip_reloc(xid, xs, o.reloc, k_of)
-                if rl is not None: o.reloc = rl; hit['cine_skip'] += 1
+    # Fix 'cine_skip' retired 2026-11-13 (dlc_generic.CINE_SKIP is empty: the DLC 1 intro plays on PC, the skip caused the
+    # start reload loop, workspace docs Befund-DLC1-Startwarp-1311.md). Its replacement 'cine_play' undoes the skip on
+    # already converted files: 20068 +0x6c4 back to Cinematic_Object 3523 Prototype +0x2410 (vtIndex 57 PlayCinematic).
+    if on('cine_play') and any(o.type == 8 and o.id == CG.SCRIPT for o in D.sections):
+        st = CG.probe(D)['state']
+        if st == 'cine_skip':
+            CG.restore(D); hit['cine_play'] += 1
+        elif st != 'ok': hit['cine_play_unknown_form'] += 1; print('WARNING cine_play:', name, CG.probe(D))
     data = D.write('le')
     if raw_old[:4] == b'CDRM': data = DW.cdrm_encode(data, 'le')
     op = os.path.join(out_dir, name); os.makedirs(os.path.dirname(op), exist_ok=True)
