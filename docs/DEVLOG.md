@@ -19,6 +19,19 @@ the three Yggdrasil units DLC 2 reuses from the main game have real maps. In nor
 HidePlaceholder=1`). See [TRU-Knowledge.md](TRU-Knowledge.md) section 6, rows "Sonar maps DLC 2" / "Sonar maps DLC 1 /
 base".*
 
+## 2026-11-13 - "I am a rock": a hidden developer object in the Mediterranean
+
+![Development build: Lara floating with TruMenu's flight cheat below the Mediterranean sea floor; under her a dark flat plane labelled "co_rock - I am a rock", behind her the sonar eye puzzle gate of the first underwater puzzle](screenshots/dev-co-rock-seafloor-2026-11-14.jpg)
+
+*Development build, TruMenu flight cheat and debug view labels on (object names, checkpoints, portals, trigger volumes). Below the
+playable geometry of `l1_seafloor`, near the eye puzzle gate of the first underwater puzzle, lies an object called
+`co_rock` - in game a dark flat plane, its start state named "I am a rock". The data show a leftover developer cheat
+object: its class script reads controller input (north / south / east / west and two diagonal moves), answers a wrong
+step with "Nope", and its sub-objects print lines such as "activate cheeet", "ragdoll" and "game completed". No
+script, cutscene or trigger of the game ever uses it, and floating through it does nothing - the input sequence is
+still unknown. See [ENGINE.md](ENGINE.md) row "`co_rock` cheat object" and [TRU-Knowledge.md](TRU-Knowledge.md) row
+"Cheats".*
+
 ## 2026-11-09 (evening) - thralls stop falling at every punch
 
 No picture, the proof is in the logs: with TruShadowCombat 0.6.8 the tutorial thrall in hall02 takes three single
