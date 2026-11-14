@@ -1,0 +1,5 @@
+.echo ===SEARCH===
+s -b 0x10000 L?0x7fff0000 64 df 84 00
+.echo ===SEARCH2===
+s -a 0x10000 L?0x7fff0000 "streamgroups\\"
+q

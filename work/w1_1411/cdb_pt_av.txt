@@ -1,0 +1,11 @@
+.echo ===LM===
+lmv m TruMenu
+.echo ===ECXR===
+.ecxr
+r
+kv 30
+.echo ===U47ab===
+u 0x47ab60 0x47abd0
+.echo ===DDS===
+dps @esp L100
+q

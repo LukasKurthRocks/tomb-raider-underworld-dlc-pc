@@ -1,0 +1,14 @@
+.echo ===F5abf===
+u 0x5abf20 0x5abfa0
+.echo ===F5a7b20===
+u 0x5a7b20 0x5a7b70
+.echo ===F6e5940===
+ub 0x6e5969 L10
+u 0x6e5969 L8
+.echo ===F4be020===
+u 0x4be000 0x4be060
+.echo ===LIST_cdc9e0===
+dd 0xcdc9e0 L8
+.echo ===REG_FRAMES===
+dds 0x19fc9c L30
+q

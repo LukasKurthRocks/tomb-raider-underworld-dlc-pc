@@ -1,0 +1,5 @@
+.echo ===FSROOT===
+dd 0x9ce278 L1
+.echo ===SEARCH===
+s -a 0x10000 L?0x7fff0000 "streamgroups\\"
+q

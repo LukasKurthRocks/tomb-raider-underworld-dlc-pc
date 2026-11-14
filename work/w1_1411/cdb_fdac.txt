@@ -1,0 +1,5 @@
+.echo ===XREF===
+s -b 0x401000 0x83d000 ac fd 00 00
+.echo ===XREF_b4===
+s -b 0x401000 0x83d000 b4 fd 00 00
+q

@@ -1,0 +1,14 @@
+.echo ===LIST===
+dd 0x18a4ce5c L4
+r $t0 = poi(0x18a4ce5c + 8)
+.printf "data %p count %d cur index %d\n", @$t0, poi(0x18a4ce5c), (0x183f0e38 - @$t0) / 4
+dd 0x183f0e38 - 0x20 L10
+dd @$t0 L8
+.echo ===OBJ===
+dds 0x18a3d0b0 L4
+.echo ===CALLER===
+ub 0x5098b7 L12
+u 0x5098b7 L6
+.echo ===DPS===
+dps 0x19fc8c L40
+q

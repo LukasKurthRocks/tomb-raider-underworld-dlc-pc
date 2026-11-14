@@ -1,0 +1,8 @@
+.echo ===MAIN===
+~0s
+kv 12
+!runaway 1
+dd 0xe7ed60 L1
+.echo ===VT84df64===
+dps 0x84df64 L6
+q

@@ -1,0 +1,14 @@
+.echo ===F6e35e0===
+u 0x6e35e0 0x6e36d0
+.echo ===F6e36d0===
+u 0x6e36d0 0x6e37c0
+.echo ===F6e55f0===
+u 0x6e55f0 0x6e5660
+dd 0x6e5638 L4
+.echo ===GLOB===
+dd 0xee03c0 L10
+dd 0x8afef0 L8
+dd 0xfad680 L30
+.echo ===STACK2===
+dds 0x19fc30 0x19fd90
+q

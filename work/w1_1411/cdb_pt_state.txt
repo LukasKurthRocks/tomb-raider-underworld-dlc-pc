@@ -1,0 +1,14 @@
+.echo ===PATH===
+da 0x19fa4c
+da 0x84ca04
+.echo ===HANDLE_REQ===
+dd 0x19f850 L2
+r $t0 = poi(0x19f854)
+r $t1 = poi(0x19f850)
+dds @$t0 L20
+dc @$t0 L40
+.echo ===REQ===
+dds @$t1 L4
+.echo ===RV_VT===
+dds poi(@$t0) L12
+q

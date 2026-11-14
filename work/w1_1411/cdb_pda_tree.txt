@@ -1,0 +1,12 @@
+.echo ===HDR===
+dd 0x222ffbd0 L20
+.echo ===LASTNODES===
+dd 0x222ffb80 L14
+.echo ===SCAN===
+r $t0 = 0x222e8900
+r $t9 = 0
+.for (r $t1 = 0; @$t1 < 0n5933; r $t1 = @$t1 + 1) { r $t2 = @$t0 + @$t1*0x10; .if (by(@$t2 + 0xd) == 0) { r $t3 = @$t2 + (dwo(@$t2 + 8) << 4); .if ((@$t3 >= 0x222ffbd0) | (@$t3 < @$t0) | (@$t3 == @$t2)) { r $t9 = @$t9 + 1; .printf "node %d at %p idx %x axis %x -> %p\n", @$t1, @$t2, dwo(@$t2+8), by(@$t2+0xc), @$t3 } } }
+.printf "bad inner nodes %d\n", @$t9
+.echo ===STACKENTRIES===
+dd 0x009de6c0 L30
+q

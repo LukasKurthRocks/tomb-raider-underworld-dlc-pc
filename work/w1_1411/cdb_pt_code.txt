@@ -1,0 +1,30 @@
+.echo ===UB4739a0===
+ub 0x4739a0 L8
+.echo ===UB552f39===
+ub 0x552f39 L10
+.echo ===UB47369c===
+ub 0x47369c L6
+.echo ===UB4746b6===
+ub 0x4746b6 L6
+.echo ===UB473af5===
+ub 0x473af5 L4
+.echo ===UB473c7b===
+ub 0x473c7b L6
+.echo ===UB473d34===
+ub 0x473d34 L6
+.echo ===UB4745b7===
+ub 0x4745b7 L6
+.echo ===UB44c19e===
+ub 0x44c19e L6
+.echo ===UB5a70de===
+ub 0x5a70de L6
+.echo ===TM85ac2===
+ub TruMenu+0x85ac2 L20
+u TruMenu+0x85ac2 L10
+.echo ===TM5a211===
+ub TruMenu+0x5a211 L10
+.echo ===TMa7440===
+ub TruMenu+0xa7440 L8
+.echo ===U552ee0===
+u 0x552ee0 0x552f40
+q

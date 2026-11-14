@@ -1,0 +1,4 @@
+.echo ===DEVLIST===
+r $t0 = poi(0xa1407c)
+.printf "device %p list +0xfdac count %d cap %d data %p\n", @$t0, poi(@$t0+0xfdac), poi(@$t0+0xfdb0), poi(@$t0+0xfdb4)
+q

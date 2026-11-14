@@ -1,0 +1,16 @@
+.echo ===LM===
+lmv m TruMenu
+.echo ===RUNAWAY===
+!runaway 3
+.echo ===MAIN===
+~0s
+r
+kv 40
+.echo ===DDS===
+dds @esp L80
+.echo ===U473a===
+ub 0x473ad9 L20
+u 0x473ad9 L30
+.echo ===MAINSTATE===
+dd 0xe7ed60 L4
+q

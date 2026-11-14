@@ -1,0 +1,17 @@
+.echo ===RAW===
+r $t0 = 0x222e8900
+r $t8 = 0
+.for (r $t1 = 0; @$t1 < 0n5933; r $t1 = @$t1 + 1) { r $t2 = @$t0 + @$t1*0x10; .if (by(@$t2 + 0xd) == 0) { r $t3 = @$t2 + (dwo(@$t2 + 8) << 4); .if ((@$t3 >= 0x222ffbd0) | (@$t3 < @$t0)) { r $t8 = @$t8 + 1; .if (@$t8 < 0n12) { .printf "node %d: %08x %08x %08x %08x\n", @$t1, dwo(@$t2), dwo(@$t2+4), dwo(@$t2+8), dwo(@$t2+0xc) } } } }
+.echo ===STATS===
+r $t4 = 0
+r $t5 = 0
+r $t6 = 0
+r $t7 = 0
+.for (r $t1 = 0; @$t1 < 0n5933; r $t1 = @$t1 + 1) { r $t2 = @$t0 + @$t1*0x10; .if (by(@$t2 + 0xd) != 0) { r $t4 = @$t4 + 1 } .else { .if (by(@$t2 + 0xe) != 0) { r $t5 = @$t5 + 1 } .else { r $t6 = @$t6 + 1 } }; .if (by(@$t2 + 0xc) > 3) { r $t7 = @$t7 + 1 } }
+.printf "leaf(+0xd!=0) %d, +0xd==0 && +0xe!=0 %d, inner %d, axis>3 %d\n", @$t4, @$t5, @$t6, @$t7
+.echo ===FIRSTNODES===
+dd 0x222e8900 L20
+.echo ===PARENT===
+r $t9 = 0
+.for (r $t1 = 0; @$t1 < 0n5933; r $t1 = @$t1 + 1) { r $t2 = @$t0 + @$t1*0x10; .if (by(@$t2 + 0xd) == 0) { .if ((@$t2 + (dwo(@$t2 + 8) << 4)) == 0x2230fb00) { .printf "parent of 2230fb00: node %d at %p: %08x %08x %08x %08x\n", @$t1, @$t2, dwo(@$t2), dwo(@$t2+4), dwo(@$t2+8), dwo(@$t2+0xc) } } }
+q

@@ -1,0 +1,14 @@
+.echo ===LM===
+lmv m TruMenu
+lm
+.echo ===RUNAWAY===
+!runaway 7
+.echo ===THREADS===
+~
+.echo ===MAIN===
+~0s
+r
+kv 60
+.echo ===ALLSTACKS===
+~*kb 25
+q

@@ -1,0 +1,11 @@
+.echo ===ITEM1===
+dc 0x186d6c10 L60
+.echo ===ITEM0===
+dc 0x18746a90 L40
+.echo ===SUB1===
+dc 0x185af4a0 L20
+.echo ===LIST18050a00===
+dc 0x18050980 L40
+.echo ===PLAYERUNIT===
+dd 0xe7f094 L1
+q

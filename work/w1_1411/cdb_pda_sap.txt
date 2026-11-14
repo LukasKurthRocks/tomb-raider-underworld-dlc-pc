@@ -1,0 +1,15 @@
+.echo ===F46c450===
+u 0x46c450 0x46c600
+.echo ===F46c720===
+u 0x46c720 0x46c880
+.echo ===F4e8fc0===
+u 0x4e8fc0 0x4e9070
+.echo ===LOCALS===
+dd 0x19fb30 L30
+.echo ===EDI_ESI_EBX===
+dd 0x2230fb00 L10
+dd 0x009de738 L8
+dd 0x222ffbd0 L10
+.echo ===ECX_this===
+dd 0x00fad680 L10
+q

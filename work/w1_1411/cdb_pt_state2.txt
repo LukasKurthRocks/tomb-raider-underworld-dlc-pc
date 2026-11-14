@@ -1,0 +1,9 @@
+.echo ===CURHANDLE===
+dc 0x188e0bd4 L30
+.echo ===FS===
+dc 0x188dff00 L40
+.echo ===F472b50===
+u 0x472b50 L8
+.echo ===F473690===
+u 0x473640 0x4736a0
+q

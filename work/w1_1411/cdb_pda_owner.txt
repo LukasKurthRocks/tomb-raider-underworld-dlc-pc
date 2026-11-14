@@ -1,0 +1,7 @@
+.echo ===ADDR===
+!address 0x222ffbd0
+.echo ===REFS===
+s -d 0x10000 L?0x7fff0000 222ffbd0
+.echo ===REFS_root===
+s -d 0x10000 L?0x7fff0000 222e8900
+q

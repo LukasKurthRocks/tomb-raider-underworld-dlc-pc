@@ -1,0 +1,14 @@
+.echo ===CNT===
+dd 0x8aff28 L8
+r $t0 = poi(0x8aff34)
+r $t1 = poi(0x8aff3c)
+r $t3 = 0
+.for (r $t2 = 0; @$t2 < @$t0 & @$t2 < 0x400; r $t2 = @$t2 + 1) { r $t4 = poi(@$t1 + @$t2*4); r $t5 = poi(@$t4 + 0x8c); .if (@$t5 != 0) { r $t6 = wo(@$t5 + 8); r $t3 = @$t3 + @$t6; .printf "i=%d item=%p sub=%p n=%d\n", @$t2, @$t4, @$t5, @$t6 } }
+.printf "total sub-items %d\n", @$t3
+.echo ===XREF_ee03c8===
+s -b 0x401000 0x850000 c8 03 ee 00
+.echo ===XREF_8afef8===
+s -b 0x401000 0x850000 f8 fe 8a 00
+.echo ===XREF_8aff34===
+s -b 0x401000 0x850000 34 ff 8a 00
+q
