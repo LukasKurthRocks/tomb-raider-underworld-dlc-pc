@@ -186,6 +186,18 @@ def fix_unit_fields(xsecs, datas, ids):
         b = bytearray(datas[si])
         struct.pack_into('<H' if w == 'u16' else '<I', b, o, nv & (0xffff if w == 'u16' else 0xffffffff))
         datas[si] = bytes(b)
+    if os.environ.get('TRUDLC_CELLSTREAM', '').lower() != 'off':
+        # F1 / PT2-1 (2026-11-14, pillory reload hang, workspace docs Befund-PT2-Pranger-1411.md / Befund-F1-
+        # Zellstreamlisten-1411.md): every {u16 StreamUnitID, u16 streamgroup index} pair of the per-cell stream lists
+        # (unit_ids.cell_stream_fields) - the learned type-7 table mapped only the first pair of a list. Unit id through
+        # the unit map, index = Xbox value (base proof 310 / 310 pairs). Gate: tools/cellstream_fix.py (proof / check).
+        # Only sections whose converted data keeps the Xbox layout reach the output (apply_overrides: conv0).
+        # TRUDLC_CELLSTREAM=off = learned table only
+        for si, o in U.cell_stream_fields(xsecs, 'be'):
+            if o + 4 > len(datas[si]): continue
+            xu, xi = struct.unpack_from('>HH', xsecs[si]['data'], o)
+            nu = ids(UNIT, xu) & 0xffff if xu not in (0, 0xffff) else xu
+            b = bytearray(datas[si]); struct.pack_into('<HH', b, o, nu, xi); datas[si] = bytes(b)
     return datas
 
 def name_stream_patches(secs):

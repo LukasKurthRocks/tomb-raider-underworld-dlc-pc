@@ -42,6 +42,12 @@ Each is small, evidence-driven, and listed in LINEAGE.md. Examples:
 * Map collision meshes (2026-11-14, P4.9): the `*_map.drm` Mesh (header, vertices, faces, KD nodes) is converted by place
   (`tools/map_mesh_fix.py`, `dlc_generic` type 13, `TRUDLC_MAP_MESH=off` = the learned table). Proof + gate (step Fixes):
   `tools/map_mesh_fix.py proof` / `check TREE`. Old trees: `tools/map_mesh_fix.py fix OUT SRC [name_map.drm ...]`.
+* Cell stream lists (2026-11-14, F1): every {u16 StreamUnitID, u16 streamgroup index} pair of the per-cell lists in the
+  unit DTP goes through the unit id map (`tools/unit_ids.py cell_stream_fields`, applied in
+  `generic_type0.fix_unit_fields`; `TRUDLC_CELLSTREAM=off` = the learned table, which mapped only the first pair of a
+  list - pillory reload hang). Proof + gate (step Fixes): `tools/cellstream_fix.py proof` / `check TREE --pack PACK`
+  (also index + 1 < record count of the named unit's streamgroup table). Old trees:
+  `tools/cellstream_fix.py fix OUT SRC name.drm ...`.
 
 ## Stage 3 — shaders and materials (the long tail)
 PC pixel shaders cannot be copied from Xbox microcode, so the Xbox shader libs are **translated**:

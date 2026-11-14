@@ -83,6 +83,43 @@ def unit_fields(secs, e='be'):
         f.append((si, o + 0x48, 'u16', 'rec'))   # Xbox-608 / +1084 ...; also u32 in Script init blocks of userType Symbol 94)
     return f
 
+def cell_stream_fields(secs, e='be'):
+    """[(sec_index, offset)] of the {u16 StreamUnitID, u16 streamgroup index} pairs of the per-cell stream lists of a unit
+    DRM (F1 / PT.2, 2026-11-14; ENGINE.md 'Cell stream lists'). Layout (both platforms): a cell section (type 0) holds
+    at +0x90 an external pointer to its cell record R in the unit DTP (Level+0x74); R+0x88 u32 pair count, R+0x8c
+    internal pointer to the pairs (R+0x8 / R+0x84 point there too). The game reads the list as [cell+0x9c] {+0x88 count,
+    +0x8c pairs} (0x5b8e80). Offsets are unique and sorted (a list shared by two cells is listed once)."""
+    if not secs or secs[0]['type'] != 0 or secs[0]['data'] is None: return []
+    ext = {so: (si, do) for si, so, do in R.parse(secs[0]['reloc'], e).external}
+    if 0x74 not in ext: return []
+    di, _ = ext[0x74]
+    s = secs[di]
+    if s['type'] != 7 or s['data'] is None: return []
+    E = '>' if e == 'be' else '<'
+    d = s['data']; ri = dict(R.parse(s['reloc'], e).internal)
+    out = set()
+    for i, q in enumerate(secs):
+        if q['type'] != 0 or q['data'] is None or i == 0: continue
+        for si, so, do in R.parse(q['reloc'], e).external:
+            if so != 0x90 or si != di or do + 0x90 > len(d): continue
+            n = struct.unpack_from(E + 'I', d, do + 0x88)[0]; t = ri.get(do + 0x8c)
+            if t is None or not 0 < n < 256 or t + 4 * n > len(d): continue
+            out.update((di, t + 4 * k) for k in range(n))
+    return sorted(out)
+
+def streamgroup_count(secs, e='be'):
+    """record count of the unit's streamgroup table, or None: Level+0x90 -> table T (type 0), T+0 internal pointer ->
+    header, header+0xc = count incl. record 0 'default' (pillory 4, water_wheel 2: default + waterWheel_main)"""
+    if not secs or secs[0]['type'] != 0 or secs[0]['data'] is None: return None
+    ext = {so: (si, do) for si, so, do in R.parse(secs[0]['reloc'], e).external}
+    if 0x90 not in ext: return None
+    si, do = ext[0x90]
+    d = secs[si]['data']
+    if d is None: return None
+    h = dict(R.parse(secs[si]['reloc'], e).internal).get(do)
+    if h is None or h + 0x10 > len(d): return None
+    return struct.unpack_from(('>' if e == 'be' else '<') + 'I', d, h + 0xc)[0]
+
 def read(d, o, w, e):
     E = '>' if e == 'be' else '<'
     return struct.unpack_from(E + ('H' if w == 'u16' else 'I'), d, o)[0]

@@ -110,6 +110,10 @@
                DLC intro / marker does not name the PC id of that intro, report <tree>\..\instref_check.json) and
                map_mesh_fix proof + check (*_map.drm collision mesh: exit 1 on a mesh not found, a KD node outside its
                arrays or node bytes +0xc..+0xf other than the Xbox bytes, report <tree>\..\map_mesh_check.json).
+               F1 gate (2026-11-14, workspace docs Befund-F1-Zellstreamlisten-1411.md): cellstream_fix proof + check on
+               both trees (per-cell stream lists {u16 StreamUnitID, u16 streamgroup index} of the unit scenes: exit 1
+               when a pair is not {map(Xbox unit), Xbox index} or its index + 1 is not below the record count of the
+               named unit's streamgroup table - the pillory reload hang, report <tree>\..\cellstream_check.json).
                -FixesOut DIR (relative to the repository) writes DIR\dlc1\mods and DIR\dlc2\mods instead of
                work\rebuild\asm_stage2b and dlc2_asm_stage2b (check runs that must not replace the usual outputs)
       Shaders  (2026-11-11, plan A2 stage 1, after Fixes; minutes) the recorded shader decisions on the Fixes output:
@@ -523,6 +527,9 @@ $steps = @{
         # and the *_map.drm collision meshes, proven on the base pairs (exit 1 on a contradicting word or another count)
         @('tools\instref_gate.py', 'proof'),
         @('tools\map_mesh_fix.py', 'proof'),
+        # 2026-11-14 (F1): the converter rule for the per-cell stream lists (every pair through the unit id map),
+        # proven on the base unit pairs (exit 1 on a contradicting pair, an index out of range or another count)
+        @('tools\cellstream_fix.py', 'proof'),
         @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', $fix1),
         # uiinit on the DLC 1 tree in place (planned words only, every write re-read), then the text-anchor gate
         @('tools\ui_init_fix.py', 'apply', $fix1, '--report', ((Split-Path -Parent $fix1) + '/uiinit_apply.json')),
@@ -547,6 +554,9 @@ $steps = @{
         # (dungeon water markers, Q124); every *_map.drm collision mesh has the Xbox KD node bytes (PDA sonar hang)
         @('tools\instref_gate.py', 'check', $fix1, '--pack', 'pack10', '--expect-refs', '--report', ((Split-Path -Parent $fix1) + '/instref_check.json')),
         @('tools\map_mesh_fix.py', 'check', $fix1, '--pack', 'pack10', '--report', ((Split-Path -Parent $fix1) + '/map_mesh_check.json')),
+        # F1 gate (2026-11-14): every cell stream pair = {map(Xbox unit), Xbox index}, index inside the named unit's
+        # streamgroup table (pillory reload hang: (101,1) = one record past the end of dlc_water_wheel)
+        @('tools\cellstream_fix.py', 'check', $fix1, '--pack', 'pack10', '--report', ((Split-Path -Parent $fix1) + '/cellstream_check.json')),
         # shader form gate (2026-11-08): the forms Windows' D3D9 or a GPU driver refuses (-ShaderGate)
         (@('tools\shader_form_gate.py', 'check', $fix1, '--list', '3', '--report', $sg1) + $sgEnforce),
         @('tools\compare_b138.py', $fix1, $cmp1),
@@ -571,6 +581,7 @@ $steps = @{
         @('tools\scan_aidata_tree.py', 'check', $fix2, '--pack', 'pack11', '--report', ((Split-Path -Parent $fix2) + '/aidata_check.json')),
         @('tools\instref_gate.py', 'check', $fix2, '--pack', 'pack11', '--expect-refs', '--report', ((Split-Path -Parent $fix2) + '/instref_check.json')),
         @('tools\map_mesh_fix.py', 'check', $fix2, '--pack', 'pack11', '--report', ((Split-Path -Parent $fix2) + '/map_mesh_check.json')),
+        @('tools\cellstream_fix.py', 'check', $fix2, '--pack', 'pack11', '--report', ((Split-Path -Parent $fix2) + '/cellstream_check.json')),
         # 2026-11-09: the end-level words the 0813 tree had wrong vs the installed tree (Level twin s32, unit root block
         # twin, uber TRANS +0x34 raw; DTP 24420 +0x6c only WARN) - exit 1 when one comes back
         @('tools\endlevel_word_judge.py', 'check', $fix2, '--report', ((Split-Path -Parent $fix2) + '/endlevel_words_check.json')),
