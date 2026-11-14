@@ -83,6 +83,10 @@
 //    DrainModePercent at the bar's loads 0x6f2965 / 0x6f2972 (100 = the data), condition 538 (meter full, the first
 //    condition of the vault-off strike) answered 1 with StrikeWithoutFullMeter=1; log lines per 0xd9 fill and per
 //    strike prompt (CM+0x1fc bit 28 from condition 2302). All defaults = the game, all live (section "group L").
+// 21. 0.6.15 (test switches, PC-side only): [Adrenaline] ModeWithoutTarget - the adrenaline tick's lock test 0x718beb
+//    accepts the soft lock (CM+0x1fc bit 9, LT held without a target) besides the hard lock (bit 10), two bytes written
+//    only while 1 and only after the first combat manager; [Adrenaline] StrikeWithoutButton - condition 150 answers 1
+//    for the vault-off strike entry's {150,150,46} (pad X held) only. Both default off, live (section "0.6.15").
 //
 // Every engine address is byte-checked before use; a failed check switches the affected part off with a logged
 // reason. Options: TruShadowCombat.ini next to the .asi (README.md).
@@ -100,7 +104,7 @@
 
 namespace {
 
-const char kVersion[] = "TruShadowCombat 0.6.14 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
+const char kVersion[] = "TruShadowCombat 0.6.15 (TU target list 7 -> 10, conditions 2005 / 2006 / 2011 / 2013 / 538, "
                         "states 1017 / 244 / 1007, shadow strike 1014 (Translate, TruShadowPowerMeterApi v1-v3), "
                         "finisher 1013 probe + doppelganger translation (Translate1013); 0.4.1: both switches read "
                         "again at run time; 0.5: states 1019 / 1020 (Translate1019 / Translate1020, log only by default); 0.5.1: states 231 / 1004 slots 0 / 1 "
@@ -150,7 +154,10 @@ const char kVersion[] = "TruShadowCombat 0.6.14 (TU target list 7 -> 10, conditi
                         "default); 0.6.14: group L - F6 adrenaline fill / drain percent on the game's 0xd9 fill and "
                         "the data drain rates ([Adrenaline] FillPercent / DrainPercent / DrainModePercent, 100 by "
                         "default), strike without a full meter (StrikeWithoutFullMeter, off by default), fill and "
-                        "strike-prompt log lines)";
+                        "strike-prompt log lines; 0.6.15: test switches - adrenaline mode with the soft lock, no "
+                        "target needed ([Adrenaline] ModeWithoutTarget, lock test 0x718beb, off by default) and the "
+                        "vault-off strike without pad X (StrikeWithoutButton, condition 150 for the strike entry "
+                        "only, off by default))";
 const DWORD kImageBase = 0x00400000;
 
 // ---------------------------------------------------------------- options / log
@@ -902,6 +909,12 @@ done:
 // feedback (Lara event 0x38). With 1 the main-game answer is 1 (the strike empties the meter itself, 0x71d5e2).
 volatile LONG g_strikeAnyMeter = 0;
 DWORD g_strikeAnyTick = 0;
+// 0.6.15: [Adrenaline] StrikeWithoutButton - condition 150 (action held, 0x760b50) wrapped in Lara's machines 1 / 2;
+// answers 1 only for the strike entry's {150,150,46} (section "0.6.15" below)
+const DWORD kCond150Pc = 0x00760b50;
+volatile LONG g_strikeNoButton = 0;
+bool g_cond150Ok = false;
+char __cdecl Cond150(void *agent, void *cache, const BYTE *record);
 
 char __cdecl Pred538(const BYTE *record) {
     const int dg = Doppelganger();
@@ -3017,12 +3030,15 @@ void __fastcall RegHook(void *self, void *edx, DWORD a, DWORD b) {
     LONG call = InterlockedIncrement(&g_regCalls);
     __try {
         if (g_conditions && g_blocksOk) {
+            // 0.6.15: condition 150 last, so a failed byte check simply leaves it out of the count
             const CondAdd m1[] = {{2005, &Cond2005, 0}, {2013, &Cond2013, 0}, {2006, &Cond2006, 0},
-                                  {2011, &Cond2011, kCond2011Pc}, {538, &Cond538, kCond538Pc}};
+                                  {2011, &Cond2011, kCond2011Pc}, {538, &Cond538, kCond538Pc},
+                                  {150, &Cond150, kCond150Pc}};
             const CondAdd m2[] = {{2005, &Cond2005, 0}, {2013, &Cond2013, 0},
-                                  {2011, &Cond2011, kCond2011Pc}, {538, &Cond538, kCond538Pc}};
-            ExtendConds(kM1CondPush, g_m1Cond, sizeof(g_m1Cond) / 12, m1, 5, 1);
-            ExtendConds(kM2CondPush, g_m2Cond, sizeof(g_m2Cond) / 12, m2, 4, 2);
+                                  {2011, &Cond2011, kCond2011Pc}, {538, &Cond538, kCond538Pc},
+                                  {150, &Cond150, kCond150Pc}};
+            ExtendConds(kM1CondPush, g_m1Cond, sizeof(g_m1Cond) / 12, m1, g_cond150Ok ? 6 : 5, 1);
+            ExtendConds(kM2CondPush, g_m2Cond, sizeof(g_m2Cond) / 12, m2, g_cond150Ok ? 5 : 4, 2);
         }
         if (g_strikeGate || g_strikeTranslate || g_statesOn) ExtendStates();
     } __except (EXCEPTION_EXECUTE_HANDLER) {
@@ -6899,6 +6915,221 @@ void SetupL14() {
         (g_adrLog && g_q108ReadOk) ? "on" : "off");
 }
 
+// ---------------------------------------------------------------- 0.6.15: test switches (mode without a target,
+// vault-off strike without the button). Main workspace docs\Befund-Adrenalin-ohne-Ziel-1411.md (static, PC tru.exe =
+// retail logic):
+//  * the adrenaline tick 0x718bd0 starts and keeps the mode only with the HARD lock: 0x718beb `shr ecx,0xa; test cl,1;
+//    je 0x718c71` = CM+0x1fc bit 10, set by 0x71edf0 only with a live target of targeter 0 in CM+0xc. Every failed
+//    test goes to 0x718c71: fail sound (event 0x3b) with bit 9 or 10 + gates + R3 edge, then 0x718cda ends a running
+//    mode (0x718ad0) - the game ends the mode in the first tick without the hard lock;
+//  * [Adrenaline] ModeWithoutTarget=1 turns the test into bit 9 OR 10 (bit 9 = soft lock: LT held without a target,
+//    0x71ec50): two single bytes, 0x718bed 0a -> 09 (`shr ecx,9`) and 0x718bf0 01 -> 03 (`test cl,3`); ecx is dead after
+//    the test (0x718bfd reloads it; TruShadowPower's stub at 0x718bf3 keeps it). Releasing LT clears bit 9 -> the
+//    game's own end path 0x718cda. Not "no lock at all": R3 without LT is also action 25 of the chart (records 718 /
+//    841 / ...), and without LT nothing would end the mode but R3 or an empty meter;
+//  * start 0x7189c0 / end 0x718ad0 (HUD groups 15 / 12, time ramp 0x78c160 to tuning +0x31c, events 0x39 / 0x3a,
+//    0x6e6670) and the other readers of bit 27 (camera mode 0x34 at 0x5e80a9, sound / animation word 0x6c1e0c, meter
+//    0x6e663b / 0x6e6670, condition 1047 0x765600, 0x71e54f) do not read the target; the global readers of CM+0xc
+//    (0x5e5a66, 0x703741, 0x716685, 0x71ab56, 0x71c880, 0x758811, 0x771633) resolve the handle with a null / dead test;
+//  * the bytes are written only after the first combat manager exists (all plugins are loaded by then: TruShadowPower
+//    byte-checks 0x718be3..0x718c02 at its start) and only while the switch is 1 - with 0 they are the game's. Write
+//    order keeps every intermediate state a valid test (on: 0x718bf0 first, off: 0x718bed first; between: bits 10 / 11);
+//  * [Adrenaline] StrikeWithoutButton=1: the strike's only transition (lara DTP 850 +0x720a0, into chart record 786 =
+//    state 1014) ends with {150,150,46} = action 46 held (pad X). Condition 150 (0x760b50) is wrapped in Lara's machines
+//    1 / 2 and answers 1 ONLY for that record: the 6 records before it must be the strike's {500,538,1} {2000,2001,1}
+//    {2000,2011,1} {700,701,0} {1500,1502,0} {2300,2302,1}. The list stops at the first false (0x785920), so 150 is
+//    asked only when those hold; every other use of condition 150 gets the game's answer.
+const DWORD kM15ShrImm = 0x00718bed, kM15TestImm = 0x00718bf0;
+const BYTE kM15ShrGame = 0x0a, kM15ShrNew = 0x09, kM15TestGame = 0x01, kM15TestNew = 0x03;
+// the strike entry list, 7 records {u16 key, u16 id, u16 value, u8 flags} (+ 1 unused byte, not compared)
+const BYTE kM15StrikeConds[7][7] = {
+    {0xf4, 0x01, 0x1a, 0x02, 0x01, 0x00, 0x00},   // {500,538,1}   meter full
+    {0xd0, 0x07, 0xd1, 0x07, 0x01, 0x00, 0x00},   // {2000,2001,1} activity 1002
+    {0xd0, 0x07, 0xdb, 0x07, 0x01, 0x00, 0x00},   // {2000,2011,1} hard-lock target
+    {0xbc, 0x02, 0xbd, 0x02, 0x00, 0x00, 0x00},   // {700,701,0}
+    {0xdc, 0x05, 0xde, 0x05, 0x00, 0x00, 0x00},   // {1500,1502,0}
+    {0xfc, 0x08, 0xfe, 0x08, 0x01, 0x00, 0x00},   // {2300,2302,1} strike prompt
+    {0x96, 0x00, 0x96, 0x00, 0x2e, 0x00, 0x00},   // {150,150,46}  action 46 held = pad X
+};
+volatile LONG g_modeNoTarget = 0;              // [Adrenaline] ModeWithoutTarget (read again at run time)
+volatile bool g_m15Ok = false;                 // byte checks of the tick passed (false after a later mismatch)
+bool g_m15Armed = false;                       // the first combat manager was seen (poll thread only)
+volatile bool g_m15On = false;                 // the two bytes as this plugin left them: true = 09 / 03
+volatile LONG g_s15Answers = 0;
+DWORD g_s15Tick = 0;
+
+void M15ReadSwitches(bool report) {
+    const char *ini = g_iniPath;
+    const LONG mode = GetPrivateProfileIntA("Adrenaline", "ModeWithoutTarget", 0, ini) ? 1 : 0;
+    const LONG strike = GetPrivateProfileIntA("Adrenaline", "StrikeWithoutButton", 0, ini) ? 1 : 0;
+    if (report && (mode != g_modeNoTarget || strike != g_strikeNoButton))
+        Log(1, "0.6.15 switches (run time): [Adrenaline] ModeWithoutTarget %ld, StrikeWithoutButton %ld", mode, strike);
+    InterlockedExchange(&g_modeNoTarget, mode);
+    InterlockedExchange(&g_strikeNoButton, strike);
+}
+
+// poll thread (at most once per second): place / remove the two bytes of the lock test
+void M15Apply(const char *why) {
+    if (!g_m15Ok) return;
+    if (!g_m15Armed) {
+        const BYTE *gt = reinterpret_cast<const BYTE *>(Rd(reinterpret_cast<const void *>(kGameTrackerPtr)));
+        if (!gt || !Rd(gt + 0x504)) return;
+        g_m15Armed = true;
+        Log(1, "0.6.15 ModeWithoutTarget: first combat manager seen - the switch acts from now on (ModeWithoutTarget %ld)",
+            g_modeNoTarget);
+    }
+    const bool want = g_modeNoTarget != 0;
+    if (want == g_m15On) return;
+    const BYTE shr = *reinterpret_cast<const volatile BYTE *>(kM15ShrImm);
+    const BYTE tst = *reinterpret_cast<const volatile BYTE *>(kM15TestImm);
+    const BYTE expShr = g_m15On ? kM15ShrNew : kM15ShrGame, expTst = g_m15On ? kM15TestNew : kM15TestGame;
+    if (shr != expShr || tst != expTst) {
+        Log(0, "0.6.15 ModeWithoutTarget: bytes 0x718bed / 0x718bf0 are %02x / %02x, not %02x / %02x as left by this "
+               "plugin - switch off for this run", shr, tst, expShr, expTst);
+        g_m15Ok = false;
+        return;
+    }
+    bool ok;
+    if (want) {
+        const bool a = WriteCode(kM15TestImm, &kM15TestNew, 1);
+        ok = a && WriteCode(kM15ShrImm, &kM15ShrNew, 1);
+        if (a && !ok) WriteCode(kM15TestImm, &kM15TestGame, 1);
+    } else {
+        ok = WriteCode(kM15ShrImm, &kM15ShrGame, 1) && WriteCode(kM15TestImm, &kM15TestGame, 1);
+    }
+    if (!ok) {
+        Log(0, "0.6.15 ModeWithoutTarget: writing 0x718bed / 0x718bf0 failed - switch off for this run");
+        g_m15Ok = false;
+        return;
+    }
+    g_m15On = want;
+    Log(1, "0.6.15 ModeWithoutTarget (%s): 0x718beb = %s - %s", why,
+        want ? "shr ecx,9; test cl,3" : "shr ecx,0xa; test cl,1 (the game's bytes)",
+        want ? "adrenaline mode with the soft lock (LT held, CM+0x1fc bit 9) or the hard lock (bit 10); LT released = "
+               "the game's end (PC test option)"
+             : "the game's test: hard lock only (bit 10 = target of targeter 0)");
+}
+
+// poll thread (every 10 ms, reads only): one line per adrenaline mode started without the hard lock, one at its end
+void M15Poll(DWORD now) {
+    static bool have = false, was = false, noTarget = false;
+    static DWORD since = 0;
+    static LONG lines = 0;
+    if (!g_m15Ok) return;
+    const BYTE *gt = reinterpret_cast<const BYTE *>(Rd(reinterpret_cast<const void *>(kGameTrackerPtr)));
+    const BYTE *cm = gt ? reinterpret_cast<const BYTE *>(Rd(gt + 0x504)) : nullptr;
+    if (!cm) {
+        have = was = noTarget = false;
+        return;
+    }
+    const DWORD f = Rd(cm + 0x1fc);
+    const bool on = (f & kQ108BitMode) != 0;
+    if (!have) {
+        have = true;
+        was = on;
+        return;
+    }
+    if (on && !was) {
+        since = now;
+        noTarget = g_m15On && !(f & kQ108BitLock);
+        if (noTarget && ++lines <= 200) {
+            const DWORD h = Rd(cm + 0xc);
+            const DWORD inst = h ? Rd(reinterpret_cast<const void *>(h)) : 0;
+            Q108State s;
+            Q108Read(&s);
+            char text[420];
+            Q108Text(s, text, sizeof(text));
+            Log(1, "0.6.15 adrenaline mode without target: started with the soft lock only (CM+0x1fc bit 9 %lu, bit 10 0; "
+                   "target handle CM+0xc 0x%08lx, instance 0x%08lx) - [Adrenaline] ModeWithoutTarget=1 - %s",
+                (f >> 9) & 1, h, inst, text);
+        }
+    } else if (!on && was && noTarget) {
+        noTarget = false;
+        if (lines <= 200)
+            Log(1, "0.6.15 adrenaline mode without target: ended after %lu ms (%s; CM+0x1fc 0x%08lx, meter %.1f)",
+                now - since, !(f & 0x600) ? "lock released - the game's end 0x718cda"
+                             : RdFloat(cm + 0x3c) <= 0.0f ? "meter empty" : "R3 again or another end",
+                f, RdFloat(cm + 0x3c));
+    }
+    was = on;
+}
+
+// game thread: condition 150 of Lara's machines (cdecl agent, cache, record; the list walker 0x785920 passes the record
+// inside the chart DTP). The game's answer, except 1 for the strike entry's {150,150,46} with StrikeWithoutButton=1
+char __cdecl Cond150(void *agent, void *cache, const BYTE *record) {
+    const char r = reinterpret_cast<CondFn>(kCond150Pc)(agent, cache, record);
+    if (r || !g_strikeNoButton || !record) return r;
+    bool strike = false;
+    __try {
+        if (memcmp(record, kM15StrikeConds[6], 7) == 0) {
+            strike = true;
+            for (int k = 0; k < 6 && strike; ++k)
+                if (memcmp(record - 8 * (6 - k), kM15StrikeConds[k], 7) != 0) strike = false;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        strike = false;
+    }
+    if (!strike) return r;
+    const LONG n = InterlockedIncrement(&g_s15Answers);
+    const DWORD now = GetTickCount();
+    if (n == 1 || now - g_s15Tick >= 1000) {
+        g_s15Tick = now;
+        InterlockedExchange(&g_s15Answers, 0);
+        Q108State s;
+        Q108Read(&s);
+        char text[420];
+        Q108Text(s, text, sizeof(text));
+        Log(1, "0.6.15 condition 150 {150,150,46} (action 46 held = pad X) answered 1 without the button for the "
+               "vault-off strike entry (chart record 786 = state 1014; [Adrenaline] StrikeWithoutButton=1; %ld "
+               "answer(s) since the last line) - %s", n, text);
+    }
+    return 1;
+}
+
+void SetupM15() {
+    struct Check { DWORD at; const char *hex; const char *what; };
+    const Check modeFacts[] = {
+        {0x00718bd0, "d9ee 56 8bf1 d85e3c dfe0 f6c405 0f8a8e000000 8b86fc010000 8bc8 c1e90a f6c101 747e",
+         "adrenaline tick 0x718bd0: meter > 0, hard lock = shr ecx,0xa; test cl,1; je 0x718c71"},
+        {0x00718bfd, "8b0d58dbfa00 8b9100050000 83ba3401000003", "tick: ecx reloaded after the lock test (weapon slot)"},
+        {0x00718c71, "8b86fc010000 8bc8 c1e909 f6c101 7507 c1e80a a801 7452", "tick failure branch: bit 9 or 10"},
+        {0x00718cc3, "a194f0e700 6a00 68ff000000 6a3b 50 e8a9faffff", "tick failure branch: event 0x3b (fail sound)"},
+        {0x007189d7, "6a0f e8f24f0600 6a0c e8eb4f0600 e886500600 818efc01000000000008",
+         "adrenaline start 0x7189c0: HUD 15 / 12, bit 27 set"},
+        {0x00718ae7, "6a0f e882500600 6a0c e8db4e0600 e8764f0600 81a6fc010000fffffff7",
+         "adrenaline end 0x718ad0: HUD, bit 27 clear"},
+    };
+    bool ok = true;
+    for (const auto &c : modeFacts)
+        if (!HexAt(c.at, c.hex)) {
+            Log(0, "0.6.15: %s at 0x%08lx does not match - ModeWithoutTarget not available", c.what, c.at);
+            ok = false;
+            break;
+        }
+    g_m15Ok = ok;
+    const Check strikeFacts[] = {
+        {kCond150Pc, "8b442404 53 56 8b742414 50 56 e87f150200 83c408 803de6b48a0000 7431",
+         "condition 150 0x760b50 (cdecl agent, cache, record; value 0x7820e0)"},
+        {0x00760b7f, "8b0d682ba000 8b5118 8b0a 8d0440 c1e004 8b1408 80e204 80fa04 0f94c3",
+         "condition 150: action record x 0x30 & 4 (held)"},
+        {0x00785964, "56 50 55 ff542420 83c40c 84c0 741c", "condition list 0x785920: handler(machine, cache, record)"},
+        {0x00785972, "8b4c241c 83c301 83c608 663b5904 72b6", "condition list 0x785920: 8-byte records"},
+    };
+    ok = g_conditions && g_blocksOk;
+    for (const auto &c : strikeFacts)
+        if (ok && !HexAt(c.at, c.hex)) {
+            Log(0, "0.6.15: %s at 0x%08lx does not match - StrikeWithoutButton not available", c.what, c.at);
+            ok = false;
+        }
+    g_cond150Ok = ok;
+    M15ReadSwitches(false);
+    Log(1, "0.6.15 test switches: ModeWithoutTarget %ld (lock test 0x718beb %s; bytes written from the first combat "
+           "manager on and only while 1), StrikeWithoutButton %ld (condition 150 %s); read again at run time (<= 1 / s)",
+        g_modeNoTarget, g_m15Ok ? "checked" : "NOT checked - off", g_strikeNoButton,
+        g_cond150Ok ? "wrapped at Lara's registration, answers 1 only for the strike entry {150,150,46}"
+                    : (g_conditions && g_blocksOk) ? "NOT wrapped (byte checks)" : "NOT wrapped ([Conditions] off)");
+}
+
 void Q108ReadSwitches(bool report) {
     const char *ini = g_iniPath;
     const LONG assist = GetPrivateProfileIntA("Adrenaline", "AssistPointer", 0, ini) ? 1 : 0;
@@ -6916,6 +7147,7 @@ void Q108ReadSwitches(bool report) {
     InterlockedExchange(&g_lockKeyLeft, left);
     InterlockedExchange(&g_chunkRemoveLast, chunk);
     L14ReadSwitches(report);   // 0.6.14: F6 fill / drain percent, strike without a full meter
+    M15ReadSwitches(report);   // 0.6.15: mode without a target, strike without the button
 }
 
 // poll thread (every 10 ms, reads only, faults caught by Rd): one line per change of adrenaline mode / window / full,
@@ -6957,7 +7189,9 @@ DWORD WINAPI Q108Thread(LPVOID) {
             lastIni = now;
             Q108ReadSwitches(true);
             Q108ChunkApply("run time");
+            M15Apply("run time");   // 0.6.15
         }
+        M15Poll(now);               // 0.6.15: own reads, independent of [Adrenaline] Log
         if (!g_adrLog || !g_q108ReadOk) continue;
         Q108State s;
         Q108Read(&s);
@@ -7201,6 +7435,7 @@ void Start(HMODULE self) {
     SetupHitSpeed();                  // 0.6.10: K-8b msg+0x44 / +0x48 of Lara's contact hit (independent)
     SetupQ108();                      // 0.6.13: group C - Q108 log, Q109 assist, Q68 lock input, Q99 option A
     SetupL14();                       // 0.6.14: group L - F6 fill / drain percent, strike without a full meter
+    SetupM15();                       // 0.6.15: test switches ModeWithoutTarget / StrikeWithoutButton
 }
 
 }  // namespace

@@ -1,4 +1,45 @@
-# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.14)
+# TruShadowCombat.asi - DLC 2 combat of the title update (0.6.15)
+
+0.6.15 (2026-11-14, **offline, not yet seen in game**; two TEST switches, main workspace
+`docs\Befund-Adrenalin-ohne-Ziel-1411.md`, `docs\Befund-Adrenalin-Modus-Bedingung-1411.md`, ENGINE.md row "Adrenaline
+mode without a target, strike without X"): build `work\asi\tsc0615`, byte pre-checks `work\asi\tsc0615\precheck_0615.txt`
+(22 checks: the 10 of `SetupM15`, 12 proof facts; 0 mismatches against `data\pc\tru.exe` and the installed tru.exe).
+**PC test options, not TU translations; both default 0 = the game.**
+* **`[Adrenaline] ModeWithoutTarget`** (new, live, default **0**): R3 (action 37) starts the adrenaline mode in the tick
+  0x718bd0 only with the **hard lock** (CM+0x1fc bit 10, set by 0x71edf0 only with a live target of targeter 0 in
+  CM+0xc). LT without an enemy gives the **soft lock** (bit 9) and R3 runs the failure branch 0x718c71 = Lara event 0x3b
+  (fail sound). With 1 the lock test `shr ecx,0xa; test cl,1` at 0x718beb becomes `shr ecx,9; test cl,3` (two single
+  bytes, 0x718bed 0a -> 09, 0x718bf0 01 -> 03): soft **or** hard lock. The tick ends a running mode as soon as the
+  test fails (0x718cda -> 0x718ad0), so **releasing LT ends it** - the game's own end path. Not "no lock at all": R3
+  without LT is also action 25 of Lara's chart, and nothing but R3 / an empty meter would end the mode. Start 0x7189c0 /
+  end 0x718ad0 (HUD, time ramp, events 0x39 / 0x3a) and the other bit-27 readers (camera mode 0x34, sound word,
+  meter, condition 1047) do not read the target; the readers of CM+0xc test the handle themselves. The bytes are
+  written **only while the switch is 1** and only after the first combat manager exists (TruShadowPower byte-checks
+  0x718be3..0x718c02 when it loads); with 0 they are the game's. Lines: `0.6.15 ModeWithoutTarget (...)` per write,
+  `0.6.15 adrenaline mode without target: started with the soft lock only ...` per start, `... ended after n ms (...)`.
+* **`[Adrenaline] StrikeWithoutButton`** (new, live, default **0**; 13.11. test evening, W8 "the vault-off is enough"):
+  the vault-off strike's only transition (lara DTP 850 +0x720a0, into chart record 786 = state 1014) is `{500,538,1}
+  {2000,2001,1} {2000,2011,1} {700,701,0} {1500,1502,0} {2300,2302,1} {150,150,46}`; the last record = action 46 held
+  (pad X). Condition 150 (0x760b50, a generic "action held" test used by ~98 transitions) is wrapped in Lara's machines
+  1 / 2 like 538; with 1 it answers 1 **only** when its record is `{150,150,46}` and the 6 records before it are exactly
+  the strike's (the list stops at the first false, 0x785920, so it is asked only when they hold). Every other button
+  test gets the game's answer; the "not full" feedback `{150,150,46} {500,538,0} {2300,2304,1}` is untouched. Together
+  with `StrikeWithoutFullMeter=1`: any meter. Needs `[Conditions] Enabled=1`. Line `0.6.15 condition 150 {150,150,46}
+  ... answered 1 without the button ...` (at most one per second, with the count).
+* Sites: 0x718bed / 0x718bf0 (bytes, only while ModeWithoutTarget=1) - next to, not inside, TruShadowPower's tick
+  sites 0x718bf3 / 0x718c5d / 0x718cda; Lara's condition tables (copies, as 538). TruMenu: not touched.
+
+| # | what | expected |
+|---|---|---|
+| 1 | game start | `TruShadowCombat 0.6.15 ... loaded`; `0.6.15 test switches: ModeWithoutTarget 0 (lock test 0x718beb checked; ...), StrikeWithoutButton 0 (condition 150 wrapped at Lara's registration, ...)`; no `0.6.15: ... does not match`; at the level `machine 1 conditions: ... 150 (replaced)` |
+| 2 | level loaded | `0.6.15 ModeWithoutTarget: first combat manager seen - the switch acts from now on (ModeWithoutTarget 0)` |
+| 3 | `ModeWithoutTarget=0`, no enemy near, hold LT, press R3 (meter > 0) | fail sound, no mode (as before); no `0.6.15 adrenaline mode without target` line |
+| 4 | `ModeWithoutTarget=1` (live) | `0.6.15 switches (run time): ... ModeWithoutTarget 1 ...`, `0.6.15 ModeWithoutTarget (run time): 0x718beb = shr ecx,9; test cl,3 ...` |
+| 5 | as 3 with the switch 1 | slow motion starts (`0.6.13 Q108 adrenaline mode ON ... hard lock 0`), `0.6.15 adrenaline mode without target: started with the soft lock only (CM+0x1fc bit 9 1, bit 10 0; target handle CM+0xc 0x00000000 ...)`; release LT -> mode ends, `... ended after n ms (lock released - the game's end 0x718cda ...)`; R3 again while LT held also ends it |
+| 6 | as 5, then an enemy comes into view | the lock becomes hard (bit 10), the mode keeps running as in the game; camera / HUD look normal |
+| 7 | `StrikeWithoutButton=1`, full meter, LT on a Viking, vault | the strike starts without X: `0.6.15 condition 150 {150,150,46} ... answered 1 without the button ...`, then `0.6.13 Q108 state 1014 enter ... STARTED`; other X uses (finisher, jumps) as before |
+| 8 | `StrikeWithoutButton=1` + `StrikeWithoutFullMeter=1`, empty meter | as 7 with any meter (`0.6.14 F6 condition 538 ... answered 1` too) |
+| 9 | trouble | both back to 0 (live; with 0 the tick bytes are the game's again: `0.6.15 ModeWithoutTarget (run time): ... (the game's bytes)`); send the log |
 
 0.6.14 (2026-11-12, **offline, not yet seen in game**; group L / F6, main workspace `docs\Befund-Gruppe-L-1211.md`,
 `docs\Befund-Gruppe-F-1211.md` 4.3, ENGINE.md 13.7): build `work\asi\combat0614`, byte pre-checks
