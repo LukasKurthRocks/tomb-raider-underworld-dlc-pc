@@ -1,0 +1,24 @@
+.echo ===DEV===
+r $t0 = poi(0xa1407c)
+.printf "device %p count %d cap %d data %p\n", @$t0, poi(@$t0+0xfdac), poi(@$t0+0xfdb0), poi(@$t0+0xfdb4)
+.echo ===U47ab90===
+u 0x47ab90 0x47ac00
+.echo ===APPEND_506bc8===
+u 0x506b80 0x506c40
+.echo ===APPEND_50fe88===
+u 0x50fe40 0x50ff00
+.echo ===APPEND_510548===
+u 0x510500 0x5105c0
+.echo ===APPEND_5117cb===
+u 0x511780 0x511840
+.echo ===APPEND_5156a8===
+u 0x515660 0x515720
+.echo ===APPEND_516d98===
+u 0x516d50 0x516e10
+.echo ===VT84df64===
+dps 0x84df64 L20
+.echo ===CTOR57140c===
+u 0x5713c0 0x571440
+.echo ===CTOR572480===
+u 0x572440 0x5724b0
+q

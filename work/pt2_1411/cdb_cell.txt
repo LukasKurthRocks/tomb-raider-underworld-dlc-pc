@@ -1,0 +1,12 @@
+.echo ===CUR===
+r $t0 = poi(0xcdcc80)
+.printf "curcell %p vt %p vf14 %p vf20 %p vf2c %p vf30 %p\n", @$t0, poi(@$t0), poi(poi(@$t0)+0x14), poi(poi(@$t0)+0x20), poi(poi(@$t0)+0x2c), poi(poi(@$t0)+0x30)
+dd @$t0 L30
+.echo ===VF===
+u poi(poi(@$t0)+0x20) L8
+u poi(poi(@$t0)+0x14) L8
+u poi(poi(@$t0)+0x2c) L8
+u poi(poi(@$t0)+0x30) L10
+.echo ===U5c1b50===
+u 0x5c1b50 L30
+q

@@ -1,0 +1,62 @@
+.echo ===CELLS===
+r $t0 = 0x180d8120
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x180d8320
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x18301550
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x1837afd0
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x18485900
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x18587a40
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x185884c0
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x185b5150
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x187502d0
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x187689b0
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x18775540
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x18790200
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x187a26a0
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x187af7b0
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+r $t0 = 0x187d8530
+r $t1 = poi(@$t0+0x9c)
+.printf "CELL %p scene %p x %p rec %p c %f %f %f e %f %f %f\n", @$t0, poi(@$t0+8), @$t1, poi(poi(poi(@$t0+0x98))+0x50), dwo(@$t0+0x30), dwo(@$t0+0x34), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x44), dwo(@$t0+0x48)
+.if (@$t1 > 0x10000) { .printf "  n %d\n", poi(@$t1+0x88); dw poi(@$t1+0x8c) L10 }
+q

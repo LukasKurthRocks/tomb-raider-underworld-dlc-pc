@@ -1,0 +1,6 @@
+.echo ===RMI===
+s -[1]d 0x10000 L?0x7fff0000 00849764
+.echo ===TEX===
+s -[1]d 0x10000 L?0x7fff0000 00849b20
+.echo ===END===
+q

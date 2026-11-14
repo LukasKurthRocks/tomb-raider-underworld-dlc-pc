@@ -1,0 +1,4 @@
+.echo ===RECS===
+r $t2 = poi(0x8aa5d4)
+.for (r $t3 = 0; @$t3 < poi(0x8aa5cc); r $t3 = @$t3 + 1) { r $t4 = poi(@$t2 + @$t3 * 0xc); r $t5 = poi(@$t2 + @$t3 * 0xc + 4); .printf "SG %d rec %p owner %p\n", @$t3, @$t4, @$t5; dd @$t4-0x20 L18; dd @$t5 L10 }
+q

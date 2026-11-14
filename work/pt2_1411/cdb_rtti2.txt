@@ -1,0 +1,44 @@
+.echo ===RTTI===
+.printf "vt 84df64 "
+da poi(poi(0x84df64-4)+0xc)+8
+.printf "vt 84dbb4 "
+da poi(poi(0x84dbb4-4)+0xc)+8
+.printf "vt 849764 "
+da poi(poi(0x849764-4)+0xc)+8
+.printf "vt 8497d8 "
+da poi(poi(0x8497d8-4)+0xc)+8
+.printf "vt 849b20 "
+da poi(poi(0x849b20-4)+0xc)+8
+.printf "vt 849b18 "
+da poi(poi(0x849b18-4)+0xc)+8
+.printf "vt 849594 "
+da poi(poi(0x849594-4)+0xc)+8
+.printf "vt 84958c "
+da poi(poi(0x84958c-4)+0xc)+8
+.printf "vt 849704 "
+da poi(poi(0x849704-4)+0xc)+8
+.printf "vt 8496fc "
+da poi(poi(0x8496fc-4)+0xc)+8
+.printf "vt 848ec4 "
+da poi(poi(0x848ec4-4)+0xc)+8
+.printf "vt 848c3c "
+da poi(poi(0x848c3c-4)+0xc)+8
+.printf "vt 848c5c "
+da poi(poi(0x848c5c-4)+0xc)+8
+.printf "vt 848cd0 "
+da poi(poi(0x848cd0-4)+0xc)+8
+.printf "vt 8492cc "
+da poi(poi(0x8492cc-4)+0xc)+8
+.printf "vt 84421c "
+da poi(poi(0x84421c-4)+0xc)+8
+.printf "vt 84c9f0 "
+da poi(poi(0x84c9f0-4)+0xc)+8
+.printf "vt 849aa8 "
+da poi(poi(0x849aa8-4)+0xc)+8
+.printf "vt 8496bc "
+da poi(poi(0x8496bc-4)+0xc)+8
+.printf "vt 849744 "
+da poi(poi(0x849744-4)+0xc)+8
+.printf "vt 849754 "
+da poi(poi(0x849754-4)+0xc)+8
+q

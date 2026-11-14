@@ -1,0 +1,12 @@
+.echo ===SGVEC===
+r $t1 = poi(0x8aa5cc)
+r $t2 = poi(0x8aa5d4)
+.printf "count %d cap %d data %p\n", @$t1, poi(0x8aa5d0), @$t2
+.for (r $t3 = 0; @$t3 < @$t1; r $t3 = @$t3 + 1) { r $t4 = poi(@$t2 + @$t3 * 0xc); .printf "SG %d rec %p w1 %p keep %x name %p : ", @$t3, @$t4, poi(@$t2 + @$t3 * 0xc + 4), by(@$t2 + @$t3 * 0xc + 8), poi(@$t4 + 0xc); .if (@$t4 > 0x10000) { da poi(@$t4 + 0xc) L40 } .else { .printf "-\n" } }
+.echo ===REC0===
+dd poi(@$t2) L10
+.echo ===U5b8dc0===
+u 0x5b8dc0 0x5b8fc0
+.echo ===U5b8fc0===
+u 0x5b8fc0 0x5b9200
+q

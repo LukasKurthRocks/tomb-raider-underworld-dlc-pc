@@ -1,0 +1,11 @@
+.echo ===STRS===
+da 0x8443b4
+da 0x8443bc
+da 0x8443c8
+.echo ===U58aa===
+u 0x58aa60 0x58ab70
+.echo ===U5518===
+u 0x5518c0 0x551940
+.echo ===U4779===
+u 0x477960 0x4779b0
+q

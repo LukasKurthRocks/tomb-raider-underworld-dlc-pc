@@ -1,0 +1,7 @@
+.echo ===LIST===
+r $t0 = poi(0xa1407c)
+r $t1 = poi(@$t0+0xfdac)
+r $t2 = poi(@$t0+0xfdb4)
+.printf "device %p count %d cap %d data %p\n", @$t0, @$t1, poi(@$t0+0xfdb0), @$t2
+.for (r $t3 = 0; @$t3 < @$t1; r $t3 = @$t3 + 1) { r $t4 = poi(@$t2 + @$t3 * 4); .if (@$t4 > 0x10000) { .printf "E %d %p vt %p w1 %p w2 %p w3 %p\n", @$t3, @$t4, poi(@$t4), poi(@$t4+4), poi(@$t4+8), poi(@$t4+0xc) } .else { .printf "E %d %p bad\n", @$t3, @$t4 } }
+q

@@ -1,0 +1,13 @@
+.echo ===ARR===
+dd 0x18635af0 L28
+.echo ===CURX===
+r $t9 = poi(0xcdcc80)
+r $t1 = poi(@$t9+0x9c)
+.printf "cur %p x %p n %d list %p\n", @$t9, @$t1, poi(@$t1+0x88), poi(@$t1+0x8c)
+dw poi(@$t1+0x8c) L20
+.echo ===CUR98===
+dd poi(@$t9+0x98) L4
+dd poi(poi(@$t9+0x98))+0x50 L4
+.echo ===CUR58===
+dd @$t9+0x50 L10
+q

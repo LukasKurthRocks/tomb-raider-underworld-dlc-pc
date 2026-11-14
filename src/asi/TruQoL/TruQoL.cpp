@@ -159,7 +159,7 @@
 
 namespace {
 
-const char kVersion[] = "TruQoL 0.1.7";             // 0.1.7: dated log lines (Q107)
+const char kVersion[] = "TruQoL 0.1.8";             // 0.1.7: dated log lines (Q107); 0.1.8: [Fixes] ReleaseWalk (PT.2)
 const DWORD kImageBase = 0x00400000;
 
 // ---- 1. frame limiter: the frame-time function 0x5da230 and its two clock reads ----
@@ -262,6 +262,33 @@ const char *const kSaveTickHex = "56 8bf1 8b4624 83f801 0f846d010000 83c0fe 83f8
 const int kSaveRetries = 10;                // at most 10 retries ...
 const DWORD kSaveRetryMs = 100;             // ... 100 ms apart (about 1 s, only after a failed first open)
 
+// ---- 7. render device: the deferred release walk 0x47ab90 (0.1.8, PT.2 2026-11-14) ----
+// PCRenderDevice+0xfdac {count, capacity, data} collects released render resources (PCRenderModelInstance, PCTexture,
+// PCRenderModel, PCRenderLight); 0x47ab90 (from the device frame 0x5098b7) deletes them with a walking POINTER into
+// the data. A destructor that releases another resource appends to the same list; when that append crosses the
+// capacity, the data moves (grow 0x55e3c0) and the pointer walks on in the freed buffer -> crash 0x47abb7 (old tree,
+// death in dlc_pillory, 13.11. 14:35: 512 entries deleted, a PCTexture appended as the 513th). The patch walks by
+// INDEX and reads count + data again every step - same order, same calls, appended entries are still deleted.
+const DWORD kReleaseWalk = 0x0047ab90;      // the whole loop + the first instruction after it (guard)
+const char *const kReleaseWalkHex = "8b81acfd0000 83ec0c 56 8db1acfd0000 57 8bb9b4fd0000 8b4e08 8d1481 3bfa 741d 8b0f "
+                                    "85c9 7408 8b01 8b10 6a01 ffd2 8b06 8b4e08 83c704 8d1481 3bfa 75e3 c70600000000";
+const DWORD kReleaseLoop = 0x0047aba1;      // 45 bytes 0x47aba1..0x47abce replaced
+const BYTE kReleaseLoopNew[45] = {
+    0x31, 0xff,                             // xor edi, edi              ; i = 0
+    0x3b, 0x3e,                             // cmp edi, [esi]            ; i < count (read every step)
+    0x73, 0x27,                             // jae 0x47abce
+    0x8b, 0x4e, 0x08,                       // mov ecx, [esi+8]          ; data (read every step)
+    0x8b, 0x0c, 0xb9,                       // mov ecx, [ecx+edi*4]
+    0x47,                                   // inc edi
+    0x85, 0xc9,                             // test ecx, ecx
+    0x74, 0xf1,                             // je 0x47aba3
+    0x8b, 0x01,                             // mov eax, [ecx]
+    0x6a, 0x01,                             // push 1
+    0xff, 0x10,                             // call [eax]                ; vf0(1) = delete, as the game
+    0xeb, 0xe9,                             // jmp 0x47aba3
+    0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
+    0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+
 // ---- options (TruQoL.ini) ----
 int g_enabled = 1, g_logLevel = 1;
 int g_limitEnabled = 1, g_maxFps = 60, g_autoOff = 1, g_spinUs = 0;
@@ -273,6 +300,7 @@ int g_skipIntro = 0;                        // 0.1.2: [Startup] SkipIntro (resta
 int g_frontEndPauseBit = 0;                 // 0.1.4: [Fixes] FrontEndPauseBit (live; read by PauseBitCheck)
 int g_exitTrace = 0;                        // 0.1.5: [Diag] ExitTrace (restart; not in the shipped INI)
 int g_saveRetry = 0;                        // 0.1.6: [Save] RetryOnLock (restart)
+int g_releaseWalk = 0;                      // 0.1.8: [Fixes] ReleaseWalk (restart)
 
 char g_logPath[MAX_PATH], g_dir[MAX_PATH];
 CRITICAL_SECTION g_logLock;
@@ -1489,6 +1517,24 @@ void StartSaveRetry() {
         kSaveOpenCall, kSaveRetries, kSaveRetryMs);
 }
 
+// 0.1.8 (PT.2): [Fixes] ReleaseWalk - the deferred release walk by index (see section 7 above)
+void StartReleaseWalk() {
+    if (!g_releaseWalk) {
+        Log(1, "Fixes ReleaseWalk: off (ReleaseWalk=0) - the game's own release walk 0x%08lx (pointer walk; crashes when "
+               "a destructor's release grows the list during the walk) (restart key)", kReleaseWalk);
+        return;
+    }
+    if (!HexBytesAt(kReleaseWalk, kReleaseWalkHex)) {
+        Log(0, "Fixes ReleaseWalk: off - the release walk 0x%08lx does not match this tru.exe (or another plugin patched "
+               "it)", kReleaseWalk);
+        return;
+    }
+    if (!WriteCode(kReleaseLoop, kReleaseLoopNew, sizeof(kReleaseLoopNew))) return;
+    Log(1, "Fixes ReleaseWalk: on - render device release walk 0x%08lx..0x%08lx walks by index (count + data read every "
+           "step), so a list that grows during the walk no longer leaves the walk in freed memory", kReleaseLoop,
+        kReleaseLoop + static_cast<DWORD>(sizeof(kReleaseLoopNew)));
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // 0.1.1 live keys (TruMenu page Fixes / TruMenu.switches.txt "live"): game thread, from LiveTick. Every read passes the
 // current value as its default (a missing key keeps it); one log line per change. Not here (restart): [TruQoL] Enabled,
@@ -1623,6 +1669,7 @@ void ReadOptions() {
     g_frontEndPauseBit = IniInt("Fixes", "FrontEndPauseBit", 0, 0, 1);   // 0.1.4
     g_exitTrace = IniInt("Diag", "ExitTrace", 0, 0, 1);                   // 0.1.5 (restart; not in the shipped INI)
     g_saveRetry = IniInt("Save", "RetryOnLock", 0, 0, 1);                 // 0.1.6 (restart)
+    g_releaseWalk = IniInt("Fixes", "ReleaseWalk", 0, 0, 1);              // 0.1.8 (restart)
 }
 
 void Start(HMODULE self) {
@@ -1630,9 +1677,9 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruQoL.log", g_dir);
     ReadOptions();
     Log(1, "%s loaded (enabled %d, log level %d; FrameLimit %d / %d fps / AutoOff %d, Fov %g / cutscenes %d, ShakeScale "
-           "%g, ThreadCap %d, SkipIntro %d, FrontEndPauseBit %d, ExitTrace %d, RetryOnLock %d)", kVersion, g_enabled,
-        g_logLevel, g_limitEnabled, g_maxFps, g_autoOff, g_fov, g_fovCutscenes, g_shakeScale, g_threadCap, g_skipIntro,
-        g_frontEndPauseBit, g_exitTrace, g_saveRetry);
+           "%g, ThreadCap %d, SkipIntro %d, FrontEndPauseBit %d, ExitTrace %d, RetryOnLock %d, ReleaseWalk %d)", kVersion,
+        g_enabled, g_logLevel, g_limitEnabled, g_maxFps, g_autoOff, g_fov, g_fovCutscenes, g_shakeScale, g_threadCap,
+        g_skipIntro, g_frontEndPauseBit, g_exitTrace, g_saveRetry, g_releaseWalk);
     if (!g_enabled) { Log(1, "disabled by TruQoL.ini ([TruQoL] Enabled=0) - nothing patched"); return; }
     const DWORD base = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(GetModuleHandleA(nullptr)));
     if (base != kImageBase) { Log(0, "image base 0x%08lx, expected 0x%08lx - nothing patched", base, kImageBase); return; }
@@ -1642,11 +1689,12 @@ void Start(HMODULE self) {
     StartCamera();
     StartSkipIntro();                        // 0.1.2: before WinMain, so no movie can be playing yet
     StartSaveRetry();                        // 0.1.6: [Save] RetryOnLock (restart)
+    StartReleaseWalk();                      // 0.1.8: [Fixes] ReleaseWalk (restart)
     g_iniTimeOk = IniTime(&g_iniTime);       // 0.1.1: the live tick reads again only after a change of TruQoL.ini
     if (g_limitHooked)
         Log(1, "live: TruQoL.ini is read again at most once a second when it changes (LogLevel, FrameLimit Enabled / "
                "MaxFps / AutoOff / SpinUs, Camera Fov / FovCutscenes / ShakeScale, Fixes FrontEndPauseBit; restart: "
-               "Enabled, ThreadCap, SkipIntro, Diag ExitTrace, Save RetryOnLock)");
+               "Enabled, ThreadCap, SkipIntro, Diag ExitTrace, Save RetryOnLock, Fixes ReleaseWalk)");
 }
 
 }  // namespace
@@ -1663,11 +1711,11 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved) {
 }
 
 extern "C" __declspec(dllexport) const char *TruQoLVersion() {
-    return "TruQoL 0.1.7 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
+    return "TruQoL 0.1.8 (player options: frame limiter at the game's frame clock 0x5da230, FOV factor at the render "
            "projection 0x5cb0a8, camera shake factor 0x5eb460, CPU thread cap for the start-up count 0x4a21d0, start-up "
            "intro skip at the script's PlayMovie call 0x77bc7b, stale front-end pause bit at the paused-branch clock "
            "call 0x5da684; live INI re-read once a second for TruMenu page Fixes; [Diag] ExitTrace (default off): "
            "first-chance exceptions + tru.exe's ExitProcess / TerminateProcess -> TruQoL.exit.log; [Save] RetryOnLock "
            "(default off): retry of the save / load CreateFileW 0x6db6d0 on a sharing / lock / access error; 0.1.7: "
-           "dated log lines)";
+           "dated log lines; 0.1.8: [Fixes] ReleaseWalk (default off): render device release walk 0x47aba1 by index)";
 }

@@ -1,0 +1,11 @@
+.echo ===COL===
+dps 0x84df60 L1
+dps 0x849760 L1
+dps 0x849b1c L1
+.echo ===BASE4f===
+u 0x4f3600 0x4f5800
+.echo ===C515===
+u 0x515690 0x515d50
+.echo ===C50e===
+u 0x50e300 0x50eb40
+q

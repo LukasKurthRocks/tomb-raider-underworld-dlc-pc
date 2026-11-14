@@ -23,10 +23,30 @@ the first build; 0.1.1 (`work\asi\qol011`) reads the live keys again while the g
 Everything below is proven statically (disassembly of the installed `tru.exe`, md5 `5560abac...`, and `binkw32.dll`);
 nothing is seen in game yet.
 
-Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\i_1211\TruQoL` (current build 0.1.7; check first with `-Check`, remove with
+Install: `scripts\windows\Set-TruQoL.ps1 -Install -SourceDir work\asi\pt2_1411\TruQoL` (current build 0.1.8; check first with `-Check`, remove with
 `-Remove` / `-Restore`). The Ultimate ASI Loader the game ships as `binkw32.dll` loads every `*.asi` next to `tru.exe`;
 ModLoader.asi is just another plugin of that loader. Log: `TruQoL.log` next to `tru.exe`, one line per feature (on /
 off / why).
+
+## 0.1.8: `[Fixes] ReleaseWalk` (PT.2, 2026-11-14)
+
+Built 2026-11-14 into `work\asi\pt2_1411\TruQoL`, not installed, not played. New restart key `[Fixes] ReleaseWalk`
+(default 0 = nothing patched, the game's behaviour). The render device keeps released render resources in a list
+(`PCRenderDevice+0xfdac`) and deletes them once per frame in **0x47ab90** with a pointer that walks the list's data.
+A destructor that releases another resource (a `PCRenderModelInstance` releasing its last `PCTexture`) appends to
+the same list; when that append crosses the capacity the data moves and the pointer walks on in freed memory - the
+crash `0x47abb7 mov eax,[ecx]` of the old tree after a death in `dlc_pillory` (dump 13.11. 14:35: 512 entries deleted,
+one `PCTexture` appended as the 513th, the walk at the old data + 0x808). With `ReleaseWalk=1` the loop
+0x47aba1..0x47abce walks by index and reads count and data every step (same order, same delete calls, entries
+appended during the walk are still deleted); the 68 bytes 0x47ab90..0x47abd4 are checked first. Patch bytes and branch
+targets checked offline against `tru.exe` (`work\pt2_1411\pt2_walkpatch_check.py`). It does **not** cure the own
+tree's Pranger hang (a data fault, `docs\ENGINE.md` "Cell stream lists"); it removes the crash that comes after it.
+
+| # | TO TEST 0.1.8 | expected |
+|---|---|---|
+| 1 | `ReleaseWalk=0` (default), start the game, read `TruQoL.log` from the last `session start` line | `loaded` line names 0.1.8 and `ReleaseWalk 0`; `Fixes ReleaseWalk: off (ReleaseWalk=0)` |
+| 2 | `ReleaseWalk=1`, start the game, load any level, play a minute, go back to the main menu | `Fixes ReleaseWalk: on - render device release walk 0x0047aba1..0x0047abce walks by index ...`; no crash, levels load and unload as before |
+| 3 | old tree (or own tree after the stream-list data fix), `ReleaseWalk=1`, die in `dlc_pillory` | the reload finishes (no crash at 0x47abb7) |
 
 ## 0.1.7: dated log lines (Q107, 2026-11-12)
 
@@ -57,6 +77,7 @@ in 0.1.6 (same sample .ini). Install: `scripts\windows\Set-TruQoL.ps1 -Install -
 | `[Startup]` | `ThreadCap` | 8 | 0 .. 31 | restart | the game's CPU count sees at most this many threads (only when the PC has more); 0 = off - acts once, before WinMain. 0.1.3: default 8 (was 31) - live on a 36-thread PC 8 / 16 / 24 work, 25 and more hang at the first load (worker pool, ENGINE.md 3), more threads gave no faster loading |
 | `[Startup]` | `SkipIntro` | 0 | 0 / 1 | restart | 0.1.2: 1 = skip the start-up intro movie (only before the "press start" screen, never in a level; the legal screens stay); patched once at the start |
 | `[Fixes]` | `FrontEndPauseBit` | 0 | 0 / 1 | live | 0.1.4: 1 = clear the pause bit the front end keeps after "pause -> back to the main menu" (main-menu clocks, e.g. the teaser timer, then run in real time instead of half speed); only in the front end and only while no pause is open - the pause in a level is untouched. 0 = the game's behaviour (the bit stays until the next level load) |
+| `[Fixes]` | `ReleaseWalk` | 0 | 0 / 1 | restart | 0.1.8: 1 = the render device's deferred release walk 0x47ab90 runs by index (count + data read every step) - no crash when a deletion grows the list during the walk (death in `dlc_pillory`, crash 0x47abb7). 0 = the game's pointer walk |
 
 | `[Save]` | `RetryOnLock` | 0 | 0 / 1 | restart | 0.1.6: 1 = when the save / load file cannot be opened because another program holds it (sharing / lock / access error), try again up to 10 times 100 ms apart (only then; at most about 1 s); 0 = the game's one try (a failed save write deletes the slot's file) |
 | `[Diag]` | `ExitTrace` | 0 | 0 / 1 | restart | 0.1.5: 1 = write `TruQoL.exit.log` (first-chance exceptions, tru.exe's own `ExitProcess` / `TerminateProcess`, the DLL detach) - a diagnosis, see "ExitTrace" below. **Not in the shipped `TruQoL.ini`** (every key there needs a TruMenu switches row, which TruMenu's owner adds): add `[Diag]` / `ExitTrace=1` by hand |

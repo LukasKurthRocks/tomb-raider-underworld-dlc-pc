@@ -1,0 +1,9 @@
+.echo ===UNITS===
+.for (r $t0 = 0xdbab40; @$t0 < 0xdbc640; r $t0 = @$t0 + 0xd8) { .if (by(@$t0+4) != 0) { r $t1 = poi(@$t0+8); .printf "U id %d state %d lvl %p ", poi(@$t0), by(@$t0+4), @$t1; .if (@$t1 > 0x10000) { r $t2 = poi(@$t1+0x90); .if (@$t2 > 0x10000) { .printf "sgt %p hdr %p cnt %d base %p ", @$t2, poi(@$t2), poi(poi(@$t2)+0xc), poi(@$t2+8) } }; da @$t0+0xc } }
+.echo ===CELLS===
+r $t5 = poi(0x8aa5d4)
+.for (r $t6 = 0; @$t6 < poi(0x8aa5cc); r $t6 = @$t6 + 1) { r $t7 = poi(@$t5 + @$t6 * 0xc + 4); .printf "SCENE %p ncells %d arr %p\n", @$t7, poi(@$t7+0x14), poi(@$t7+0x18); .for (r $t8 = 0; @$t8 < poi(@$t7+0x14); r $t8 = @$t8 + 1) { r $t9 = poi(poi(@$t7+0x18) + @$t8 * 4); .if (@$t9 > 0x10000) { r $t10 = poi(@$t9+0x9c); .if (@$t10 > 0x10000) { .printf "C %d %p n %d :", @$t8, @$t9, poi(@$t10+0x88); .for (r $t11 = 0; @$t11 < poi(@$t10+0x88); r $t11 = @$t11 + 1) { .printf " %d/%d", wo(poi(@$t10+0x8c) + @$t11*4), wo(poi(@$t10+0x8c) + @$t11*4 + 2) }; .printf "\n" } .else { .printf "C %d %p nostream\n", @$t8, @$t9 } } } }
+.echo ===CURCELL===
+r $t9 = poi(0xcdcc80)
+.printf "cur %p scene %p\n", @$t9, poi(@$t9+8)
+q

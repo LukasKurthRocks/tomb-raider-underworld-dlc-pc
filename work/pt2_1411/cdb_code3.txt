@@ -1,0 +1,18 @@
+.echo ===STR===
+s -a 0x400000 0xb00000 "treamgroup"
+s -a 0x400000 0xb00000 "TREAMGROUP"
+s -a 0x400000 0xb00000 "StreamGroup"
+.echo ===C848ec4===
+u 0x5025e0 0x502700
+.echo ===DTOR8497d8===
+u 0x50ea60 L10
+u 0x50e8a0 0x50e900
+u 0x50f6b0 0x50f700
+.echo ===DTOR849b18===
+u 0x515d50 L30
+u 0x515da0 0x515e40
+.echo ===VT849764===
+dps 0x849764 L10
+.echo ===VT849594===
+dps 0x849594 L10
+q

@@ -1,0 +1,28 @@
+.echo ===STR===
+s -a 0x83d000 0x9d0000 "streamgroups"
+.echo ===VTS===
+dps 0x8497d8 L8
+dps 0x848ec4 L8
+dps 0x849b18 L8
+dps 0x84958c L8
+dps 0x8496fc L8
+.echo ===VTREF===
+s -b 0x401000 0x83d000 d8 97 84 00
+s -b 0x401000 0x83d000 c4 8e 84 00
+s -b 0x401000 0x83d000 18 9b 84 00
+s -b 0x401000 0x83d000 8c 95 84 00
+s -b 0x401000 0x83d000 fc 96 84 00
+.echo ===SAMPLE===
+dd 0x186f0c64-0x40 L30
+dd 0x183998b4-0x40 L30
+.echo ===DEVCTOR===
+u 0x508a60 L20
+.echo ===GROW===
+u 0x55e3c0 L30
+.echo ===DTOR84df===
+u 0x5247c0 L30
+u 0x572460 L20
+.echo ===OBJ84df===
+dd 0x180d8120 L40
+dd 0x18301550 L40
+q
