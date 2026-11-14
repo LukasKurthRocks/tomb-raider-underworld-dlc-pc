@@ -716,6 +716,14 @@ def _convert_drm(xsecs, ids, store, media=None, T=None, use_pc_copy=True, use_te
                     d13[8:12] = struct.pack('<HH', (xb[8] << 8) | xb[9], (xb[10] << 8) | xb[11])
                     d13[16:20] = xb[16:20]
                     data = bytes(d13)
+                if t == 13 and os.environ.get('TRUDLC_MAP_MESH', '').lower() != 'off':
+                    # P4.9 (2026-11-14, PDA sonar hang, workspace docs Befund-W1-Testabend-1311.md / Befund-P48-P49-
+                    # Pipeline-1411.md): the collision Mesh of a *_map.drm section (header, vertices, faces, KD nodes)
+                    # by its place, not by the learned table, which u32-swapped KD node bytes +0xc..+0xf (axis / leaf
+                    # count) and left header counts / face indices raw. No-op for sections without a mesh. Proof on the
+                    # base map pairs + gate: tools/map_mesh_fix.py (proof / check). TRUDLC_MAP_MESH=off = learned table
+                    import map_mesh_fix
+                    data, _ = map_mesh_fix.fix_section(s['data'], rel, data)
                 reloc = R.write(rel, 'le'); route = 'convert'
                 if t == 7: conv0.append(k)
         if route in ('convert', 'template') and t in (2, 7, 8, 11) and xid in ids.base.get(t, {}) \

@@ -105,6 +105,11 @@
                exit 1 on the retired CINE_SKIP form or a missing file, report <tree>\..\cine_call_check.json) and
                scan_aidata_tree check on both trees (exit 1 on any wrong 0x390-byte AI record id / count, report
                <tree>\..\aidata_check.json).
+               P4.8 / P4.9 gates (2026-11-14, workspace docs Befund-P48-P49-Pipeline-1411.md): instref_gate proof + check
+               on both trees (script init words userType 4261 = PC 4697 {u16 intro id, u16}: exit 1 when a reference to a
+               DLC intro / marker does not name the PC id of that intro, report <tree>\..\instref_check.json) and
+               map_mesh_fix proof + check (*_map.drm collision mesh: exit 1 on a mesh not found, a KD node outside its
+               arrays or node bytes +0xc..+0xf other than the Xbox bytes, report <tree>\..\map_mesh_check.json).
                -FixesOut DIR (relative to the repository) writes DIR\dlc1\mods and DIR\dlc2\mods instead of
                work\rebuild\asm_stage2b and dlc2_asm_stage2b (check runs that must not replace the usual outputs)
       Shaders  (2026-11-11, plan A2 stage 1, after Fixes; minutes) the recorded shader decisions on the Fixes output:
@@ -514,6 +519,10 @@ $steps = @{
         # 2026-11-12 (Q110) objfield: u16 object ids of the unit default gear lists and the chunkdoll data D+8 = PC id
         # of the Xbox object name on every base pair (exit 1 on a contradicting field or another count than pinned)
         @('tools\object_id_field_fix.py', 'proof'),
+        # 2026-11-14 (P4.8 / P4.9): the converter rules for script intro / marker references (userType 4261 -> 4697)
+        # and the *_map.drm collision meshes, proven on the base pairs (exit 1 on a contradicting word or another count)
+        @('tools\instref_gate.py', 'proof'),
+        @('tools\map_mesh_fix.py', 'proof'),
         @('tools\dlc_fixes_build.py', 'work/rebuild/asm_stage2a/mods', $fix1),
         # uiinit on the DLC 1 tree in place (planned words only, every write re-read), then the text-anchor gate
         @('tools\ui_init_fix.py', 'apply', $fix1, '--report', ((Split-Path -Parent $fix1) + '/uiinit_apply.json')),
@@ -534,6 +543,10 @@ $steps = @{
         # P4 gates (2026-11-13): DLC 1 start calls PlayCinematic (no retired CINE_SKIP), no wrong enemy AI record
         @('tools\cine_call_gate.py', 'check', $fix1, '--report', ((Split-Path -Parent $fix1) + '/cine_call_check.json')),
         @('tools\scan_aidata_tree.py', 'check', $fix1, '--pack', 'pack10', '--report', ((Split-Path -Parent $fix1) + '/aidata_check.json')),
+        # P4.8 / P4.9 gates (2026-11-14): every script reference to a DLC intro / marker names the PC id of that intro
+        # (dungeon water markers, Q124); every *_map.drm collision mesh has the Xbox KD node bytes (PDA sonar hang)
+        @('tools\instref_gate.py', 'check', $fix1, '--pack', 'pack10', '--expect-refs', '--report', ((Split-Path -Parent $fix1) + '/instref_check.json')),
+        @('tools\map_mesh_fix.py', 'check', $fix1, '--pack', 'pack10', '--report', ((Split-Path -Parent $fix1) + '/map_mesh_check.json')),
         # shader form gate (2026-11-08): the forms Windows' D3D9 or a GPU driver refuses (-ShaderGate)
         (@('tools\shader_form_gate.py', 'check', $fix1, '--list', '3', '--report', $sg1) + $sgEnforce),
         @('tools\compare_b138.py', $fix1, $cmp1),
@@ -556,6 +569,8 @@ $steps = @{
         @('tools\melee_link_record_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $melee2),
         @('tools\generator_intro_fix.py', 'scan', $fix2, '--pack', 'pack11', '--report', $gen2),
         @('tools\scan_aidata_tree.py', 'check', $fix2, '--pack', 'pack11', '--report', ((Split-Path -Parent $fix2) + '/aidata_check.json')),
+        @('tools\instref_gate.py', 'check', $fix2, '--pack', 'pack11', '--expect-refs', '--report', ((Split-Path -Parent $fix2) + '/instref_check.json')),
+        @('tools\map_mesh_fix.py', 'check', $fix2, '--pack', 'pack11', '--report', ((Split-Path -Parent $fix2) + '/map_mesh_check.json')),
         # 2026-11-09: the end-level words the 0813 tree had wrong vs the installed tree (Level twin s32, unit root block
         # twin, uber TRANS +0x34 raw; DTP 24420 +0x6c only WARN) - exit 1 when one comes back
         @('tools\endlevel_word_judge.py', 'check', $fix2, '--report', ((Split-Path -Parent $fix2) + '/endlevel_words_check.json')),

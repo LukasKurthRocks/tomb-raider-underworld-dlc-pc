@@ -35,6 +35,13 @@ Each is small, evidence-driven, and listed in LINEAGE.md. Examples:
 * DLC 1 start: the retired rule `CINE_SKIP` (2026-10-09 .. 2026-11-13, skipped the intro cinematic) is off; gate
   `tools/cine_call_gate.py check TREE` (step Fixes): script 20068 +0x6c4 must call Cinematic_Object 3523 +0x2410
   (vtIndex 57 PlayCinematic). Old trees: `tools/dlc_patch.py --only=cine_play OUT SRC dlc_level1_start.drm`.
+* Script intro / marker references (2026-11-14, P4.8): init words of base type 10 / userType 4261 (PC 4697) keep the
+  u16 intro id (intro id map) in `tools/script_learn.py` (`TRUDLC_SCRIPT_INSTREF=off` = the learned table). Proof + gate
+  (step Fixes): `tools/instref_gate.py proof` / `check TREE --pack PACK --expect-refs`. Old trees:
+  `tools/instref_gate.py fix OUT SRC name.drm ...`.
+* Map collision meshes (2026-11-14, P4.9): the `*_map.drm` Mesh (header, vertices, faces, KD nodes) is converted by place
+  (`tools/map_mesh_fix.py`, `dlc_generic` type 13, `TRUDLC_MAP_MESH=off` = the learned table). Proof + gate (step Fixes):
+  `tools/map_mesh_fix.py proof` / `check TREE`. Old trees: `tools/map_mesh_fix.py fix OUT SRC [name_map.drm ...]`.
 
 ## Stage 3 — shaders and materials (the long tail)
 PC pixel shaders cannot be copied from Xbox microcode, so the Xbox shader libs are **translated**:

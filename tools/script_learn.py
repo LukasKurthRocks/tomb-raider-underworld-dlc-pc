@@ -20,8 +20,31 @@ CLASSES = ('s32', 's16', 'raw', 'b2s16', 's16b2', 'id16a:100', 'id16b:100', 'id1
            # unit ids (u16), intro unique ids (u32, generic_type0 113), localisation string ids (101, tools/locals.py)
            'id32:7', 'id16a:11', 'id16a:110', 'id32:113', 'id16a:101', 'id32:101', 'id32:6', 'id32:114')
 PREF = {c: i for i, c in enumerate(CLASSES)}
+# P4.8 (2026-11-14, PW.1 / Q124, workspace docs Befund-PW1-Wasserhoehe-1311.md, Befund-P48-P49-Pipeline-1411.md):
+# member init words of base type 10 with the userType Symbol 4261 (Xbox; PC 4697) are an instance / marker reference
+# {u16 intro id, u16 0} (dungeon water scripts 20415 / 20774: target markers of SetWaterDepthToMarkerZVal). The learned
+# table has 134 base words of that label and NONE informative for its classes (the PC intro ids are renumbered, no
+# u16 class with the intro map existed), so the label fell back to ('init', 10, 1, 0) = id16a:100 and the intro ids
+# were converted as Symbols (9622 -> 12154 ...): the markers were not found, the dungeon water never lowered. Now:
+# the u16 stays in place through the intro id map (ids(113, x): identity for DLC intros unless renumbered, e.g.
+# 9395 -> 29395 = generic_type0.intro_new), the second u16 in place. Proof on the base pairs and the gate:
+# tools/instref_gate.py (proof / check). TRUDLC_SCRIPT_INSTREF=off restores the learned classes (A/B runs).
+INSTREF_UT = 4261           # Xbox userType Symbol of the reference (DlcIds.sym(4261) = PC 4697)
+INSTREF_CLASS = 'intro16a'
+
+
+def instref(lab, xw=None):
+    """True for a walker label ('init', 10, depth, 0, INSTREF_UT): the FIRST word of the init block, any depth (the
+    block goes on with other fields: base words at k = 12 are u32, l7_yggdrasil_end 11117 +0x190 0000000f -> 0f000000).
+    With the Xbox word: only when its high u16 is not 0 (no intro has id 0; DLC 1 20774 +0x130 = 00000002 is a k = 12
+    word of the block at +0x124 that is also a pointer target, so the walker starts a block there - left to the table)"""
+    return isinstance(lab, tuple) and len(lab) >= 5 and lab[0] == 'init' and lab[1] == 10 and lab[3] == 0 \
+        and lab[4] == INSTREF_UT and (xw is None or xw[:2] != b'\0\0')
 
 def apply_word(xw, c, ids):
+    if c == INSTREF_CLASS:      # {u16 intro / marker id, u16}: intro id map (generic_type0 INTRO = 113), u16 in place
+        a, b = struct.unpack('>HH', xw)
+        return struct.pack('<HH', ids(113, a) & 0xffff if a not in (0, 0xffff) else a, b)
     if c == 'syma_r':
         a, = struct.unpack('>H', xw[:2])
         return struct.pack('<H', ids(G.SYM, a) & 0xffff if a not in (0, 0xffff) else a) + xw[2:4]
@@ -134,11 +157,13 @@ def convert(xd, rel, ids, T, fallback=None, W=None):
     out = bytearray(xd)
     skip = set(rel.pointer_offsets()) | set(rel.id_offsets())
     paths = path_words(xd, W) if os.environ.get('TRUDLC_SCRIPT_PATHS', '').lower() != 'off' else set()
+    iref = os.environ.get('TRUDLC_SCRIPT_INSTREF', '').lower() != 'off'      # P4.8 (2026-11-14), see INSTREF_UT
     for w in range(0, len(xd) // 4 * 4, 4):
         if w in skip: continue
         xw = xd[w:w + 4]
         lab = W.lab.get(w)
         if w in paths: c = 'id16ab:100'
+        elif iref and instref(lab, xw): c = INSTREF_CLASS
         elif lab is not None: c = T.best(lab + ('~' + _shape(xw),))
         elif fallback is not None: c = fallback(w, xw)
         else: c = 'raw' if G.is_text(xw) and xw != xw[::-1] else 's32'

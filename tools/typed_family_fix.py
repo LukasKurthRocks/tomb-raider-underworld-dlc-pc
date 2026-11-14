@@ -29,7 +29,9 @@ Rules (step names of tools/dlc_struct_fixes.py):
              name strings (>= 8 printable bytes at a pointer target) raw; the root +0xa4 block +0x90 / +0x94 has no
              rule over the base units (l7_yggdrasil_end +0x94 raw, l7_yggdrasil_hall02 +0x94 s32), but since 2026-11-09
              the unit's own base twin (the leveltwin twin of its Level) decides where its Xbox word is the same
-             (root_twin_words: dlc_yggdrasil_end 21218 +0x14f04 = 18550 -> raw)
+             (root_twin_words: dlc_yggdrasil_end 21218 +0x14f04 = 18550 -> raw); since 2026-11-14 (P4.8) the
+             watervolume blocks (object 7) +0x10 / +0x4c as u16 pairs (s16) before every other rule (water_table:
+             21 base units of the PC unit list, 55 volumes)
   fxrec      FX particle records (anchor bf800000 x3, c04a468e x2): record +0x18 and +0x38 with an Xbox word XX000000
              -> raw (17j-b pattern_twins.py: DTP 22819 of dlc2_checkpoint, 13 DRMs)
   sgmesh     streamgroup mesh-list DTPs {u32 n, n x {u32 mesh id (idref 12), u32, u32, u32}}: every word s32 (the id
@@ -138,7 +140,10 @@ PROOF_EXPECT = {
                    # unit-DTP path table (18e = 17o d4_table: 81 base units, 77 with equal intro count / names)
                    'tbl_units_all': 81, 'tbl_units': 77, 'tbl_samples': 774257, 'tbl_keys_K1': 254442, 'tbl_keys_KS': 64,
                    'tbl_keys_K3': 186022, 'loo_K1_n': 315349, 'loo_K1_wrong': 3,
-                   'loo_K3_n': 203862, 'loo_K3_wrong': 21, 'loo_KS_n': 19526, 'loo_KS_wrong': 0},
+                   'loo_K3_n': 203862, 'loo_K3_wrong': 21, 'loo_KS_n': 19526, 'loo_KS_wrong': 0,
+                   # P4.8 2026-11-14: watervolume +0x4c / +0x10 u16 pairs (21 base units of the PC unit list, 55 volumes)
+                   'wv_units': 21, 'wv_volumes': 55, 'wv4c_ok': 13, 'wv4c_amb': 42, 'wv10_ok': 55, 'wv10_id_same': 0,
+                   'wv10_id_renumbered': 55},
     'fxrec': {'records': 4695, 'ok': 228, 'contra': 0},
     'sgmesh': {'dtps': 84, 'ok': 188, 'amb': 178, 'contra': 0},
     # 18e: 11 032 base particle records (17o p1_base), 12 offsets x records, 0 slots
@@ -400,6 +405,65 @@ def intro_table():
     st['keys'] = len(D); st['keys_with_rules'] = len(rules); st['rule_words'] = sum(len(v) for v in rules.values())
     _ST['it'] = (i7c, rules, root, strs, st)
     return _ST['it']
+
+
+# P4.8 (2026-11-14, PW.1 side finding, workspace docs Befund-PW1-Wasserhoehe-1311.md / Befund-P48-P49-Pipeline-1411.md):
+# the watervolume intro data block (PC object id 7, 0xc0 B) has two u16-pair words the BASE_UNITS (no water volume)
+# give no rule for: +0x4c {u16 a, u16 flags} (PC ProcessIntroData 0x6ac720 reads +0x4e as the zone flags -> +0x7c,
+# +0x4c -> +0xc0; dlc_dungeon zone 9594: Xbox flags 4, the converter wrote s32 -> flags 0) and +0x10 {u16, u16 intro id
+# of a linked instance} (+0x12 -> INSTANCE_Find, zone +0xb4; the converter wrote s32 -> PC reads 0). Both s16 (the DLC
+# intro ids are not renumbered except intro_new collisions; the base pairs renumber +0x12 with the unit's intros).
+# Proof: water_table() over the base units of the PC unit list (volumes paired by rounded position).
+WATER_OBJ = 7
+WATER_U16 = {0x10: 's16', 0x4c: 's16'}
+WATER_UNITLIST = os.path.join(HERE, '..', 'work', 'generic', 'lists', 'pc_unitlist.txt')
+
+
+def water_table():
+    """counts over the watervolume intros of the base units (Xbox layer1 / layer2 vs PC bigfile, paired by rounded
+    position): +0x4c byte order, +0x10 first u16 in place + second u16 = the PC id of the same unit intro"""
+    if 'wv' in _ST: return _ST['wv']
+    got = collections.Counter()
+    names = [l.strip().split('\\')[-1] for l in open(WATER_UNITLIST) if '\\' in l]      # 'levels\l1\l1_baldrs_hall'
+    for nm in names:
+        if nm.startswith('dlc') or nm.startswith('container'): continue
+        X, P = base_unit(nm)
+        if X is None or P is None: continue
+        kx, kp = unit_dtp(X, 'be'), unit_dtp(P, 'le')
+        if kx is None or kp is None: continue
+        ux, up = X.sections[kx], P.sections[kp]
+        IX, px = intros(ux, 'be'); IP, pp = intros(up, 'le')
+        xd, pd = bytes(ux.data), bytes(up.data)
+        def vols(I, d, E):
+            out = {}
+            for o, obj, dp, sz in I:
+                if obj != WATER_OBJ or dp is None or sz < 0x50: continue
+                out[tuple(round(v) for v in struct.unpack_from(E + '3f', d, o + 0x10))] = (o, dp)
+            return out
+        VX, VP = vols(IX, xd, '>'), vols(IP, pd, '<')
+        common = sorted(set(VX) & set(VP))
+        if not common: continue
+        # the converter's base intro id map (generic_type0 space 113, unit_ids: Xbox intro uniqueID -> PC uniqueID)
+        if 'wv_imap' not in _ST:
+            import generic_type0 as G0
+            _ST['wv_imap'] = G0.space_maps().get(G0.INTRO, {})
+        imap = _ST['wv_imap']
+        got['wv_units'] += 1
+        for k in common:
+            (xo, xdp), (po, pdp) = VX[k], VP[k]
+            got['wv_volumes'] += 1
+            c = cls(xd[xdp + 0x4c:xdp + 0x50], pd[pdp + 0x4c:pdp + 0x50])
+            got['wv4c_' + ('ok' if c == 's16' else 'amb' if c == 'amb' else 'contra')] += 1
+            # +0x10: the PC keeps the u16 pair layout {u16 a in place, u16 intro id}; the id itself is renumbered with the
+            # unit's intro block (l1_* +1, l2_* / l7_* other offsets; not in the space-113 map) - so the proof is the
+            # layout: first half equal, second half non-zero exactly when the Xbox one is (s32 would move the id to +0x10)
+            xa, xb = struct.unpack_from('>HH', xd, xdp + 0x10); pa, pb = struct.unpack_from('<HH', pd, pdp + 0x10)
+            ok = xa == pa and (xb == 0) == (pb == 0) and (xb, pb) != (0, 0) or (xa, xb) == (pa, pb)
+            got['wv10_' + ('ok' if ok else 'contra')] += 1
+            if ok and xb: got['wv10_id_same' if pb == xb else 'wv10_id_renumbered'] += 1
+            if not ok: _ST.setdefault('wv_bad', []).append((nm, xa, xb, pa, pb, imap.get(xb)))
+    _ST['wv'] = got
+    return got
 
 
 def l7_levels():
@@ -947,6 +1011,11 @@ def proof_counts(rule):
         T = path_table()
         for tn in ('K1', 'KS', 'K3'): got['tbl_keys_' + tn] = len(T[tn])
         for tn, (n, bad) in sorted(table_loo().items()): got['loo_%s_n' % tn] = n; got['loo_%s_wrong' % tn] = bad
+        # P4.8 (2026-11-14): watervolume +0x4c / +0x10 u16 pairs on the base units with water volumes
+        wv = water_table()
+        for k in ('wv_units', 'wv_volumes', 'wv4c_ok', 'wv4c_amb', 'wv10_ok', 'wv10_id_same', 'wv10_id_renumbered'):
+            got[k] = wv[k]
+        got['contra'] += wv['wv4c_contra'] + wv['wv10_contra']
     elif rule == 'fxrecread':
         # every base particle record word at an FXREAD offset: PC word == the reader's byte order of the Xbox word
         # (ok; amb = the Xbox word reads the same in every byte order), else contra; objrec must not rule the offset
@@ -1152,6 +1221,9 @@ def plan(rule, XD, PD, rel='', pack=None):
         w = {}
         for o, obj, dp, sz in IP:
             w[o + 0x7c] = 's32'
+            if obj == WATER_OBJ and dp is not None:          # P4.8 (2026-11-14): watervolume u16 pairs (water_table)
+                for q, c in WATER_U16.items():
+                    if q + 4 <= sz: w[dp + q] = c
             for q, c in rules.get((obj, sz), {}).items(): w.setdefault(dp + q, c)
         for q in name_strings(bytes(ux.data), px): w.setdefault(q, 'raw')
         # 2026-11-09: root +0xa4 block +0x90 / +0x94 - no rule over the base units (they disagree), but the unit's own
