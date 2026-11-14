@@ -1139,7 +1139,22 @@ def u16_paths(d, rel, xs, st, risk, sid):
     u16 little-endian, the padding u16 unchanged. A path whose element 0 already is the final member name stays (PC copy /
     path_words); one naming another member of this script stays and is listed as a risk."""
     import script_member_pairs as MP
+    from script_u16array_check import arrays
     I = ids()
+    # crash 2 (2026-11-14 21:50, OBJECTIVES screen, tru.exe 0x4ca2a0 -> 0x5a4ce0 -> call 0x02000000): the COUNT word of
+    # such an array (a record {u32 a, u32 n, u16 *path, u16[n]} of a widget list, 3347 member #20 userType 361) kept the
+    # Xbox byte order in 6 records (n = 2 read as 0x02000000; the converter swapped only the first record of the list,
+    # the pointer target) - 0x4d08e0 then walks past the path. Every array count = the Xbox count, little-endian.
+    xd = xs['data']; xr = R.parse(xs['reloc'], 'be'); xptr = set(xr.pointer_offsets()); bptr = set(rel.pointer_offsets())
+    for co, n, t, words in arrays(xd, xr):
+        if co in xptr or co in bptr or co + 4 > len(d): continue
+        cur = struct.unpack_from('<I', d, co)[0]
+        if cur == n: st['u16 array counts right'] += 1; continue
+        if bytes(d[co:co + 4]) == xd[co:co + 4]:
+            struct.pack_into('<I', d, co, n); st['u16 array counts: Xbox byte order -> little-endian'] += 1; st['init words changed'] += 1
+        else:
+            risk.append('%d +0x%x: u16 array count %d, built word %s - kept' % (sid, co, n, bytes(d[co:co + 4]).hex()))
+            st['u16 array counts with another value (kept)'] += 1
     paths, left = u16_path_arrays(xs['data'], xs['reloc'], bytes(d), rel)
     for k, v in left.items(): st['u16 arrays left (%s)' % k] += v
     final = {q['a']: q['name'] for q in MP.entries(bytes(d), R.write(rel, 'le'), 'le')[1]['members']}
@@ -1299,7 +1314,7 @@ def build(argv):
     infos = [dict(size=len(x.data)) for x in E2.sections]
     bad = sum(bool(R.check(R.parse(x.reloc, 'le'), len(x.data), infos)) for x in E2.sections)
     if bad: sys.exit('%d sections with relocations out of bounds - nothing written' % bad)
-    gates = gate_sections(E2.sections, pc, PCS, pk, inv, rec, targets)
+    gates = gate_sections(E2.sections, pc, PCS, pk, inv, rec, targets, K)
     for g in gates: L('gate: %s' % g)
     if any(g.startswith('FAIL') for g in gates): sys.exit('gate failed - nothing written')
     os.makedirs(os.path.join(out, 'mods'), exist_ok=True)
@@ -1329,7 +1344,7 @@ def vt_sig(v, S, own):
     return out
 
 
-def gate_sections(S, pc, PCS, pk, inv, rec, targets):
+def gate_sections(S, pc, PCS, pk, inv, rec, targets, K=None):
     """static gates on the written sections (list of DW.Section, PC layout); returns lines, 'FAIL ...' on a failure"""
     import script_init_from_pc as SIP
     out = []
@@ -1498,6 +1513,8 @@ def gate_sections(S, pc, PCS, pk, inv, rec, targets):
         for k, c in left.items(): ust['left (%s)' % k] += c
         for t, n, words, xv, xa in paths:
             e0 = struct.unpack_from('<H', v.d, t)[0]
+            if struct.unpack_from('<I', v.d, t - 8)[0] != n:     # {u32 n, u16 *path -> t, u16[n]}
+                badu.append('%d:%d +0x%x n=%d: count word %s is not %d little-endian' % (key[0], key[1], t, n, v.d[t - 8:t - 4].hex(), n)); continue
             if mem[e0] == 1 and fin.get(xa) == e0: ust['element 0 = the Xbox-named member'] += 1; continue
             why = ('names no member / function: 0x4d08e0 returns a stack address' if not mem[e0] and e0 not in fn_names else
                    'resolves to a function, not the member' if not mem[e0] else
@@ -1506,6 +1523,87 @@ def gate_sections(S, pc, PCS, pk, inv, rec, targets):
                                                                   v.d[t:t + 4 * words].hex(), why))
     out.append(('ok   ' if not badu else 'FAIL ') + 'u16 UI target paths of the ported / new scripts: %s, other %d %s' % (
         dict(ust), len(badu), badu[:8]))
+    # (7) Xbox byte order left in place (crash 2, 2026-11-14 21:50: list record counts 2 read as 0x02000000): every
+    # non-pointer word of a ported / new script whose built bytes = the Xbox bytes while the Xbox word is a small
+    # integer 1..0xffff (little-endian that reads as >= 0x01000000) - allowed only for an init leaf whose learned base
+    # rule is 'raw' (byte fields, proven on the base pairs, e.g. userType 779 [0, 4])
+    if K is None: K = load_knowledge()
+    bst = collections.Counter(); badb = []
+    for key in sorted(tset):
+        v = view(key); xs = pk[inv[key]]
+        if v is None: continue
+        xd = xs['data']; xr = R.parse(xs['reloc'], 'be'); xptr = set(xr.pointer_offsets()); bptr = set(v.rel.pointer_offsets())
+        cand = [w for w in range(0, min(len(xd), len(v.d)) - 3, 4) if w not in xptr and w not in bptr and
+                v.d[w:w + 4] == xd[w:w + 4] and 1 <= struct.unpack_from('>I', xd, w)[0] <= 0xffff]
+        if not cand: continue
+        raw = set()
+        for mk, la in SIP.members(v.W, v.d, 'le').items():
+            for a in la:
+                ia = v.W.it.get(a + 16)
+                if ia is None: continue
+                for p, o in SIP.leaves(v.W, v.W.it, ia):
+                    if o in cand and K['_rules'].get((mk[3], mk[2], tuple(p))) == 'raw': raw.add(o)
+        for w in cand:
+            if w in raw: bst['raw byte fields (base rule)'] += 1
+            else: badb.append('%d:%d +0x%x Xbox %s kept' % (key[0], key[1], w, xd[w:w + 4].hex()))
+    out.append(('ok   ' if not badb else 'FAIL ') + 'Xbox byte order left in small integers of the ported / new scripts: %s, other %d %s' % (
+        dict(bst), len(badb), badb[:8]))
+    # (8) replay of tru.exe 0x4ca2a0 (widget list, [w+0x21c] count / [w+0x220] records, crash 2) and (9) of 0x4c9410
+    # (uitext transition groups, crash 1) over every ported / new script: list records {a, n, u16 *path -> next word,
+    # u16[n]} at stride (2n + 0xf) & ~3 with n <= 64; every path's element 0 resolves (member, else function up the chain)
+    rbad, rst = [], collections.Counter()
+    for key in sorted(tset):
+        v = view(key)
+        if v is None: continue
+        d, it = v.d, v.it
+        u32 = lambda o: struct.unpack_from('<I', d, o)[0]
+        mem = collections.Counter()
+        for kk, la in SIP.members(v.W, d, 'le').items():
+            if kk[0] == 'members': mem[kk[1]] += len(la)
+        fns, cls, hops = set(), v, 0
+        while cls is not None and hops < 16:
+            fns |= {nm for a, (kind_, k, nm) in cls.el.items() if kind_ == 'proto'}
+            sup = cls.super_id(); cls = view((8, sup)) if sup is not None else None; hops += 1
+        ok_ = lambda o: mem[struct.unpack_from('<H', d, o)[0]] > 0 or struct.unpack_from('<H', d, o)[0] in fns
+        seen = set()
+        for kk, la in SIP.members(v.W, d, 'le').items():
+            for a in la:
+                ia = v.W.it.get(a + 16)
+                n1 = it.get(ia) if ia is not None else None
+                if n1 is None or n1 in seen: continue
+                seen.add(n1)
+                # (8) {u32 count, records *} node whose first record has the record shape
+                if n1 + 8 <= len(d):
+                    cnt, rec = u32(n1), it.get(n1 + 4)
+                    if 1 <= cnt <= 256 and rec is not None and rec + 12 <= len(d) and it.get(rec + 8) == rec + 12:
+                        rst['widget lists'] += 1; p = rec
+                        for k in range(cnt):
+                            if p + 12 > len(d): rbad.append('%d:%d list +0x%x record %d beyond the section' % (key[0], key[1], n1, k)); break
+                            rn = u32(p + 4); rst['list records'] += 1
+                            if rn > 64: rbad.append('%d:%d list +0x%x record %d +0x%x: path count %s' % (key[0], key[1], n1, k, p, d[p + 4:p + 8].hex())); break
+                            if rn and (it.get(p + 8) != p + 12 or not ok_(p + 12)):
+                                rbad.append('%d:%d list +0x%x record %d +0x%x: path unresolved' % (key[0], key[1], n1, k, p))
+                            p += (2 * rn + 0xf) & ~3
+                # (9) uitext descriptor: 8 groups {count, records *} at node +0x7c .. +0xb8, records 0x10 bytes
+                if kk[3] == 301 and n1 + 0xb8 <= len(d):
+                    for co in range(0x7c, 0xb8, 8):
+                        n, recs = u32(n1 + co), it.get(n1 + co + 4)
+                        if not n or recs is None: continue
+                        if n > 64: rbad.append('%d:%d uitext +0x%x group +0x%x count %d' % (key[0], key[1], n1, co, n)); continue
+                        for k in range(n):
+                            r0 = recs + 0x10 * k; rst['uitext records'] += 1
+                            pn, pp = u32(r0 + 8), it.get(r0 + 12)
+                            if pn > 64 or (pn and (pp is None or not ok_(pp))):
+                                rbad.append('%d:%d uitext +0x%x group +0x%x record %d: path unresolved / count %d' % (key[0], key[1], n1, co, k, pn))
+                            en, ep = u32(r0), it.get(r0 + 4)
+                            for j in range(en if ep is not None and en <= 64 else 0):
+                                an, ap = u32(ep + 8 * j), it.get(ep + 8 * j + 4)
+                                rst['uitext entry paths'] += 1
+                                if an > 64 or (an and (ap is None or not ok_(ap))):
+                                    rbad.append('%d:%d uitext +0x%x group +0x%x record %d entry %d: path unresolved / count %d' % (
+                                        key[0], key[1], n1, co, k, j, an))
+    out.append(('ok   ' if not rbad else 'FAIL ') + 'replay of the UI list walks (tru.exe 0x4ca2a0 widget lists, 0x4c9410 uitext groups): %s, bad %d %s' % (
+        dict(rst), len(rbad), rbad[:8]))
     return out
 
 
@@ -1519,7 +1617,7 @@ def gate_cli(argv):
     inv = {(t, I(t, x)): (t, x) for (t, x) in pk}
     S = DW.read(open(fn, 'rb').read(), 'le').sections
     targets = [k for k, r in K['recipes'].items() if r in ('port', 'new93', 'new')]
-    g = gate_sections(S, pc, PCS, pk, inv, K['recipes'], targets)
+    g = gate_sections(S, pc, PCS, pk, inv, K['recipes'], targets, K)
     for x in g: print('gate: %s' % x)
     sys.exit(1 if any(x.startswith('FAIL') for x in g) else 0)
 
