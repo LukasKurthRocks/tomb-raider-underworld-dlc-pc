@@ -1842,7 +1842,8 @@ SW_START_GATED = {
 }
 SW_START_GATED_HINT = ('live nur wenn 1 beim Start', 'live if 1 at start')
 SW_MAX, SW_GROUP_MAX = 512, 24              # 0.22.23: 512 rows (was 160 - the shipped file had 159)
-QB_VIEW_MAX = 128                            # kQbViewMax: rows of one bar page (page Fixes: group rows + the open group)
+QB_VIEW_MAX = 192                            # kQbViewMax: rows of one bar page (page Fixes: group rows + the open group);
+                                             # 0.22.44 (W2): 192 (was 128) - page Tests with the guide packages + archive
 RING_FROZEN = 172                            # 0.21.5: the ring is frozen - no new entries
 
 
@@ -2192,9 +2193,9 @@ def check_0216(ini_path):
     elif pages[specials.index('kQsCostume') - 1][1] != 'kQbLara':
         problems.append('TruMenu.cpp: page Kostueme must follow page Lara')
     if 'static_assert(kQbPageN <= %d' % QB_PAGES_MAX not in src or 'g_qbRow[%d]' % QB_PAGES_MAX not in src or \
-            'const int kQbViewMax = 128;' not in src:   # 0.22.16: 112; 0.22.18: 128 (settings page, every group open)
-        problems.append('TruMenu.cpp: the page / row limits (static_assert kQbPageN <= %d, g_qbRow[%d], kQbViewMax 128) '
-                        'changed' % (QB_PAGES_MAX, QB_PAGES_MAX))
+            'const int kQbViewMax = %d;' % QB_VIEW_MAX not in src:   # 0.22.16: 112; 0.22.18: 128; 0.22.44: 192
+        problems.append('TruMenu.cpp: the page / row limits (static_assert kQbPageN <= %d, g_qbRow[%d], kQbViewMax %d) '
+                        'changed' % (QB_PAGES_MAX, QB_PAGES_MAX, QB_VIEW_MAX))
     sec = src[src.find('// ---- 0.21.6 costumes'):src.find('// ---- end of 0.21.6 costumes')]
     if len(sec) < 100: problems.append('TruMenu.cpp: section "0.21.6 costumes" missing')
     m = re.search(r'const DWORD kCosSettleMs = (\d+);', sec)
@@ -5160,8 +5161,8 @@ def check_02243():
     with TO TEST; Set-TruMenu knows the 0.22.42 hash"""
     problems = []
     src = read_cpp()
-    if '"TruMenu 0.22.43 (W5 markup' not in src[:src.find('\n', src.find('kVersion = '))]:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.43 (W5 markup"')
+    if '0.22.43 (W5 markup' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.44: a part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.43 part "0.22.43 (W5 markup"')
     offline = []
     if os.path.exists(W5_CHECKS_02243):
         for line in open(W5_CHECKS_02243, encoding='utf-8'):
@@ -5226,6 +5227,188 @@ def check_02243():
     if W5_HASH_02242 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.42 build hash (work/asi/menu0265) is missing')
     return problems, ('W5 markup (object markup through the bone matrix, query skip rules, type + id labels within 15 m, '
                       'RoomOnly / occlusion, bar rows first; %d byte checks = precheck_02243)' % len(rows))
+
+
+W2_HASH_02243 = '36d8966b52c39b9ad58c38c6abd83d97fab0f632d52917a750d475160264ad82'
+# the packages of the test guide 14.11. (workspace docs/Testanleitung-1411.md): letter, group label start, items the
+# package needs (item, argument) - owner 2026-11-13 "adren.fill / adren.keep auch im passenden Testpaket"
+W2_PACKAGES = (('a', 'Paket A: Adrenalin + Kampf', (('arena.go', '1a'), ('adren.fill', ''), ('adren.keep', ''),
+                                                    ('cheat.onehitkill', ''), ('adren.meter', ''))),
+               ('b', 'Paket B: Hoeren', (('snd.dump', ''),)),            # read_cpp: umlaut escapes -> ae / oe / ue
+               ('c', 'Paket C: DLC 2 aus dem Pausemenue', ()),
+               ('d', 'Paket D: Debug-Ansicht', (('dbg.roomonly', ''), ('dbg.metres', ''))),
+               ('e', 'Paket E: Markup / Saeule / Wasser', (('draw.markup', ''), ('level.load', 'dlc_dungeon'))),
+               ('f', 'Paket F: Fixes 13.11.', (('level.start', 'dlc1'),)))
+W2_ARCHIVED = ('tp_q90', 'ts_spots', 'light_diag', 'ts_diag', 'ts_hall02')   # sub-groups of ts_archive, in this order
+W2_KEPT = ('ts_teleport', 'ts_arena1', 'ts_cine')                           # level 0 between the TG block and the archive
+
+
+def check_02244(switches_path):
+    """0.22.44 (W2, owner live notes of the test evening 13.11.; workspace docs/Befund-W2-TruMenu-Ordnung-1411.md):
+    page Tests - the block "TG 1411" first in kQbTests: group tg_1411 (level 0, the first row), a note, then one kQfSub
+    group tg_a .. tg_f per package of the test guide (label "Paket <X>: ..." as the guide, in kQbStartClosed) with a note,
+    the items the package needs and at least one check test.mark tg<X>.<name> of its own package (unique); every row of
+    the block kQfTg, kQfTg nowhere else; switch rows sw.set of TruMenu.switches.txt; then ts_teleport / ts_arena1 /
+    ts_cine on level 0, then the closed group ts_archive (the last level-0 group) holding tp_q90 (the TP block), ts_spots,
+    light_diag, ts_diag, ts_hall02 as kQfSub groups - no old row lost (the arena / hall02 / light items still on the
+    page); QbTestsRows skips tg ids, TpCheckSet tags them 1411; kQbViewMax 192. Barrierefreiheit: no label with a
+    leading space, the planned rows only in the last group acc_planned (closed at the start), the arachnophobia rows in
+    the sub-group acc_arachno; QbViewOf: planned rows without the "   " prefix. [Menu]: an INI without Load (before
+    0.22.18) keeps the big window off (g_menuOldIni; Load stays as read), logged at the start and in ToggleMenu; row
+    DeviceGlyphs (sw.set TruMenu:Input:DeviceGlyphs) in the group set_ctl of page Spiel-Einstellungen; no new INI key /
+    item; README 0.22.44 with TO TEST; Set-TruMenu knows the 0.22.43 hash"""
+    problems = []
+    src = read_cpp()
+    if '"TruMenu 0.22.44 (W2 order' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.44 (W2 order"')
+    tests = src[src.find('const QbRow kQbTests[] = {'):]
+    tests = tests[:tests.find('\n};')]
+    a, b = tests.find('// ---- TG 1411 begin'), tests.find('// ---- TG 1411 end')
+    if a < 0 or b < a: return problems + ['TruMenu.cpp: kQbTests lacks the block "TG 1411 begin" .. "TG 1411 end"'], 'TG: no block'
+    if re.search(r'\n    \{"', tests[:a]): problems.append('TruMenu.cpp: the TG block must be the first rows of kQbTests')
+    block = tests[a:b]
+    raw = re.findall(r'\n    \{"', block)
+    rows = [r for r in qb_rows(src, True) if r[0] == 'kQbTests' and 'kQfTg' in r[6]]
+    if len(rows) != len(raw):
+        problems.append('TruMenu.cpp: TG block has %d rows, qb_rows parses %d with kQfTg' % (len(raw), len(rows)))
+    flags = len(re.findall(r'kQfTg\}', src))
+    if flags != len(raw) or re.findall(r'kQfTg\}', tests[:a] + tests[b:]):
+        problems.append('TruMenu.cpp: kQfTg only on the rows of the TG block (%d flags, %d rows)' % (flags, len(raw)))
+    if 'kQfTg = 32 };' not in src: problems.append('TruMenu.cpp: QbFlag kQfTg = 32 missing')
+    starts = LIT.findall(src[src.find('const char *const kQbStartClosed[] = {'):].split('};')[0])
+    sw_keys = set()
+    for line in open(switches_path, encoding='utf-8').read().splitlines():
+        f = [x.strip() for x in line.split('|')]
+        if line.startswith('#') or len(f) < 9 or f[0] == 'group': continue
+        sw_keys.add('%s:%s:%s' % (f[0], f[1], f[2]))
+    pkg, seen, ids, order = None, {}, set(), []
+    labels = {p: lab for p, lab, _ in W2_PACKAGES}
+    for t, de, item, arg, kind, layer, tail in rows:
+        where = 'TruMenu.cpp: TG row "%s" (%s %s)' % (de, item, arg)
+        de_en = re.search(r'\{"%s", "([^"]*)", "%s"' % (re.escape(de), re.escape(item)), block)
+        for text in (de, de_en.group(1) if de_en else ''):
+            if len(text.encode('utf-8')) > 100: problems.append(where + ': label longer than 100 bytes')
+            if text[:1] == ' ': problems.append(where + ': label with a leading space')
+        if kind == 'kQbGroup':
+            if arg == 'tg_1411':
+                if 'kQfSub' in tail or pkg is not None: problems.append(where + ': tg_1411 = the first row, level 0')
+                pkg = ''
+                continue
+            m = re.fullmatch(r'tg_([a-f])', arg)
+            if not m or 'kQfSub' not in tail: problems.append(where + ': a package group tg_<a-f> with kQfSub'); continue
+            if arg not in starts: problems.append(where + ': %s missing in kQbStartClosed' % arg)
+            pkg = m.group(1)
+            if not de.startswith(labels[pkg]): problems.append(where + ': label must start "%s" (the guide)' % labels[pkg])
+            order.append(pkg)
+            seen[pkg] = {'note': 0, 'check': 0, 'items': set()}
+            continue
+        if pkg is None: problems.append(where + ': before the group tg_1411'); continue
+        if kind == 'kQbNote':
+            if item != '-' or arg: problems.append(where + ': a note row has id "-" and no argument')
+            if pkg in seen: seen[pkg]['note'] += 1
+        elif kind == 'kQbCheck':
+            if item != 'test.mark' or not re.fullmatch(r'tg[A-F]\.[a-z0-9]+', arg) or len(arg) > 63:
+                problems.append(where + ': a check row is test.mark tg<A-F>.<name>')
+            elif arg[2].lower() != pkg: problems.append(where + ': check id of another package (group tg_%s)' % pkg)
+            if arg in ids: problems.append(where + ': check id twice')
+            ids.add(arg)
+            if pkg in seen: seen[pkg]['check'] += 1
+        elif kind == 'kQbSwitch':
+            if item != 'sw.set' or arg not in sw_keys:
+                problems.append(where + ': a switch row is sw.set <Plugin>:<Section>:<Key> of %s' %
+                                os.path.basename(switches_path))
+        elif kind in ('kQbLabel', 'kQbPlanned'): problems.append(where + ': no label / planned rows in the TG block')
+        elif pkg in seen: seen[pkg]['items'].add((item, arg))
+    if order != [p for p, _, _ in W2_PACKAGES]:
+        problems.append('TruMenu.cpp: TG package groups %s, wanted a .. f in order' % ''.join(order))
+    for p, lab, need in W2_PACKAGES:
+        c = seen.get(p)
+        if not c: continue
+        if not c['note'] or not c['check']: problems.append('TruMenu.cpp: package %s needs a hint and a check' % p.upper())
+        for it in need:
+            if it not in c['items']: problems.append('TruMenu.cpp: package %s lacks the row %s %s' % (p.upper(), it[0], it[1]))
+    # the groups after the block: kept ones on level 0, then the closed archive with the old groups as sub-groups
+    groups = re.findall(r'\{"[^"]*",\s+"[^"]*",\s+"-",\s+"([a-z0-9_]+)",\s+kQbGroup,\s+-1,\s+kQcNone,\s+0,\s+[A-Za-z0-9]+,'
+                        r'\s+([^}]*)\}', tests[b:])
+    names = [g for g, _ in groups]
+    top = [g for g, f in groups if 'kQfSub' not in f]
+    if top != list(W2_KEPT) + ['ts_archive']:
+        problems.append('TruMenu.cpp: level-0 groups after the TG block must be %s + ts_archive (got %s)' %
+                        (', '.join(W2_KEPT), ', '.join(top)))
+    if 'ts_archive' not in starts: problems.append('TruMenu.cpp: ts_archive missing in kQbStartClosed')
+    if 'ts_archive' in names:
+        after = names[names.index('ts_archive') + 1:]
+        subs = [g for g in after if g in W2_ARCHIVED]
+        if subs != list(W2_ARCHIVED): problems.append('TruMenu.cpp: archive sub-groups %s, wanted %s' % (subs, W2_ARCHIVED))
+        for g, f in groups[names.index('ts_archive') + 1:]:
+            if 'kQfSub' not in f: problems.append('TruMenu.cpp: group %s in the archive must be kQfSub' % g)
+    for item, arg in (('arena.go', '1b'), ('arena.load', 'mayan_thrall'), ('fix.hall02', ''), ('light.list', ''),
+                      ('dbg.depthdump', ''), ('cp.jump', 'dlc_yggdrasil_end 9608'), ('cine.pause', '')):
+        if not any(r[0] == 'kQbTests' and r[2] == item and r[3] == arg for r in qb_rows(src)):
+            problems.append('TruMenu.cpp: kQbTests lost the row %s %s' % (item, arg))
+    qt = fn_body(src, 'int QbTestsRows(')
+    if '!strncmp(t.id, "tg", 2)' not in qt: problems.append('TruMenu.cpp: QbTestsRows must skip the tg<X>.<name> rows too')
+    if '!_strnicmp(r.arg, "tg", 2) ? "1411" : "Q90"' not in fn_body(src, 'void TpCheckSet('):
+        problems.append('TruMenu.cpp: TpCheckSet must tag the tg checks 1411 (the archived ones Q90)')
+    if 'const int kQbViewMax = 192;' not in src: problems.append('TruMenu.cpp: kQbViewMax must be 192')
+    # Barrierefreiheit
+    acc = [r for r in qb_rows(src, True) if r[0] == 'kQbAccess']
+    accb = src[src.find('const QbRow kQbAccess[] = {'):]
+    accb = accb[:accb.find('\n};')]
+    for de, en in re.findall(r'\{"([^"]*)", "([^"]*)", "', accb):
+        if de[:1] == ' ' or en[:1] == ' ': problems.append('TruMenu.cpp: kQbAccess label "%s" starts with a space' % de)
+    heads = [(i, r) for i, r in enumerate(acc) if r[4] == 'kQbGroup']
+    if not heads or heads[-1][1][3] != 'acc_planned' or 'kQfSub' in heads[-1][1][6]:
+        problems.append('TruMenu.cpp: kQbAccess must end with the level-0 group acc_planned')
+    else:
+        last = heads[-1][0]
+        if any(r[4] == 'kQbPlanned' for r in acc[:last]):
+            problems.append('TruMenu.cpp: kQbAccess has planned rows outside the group acc_planned')
+        if any(r[4] != 'kQbPlanned' for r in acc[last + 1:]):
+            problems.append('TruMenu.cpp: the group acc_planned holds planned rows only')
+        if not any(r[4] == 'kQbPlanned' for r in acc[last + 1:]): problems.append('TruMenu.cpp: acc_planned is empty')
+    if 'acc_planned' not in starts: problems.append('TruMenu.cpp: acc_planned missing in kQbStartClosed')
+    ar = [i for i, r in enumerate(acc) if r[3] == 'acc_arachno' and r[4] == 'kQbGroup' and 'kQfSub' in r[6]]
+    want = ['arachno.on', 'arachno.hide', 'arachno.picture', 'arachno.mute', 'arachno.status']
+    if not ar or [r[2] for r in acc[ar[0] + 1:ar[0] + 6]] != want:
+        problems.append('TruMenu.cpp: kQbAccess needs the kQfSub group acc_arachno with %s' % ', '.join(want))
+    view = fn_body(src, 'void QbViewOf(')
+    if 'label ? "-- " : "", de ? r.de : r.en);' not in view:
+        problems.append('TruMenu.cpp: QbViewOf: planned rows without the "   " prefix')
+    # [Menu] Enabled in an INI before 0.22.18
+    ro = re.sub(r'//[^\n]*', '', fn_body(src, 'void ReadOptions('))
+    i_win = ro.find('g_menuWindow = OptInt(ini, "Menu", "Enabled") != 0 ? 1 : 0;')
+    i_old = ro.find('g_menuOldIni = GetPrivateProfileStringA("Menu", "Load", "", probe, sizeof(probe), ini) == 0 ? 1 : 0;')
+    i_off = ro.find('if (g_menuOldIni) g_menuWindow = 0;')
+    if not 0 <= i_win < i_old < i_off:
+        problems.append('TruMenu.cpp: ReadOptions must read Enabled, then g_menuOldIni (no [Menu] Load), then window off')
+    if re.search(r'g_enabled\s*=\s*g_menuWindow', ro): problems.append('TruMenu.cpp: an old INI must not unload TruMenu')
+    if 'int g_menuOldIni = 0;' not in src: problems.append('TruMenu.cpp: int g_menuOldIni = 0; missing')
+    if 'if (g_menuOldIni)   // 0.22.44 (W2)' not in src or 'TruMenu.ini has no [Menu] Load (written before 0.22.18)' not in src:
+        problems.append('TruMenu.cpp: the start line about an INI without [Menu] Load missing')
+    if 'g_menuOldIni ? "TruMenu.ini without [Menu] Load' not in fn_body(src, 'void ToggleMenu('):
+        problems.append('TruMenu.cpp: ToggleMenu must name the old INI as the reason')
+    # DeviceGlyphs row on page Spiel-Einstellungen, group set_ctl
+    st = [r for r in qb_rows(src, True) if r[0] == 'kQbSettings']
+    grp, ok = None, False
+    for r in st:
+        if r[4] == 'kQbGroup': grp = r[3]
+        elif r[2] == 'sw.set' and r[3] == 'TruMenu:Input:DeviceGlyphs' and r[4] == 'kQbSwitch' and grp == 'set_ctl': ok = True
+    if not ok: problems.append('TruMenu.cpp: page Spiel-Einstellungen group set_ctl lacks the switch row DeviceGlyphs')
+    if 'TruMenu:Input:DeviceGlyphs' not in sw_keys: problems.append('switches: TruMenu | Input | DeviceGlyphs missing')
+    header, opt_rows = table(src)
+    if len(opt_rows) != 283: problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.44 adds no INI key (283)' % len(opt_rows))
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.44 - ' not in readme or '\n### TO TEST 0.22.44' not in readme:
+        problems.append('README.md: section "## 0.22.44 - ..." with "### TO TEST 0.22.44" missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if W2_HASH_02243 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.43 build hash (work/asi/menu0266) is missing')
+    n = {k: sum(1 for r in rows if r[4] == k) for k in ('kQbGroup', 'kQbCheck', 'kQbSwitch', 'kQbNote')}
+    return problems, ('W2 order (page Tests: TG block %d rows - %d groups, %d checks, %d switch, %d notes, packages %s; '
+                      'archive %s; Barrierefreiheit planned rows in acc_planned, acc_arachno; old INI keeps the big '
+                      'window off; DeviceGlyphs on Spiel-Einstellungen; kQbViewMax 192)' %
+                      (len(rows), n['kQbGroup'], n['kQbCheck'], n['kQbSwitch'], n['kQbNote'],
+                       ' '.join(p.upper() for p in order), ' '.join(W2_ARCHIVED)))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -5354,7 +5537,11 @@ def check_02228(ini_path, switches_path):
     a, b = tests.find('// ---- TP Q90 begin'), tests.find('// ---- TP Q90 end')
     if a < 0 or b < a: return problems + ['TruMenu.cpp: kQbTests lacks the block "TP Q90 begin" .. "TP Q90 end"'], 'TP: no block'
     block = tests[a:b]
-    if tests.find('"ts_teleport", kQbGroup') < b: problems.append('TruMenu.cpp: the TP block must stand before ts_teleport')
+    # 0.22.44 (W2): the block is archived - inside the group ts_archive (after ts_teleport), tp_q90 a sub-group there;
+    # before: the block stood first, before ts_teleport, tp_q90 on level 0
+    arch = tests.find('"ts_archive", kQbGroup')
+    if not 0 <= tests.find('"ts_teleport", kQbGroup') < arch < a:
+        problems.append('TruMenu.cpp: the TP block must stand inside the group ts_archive (after ts_teleport)')
     raw = re.findall(r'\n    \{"', block)
     rows = [r for r in qb_rows(src, True) if r[0] == 'kQbTests' and 'kQfTp' in r[6]]
     if len(rows) != len(raw):
@@ -5376,8 +5563,8 @@ def check_02228(ini_path, switches_path):
         for text in (de, de_en.group(1) if de_en else ''):
             if len(text.encode('utf-8')) > 100: problems.append(where + ': label longer than 100 bytes')
         if kind == 'kQbGroup':
-            if arg == 'tp_q90':
-                if 'kQfSub' in tail or pkg is not None: problems.append(where + ': tp_q90 = the first row, level 0')
+            if arg == 'tp_q90':   # 0.22.44: a sub-group of ts_archive (was level 0)
+                if 'kQfSub' not in tail or pkg is not None: problems.append(where + ': tp_q90 = the first row, kQfSub')
                 pkg = ''
                 continue
             m = re.fullmatch(r'tp_([a-z0-9])', arg)
@@ -5835,6 +6022,10 @@ def main(argv):
     for p in cproblems43: print('Q02243 %s' % p)
     if not cproblems43: print('ok: 0.22.43 %s' % csummary43)
     problems += cproblems43
+    cproblems44, csummary44 = check_02244(opt.get('--switches', SWITCHES))   # 0.22.44 (W2 order)
+    for p in cproblems44: print('Q02244 %s' % p)
+    if not cproblems44: print('ok: 0.22.44 %s' % csummary44)
+    problems += cproblems44
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

@@ -1,0 +1,40 @@
+positive (unchanged sources): 0 problem(s) ok
+  W2 order (page Tests: TG block 55 rows - 7 groups, 19 checks, 1 switch, 7 notes, packages A B C D E F; archive tp_q90 ts_spots light_diag ts_diag ts_hall02; Barrierefreiheit planned rows in acc_planned, acc_arachno; old INI keeps the big window off; DeviceGlyphs on Spiel-Einstellungen; kQbViewMax 192)
+case version             : 1 problem(s) ok - TruMenu.cpp: kVersion must start with "TruMenu 0.22.44 (W2 order"
+case no TG block         : 1 problem(s) ok - TruMenu.cpp: kQbTests lacks the block "TG 1411 begin" .. "TG 1411 end"
+case TG not first        : 1 problem(s) ok - TruMenu.cpp: the TG block must be the first rows of kQbTests
+case row without kQfTg   : 3 problem(s) ok - TruMenu.cpp: TG block has 55 rows, qb_rows parses 54 with kQfTg
+case kQfTg outside       : 3 problem(s) ok - TruMenu.cpp: TG block has 55 rows, qb_rows parses 56 with kQfTg
+case enum value          : 1 problem(s) ok - TruMenu.cpp: QbFlag kQfTg = 32 missing
+case A lacks adren.keep  : 1 problem(s) ok - TruMenu.cpp: package A lacks the row adren.keep 
+case B lacks snd.dump    : 1 problem(s) ok - TruMenu.cpp: package B lacks the row snd.dump 
+case check of other pkg  : 1 problem(s) ok - TruMenu.cpp: TG row "Welle 10: kein Menue-Klick-Ton (B.2)" (test.mark tgA.wave10): check id of another package (group tg_b)
+case check id twice      : 1 problem(s) ok - TruMenu.cpp: TG row "Saeulen: Lara sinkt nicht ein (F.5)" (test.mark tgF.spiders): check id twice
+case check id form       : 1 problem(s) ok - TruMenu.cpp: TG row "Nahe Objekte deutlich, nicht ueberlagert (D.3)" (test.mark tpD.near): a check row is test.mark tg<A-F>.<name>
+case not closed          : 1 problem(s) ok - TruMenu.cpp: TG row "Paket D: Debug-Ansicht" (- tg_d): tg_d missing in kQbStartClosed
+case label not guide     : 1 problem(s) ok - TruMenu.cpp: TG row "Paket D: Debug" (- tg_d): label must start "Paket D: Debug-Ansicht" (the guide)
+case group key           : 5 problem(s) ok - TruMenu.cpp: TG row "Paket E: Markup / Saeule / Wasser (alter Baum)" (- tg_g): a package group tg_<a-f> with kQfSub
+case note with arg       : 1 problem(s) ok - TruMenu.cpp: TG row "Nebenbei, jederzeit; F11 = Bild + Marke" (- x): a note row has id "-" and no argument
+case switch unknown      : 1 problem(s) ok - TruMenu.cpp: TG row "Tasten-Hinweise nach Geraet" (sw.set TruMenu:Input:DeviceGlyphz): a switch row is sw.set <Plugin>:<Section>:<Key> of TruMenu.switches.txt
+case no archive          : 1 problem(s) ok - TruMenu.cpp: level-0 groups after the TG block must be ts_teleport, ts_arena1, ts_cine + ts_archive (got ts_teleport, ts_arena1, ts_cine, ts_archiv2)
+case archive sub level   : 2 problem(s) ok - TruMenu.cpp: level-0 groups after the TG block must be ts_teleport, ts_arena1, ts_cine + ts_archive (got ts_teleport, ts_arena1, ts_cine, ts_archive, ts_spots)
+case archive not closed  : 1 problem(s) ok - TruMenu.cpp: ts_archive missing in kQbStartClosed
+case old row lost        : 1 problem(s) ok - TruMenu.cpp: kQbTests lost the row fix.hall02 
+case QbTestsRows tg      : 1 problem(s) ok - TruMenu.cpp: QbTestsRows must skip the tg<X>.<name> rows too
+case tag 1411            : 1 problem(s) ok - TruMenu.cpp: TpCheckSet must tag the tg checks 1411 (the archived ones Q90)
+case kQbViewMax          : 1 problem(s) ok - TruMenu.cpp: kQbViewMax must be 192
+case access space        : 1 problem(s) ok - TruMenu.cpp: kQbAccess label "  Spinnen-Modell aus" starts with a space
+case planned outside     : 1 problem(s) ok - TruMenu.cpp: kQbAccess has planned rows outside the group acc_planned
+case planned not closed  : 1 problem(s) ok - TruMenu.cpp: acc_planned missing in kQbStartClosed
+case arachno not sub     : 1 problem(s) ok - TruMenu.cpp: kQbAccess needs the kQfSub group acc_arachno with arachno.on, arachno.hide, arachno.picture, arachno.mute, arachno.status
+case planned prefix      : 1 problem(s) ok - TruMenu.cpp: QbViewOf: planned rows without the "   " prefix
+case old INI rule gone   : 1 problem(s) ok - TruMenu.cpp: ReadOptions must read Enabled, then g_menuOldIni (no [Menu] Load), then window off
+case old INI unloads     : 2 problem(s) ok - TruMenu.cpp: ReadOptions must read Enabled, then g_menuOldIni (no [Menu] Load), then window off
+case probe key           : 1 problem(s) ok - TruMenu.cpp: ReadOptions must read Enabled, then g_menuOldIni (no [Menu] Load), then window off
+case start line          : 1 problem(s) ok - TruMenu.cpp: the start line about an INI without [Menu] Load missing
+case toggle reason       : 1 problem(s) ok - TruMenu.cpp: ToggleMenu must name the old INI as the reason
+case glyph row gone      : 1 problem(s) ok - TruMenu.cpp: page Spiel-Einstellungen group set_ctl lacks the switch row DeviceGlyphs
+case README TO TEST      : 1 problem(s) ok - README.md: section "## 0.22.44 - ..." with "### TO TEST 0.22.44" missing
+case PS1 hash            : 1 problem(s) ok - Set-TruMenu.ps1: the 0.22.43 build hash (work/asi/menu0266) is missing
+case switches row        : 2 problem(s) ok - TruMenu.cpp: TG row "Tasten-Hinweise nach Geraet" (sw.set TruMenu:Input:DeviceGlyphs): a switch row is sw.set <Plugin>:<Section>:<Key> of TruMenu.switches.txt
+37 cases + 1 positive, 0 failed

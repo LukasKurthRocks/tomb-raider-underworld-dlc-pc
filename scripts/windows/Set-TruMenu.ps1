@@ -163,7 +163,8 @@ $earlierBuilds = @{
                       '11bce73110d4c61c3b85cf8375e5bb019442c6154060468027b589372a10f6d5',   # 0.22.39 attract icon Q126 (work\asi\menu0262)
                       '71374f9d167be140a6b124b71b55f6c24c603dfd3a0effbcf4e0cb8fc2b80f4b',   # 0.22.40 attract styles Q126b (work\asi\menu0263)
                       '35f834c671333ef62065bd1e5044e5c1f411e09ace27fa4add3b4bbd2aecaed9',   # 0.22.41 compact attract styles Q126c (work\asi\menu0264)
-                      'c415a6c42b146f1051a017b921ce7c3542476dae6f989be2f0013224e46f140e')   # 0.22.42 W3 debug view (work\asi\menu0265)
+                      'c415a6c42b146f1051a017b921ce7c3542476dae6f989be2f0013224e46f140e',   # 0.22.42 W3 debug view (work\asi\menu0265)
+                      '36d8966b52c39b9ad58c38c6abd83d97fab0f632d52917a750d475160264ad82')   # 0.22.43 W5 markup (work\asi\menu0266)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

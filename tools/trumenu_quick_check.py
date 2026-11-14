@@ -2307,7 +2307,7 @@ def sw_rows(counts, groups):                   # QbSwRows: group row + the open 
     return sum(1 + (c if o else 0) for c, o in zip(counts, groups))
 
 
-QB_VIEW_MAX = 128                              # kQbViewMax (0.22.18; 0.21.1 .. 0.22.15: 64)
+QB_VIEW_MAX = 192                              # kQbViewMax (0.22.44; 0.22.18 .. 0.22.43: 128; 0.21.1 .. 0.22.15: 64)
 
 
 def shipped_switch_counts():                   # 0.22.23: the shipped file's group sizes (was a fixed list of 9 groups)
@@ -2442,11 +2442,15 @@ def check_swcap():
     # page Fixes: the shipped file never cuts; a 130-row group cuts 12 rows with 10 groups and says so
     worst = max(sw_page(shipped, k)[1] for k in range(len(shipped)))
     cases.append(('page Fixes, shipped file: every group open in turn, rows not shown max %d' % worst, worst == 0))
-    built, hidden = sw_page([5] * 9 + [130], 9)
-    cases.append(('page Fixes, 10 groups, open group 130 rows: %d rows built, %d named in the head' % (built, hidden),
+    # 0.22.44: the sizes follow QB_VIEW_MAX (128 -> 192): 130 / 118 rows = QB_VIEW_MAX + 2 / QB_VIEW_MAX - 10
+    big = QB_VIEW_MAX + 2
+    built, hidden = sw_page([5] * 9 + [big], 9)
+    cases.append(('page Fixes, 10 groups, open group %d rows: %d rows built, %d named in the head' % (big, built, hidden),
                   built == QB_VIEW_MAX and hidden == 12))
-    built, hidden = sw_page([118] + [1] * 9, 0)
-    cases.append(('page Fixes, 10 groups, open group 118 rows: %d rows, nothing cut' % built, built == 128 and hidden == 0))
+    fit = QB_VIEW_MAX - 10
+    built, hidden = sw_page([fit] + [1] * 9, 0)
+    cases.append(('page Fixes, 10 groups, open group %d rows: %d rows, nothing cut' % (fit, built),
+                  built == QB_VIEW_MAX and hidden == 0))
     good = True
     for name, ok in cases:
         print('swcap: %-90s %s' % (name, 'ok' if ok else 'FAIL'))
@@ -3837,9 +3841,11 @@ def check_persist():
     t3 = ini_set(t2, 'Camera', 'Rumble', '50')
     cases.append(('cam.rumble 50 replaces only that line', ini_get(t3, 'Camera', 'Rumble', '100') == '50' and
                   t3.count('Rumble=') == 1))
-    menu = lambda v: int(v) != 0                     # g_menuWindow = [Menu] Enabled != 0, default 0
-    cases.append(('[Menu] Enabled missing -> big window off; a user\'s 1 keeps it',
-                  not menu(ini_get('[Menu]\n', 'Menu', 'Enabled', '0')) and menu(ini_get(user, 'Menu', 'Enabled', '0'))))
+    def menu(text):   # g_menuWindow = [Menu] Enabled != 0, default 0; 0.22.44: off in an INI without [Menu] Load (< 0.22.18)
+        return int(ini_get(text, 'Menu', 'Enabled', '0')) != 0 and ini_get(text, 'Menu', 'Load', '') != ''
+    cases.append(('[Menu] Enabled missing -> big window off; a user\'s Load=1 + Enabled=1 keeps it',
+                  not menu('[Menu]\n') and menu(ini_set(user, 'Menu', 'Load', '1'))))
+    cases.append(('0.22.44: an INI before 0.22.18 (Enabled=1, no [Menu] Load) -> big window off', not menu(user)))
     good = True
     for name, ok in cases:
         print('persist: %-76s %s' % (name, 'ok' if ok else 'FAIL'))

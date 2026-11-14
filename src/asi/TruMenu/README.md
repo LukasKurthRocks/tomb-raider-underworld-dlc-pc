@@ -2928,6 +2928,74 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.44 - W2: TruMenu order - page Tests by the test guide, accessibility rows, big window, DeviceGlyphs row (2026-11-14)
+
+Built into `work\asi\menu0267`, not installed, no live test (finding in the workspace
+`docs\Befund-W2-TruMenu-Ordnung-1411.md`; owner live notes of 13.11., package W2 of `docs\Testabend-1311-Warteschlange.md`).
+No new INI key, no new item, no hook, no byte check.
+
+- **Page Tests by the test guide.** The first group is "Testanleitung 14.11.: Pakete A - F" (`tg_1411`, open) with one
+  sub-group per package of `docs\Testanleitung-1411.md`, the same names, closed at the start (`tg_a` .. `tg_f`):
+
+  | Group | Rows (existing items) | Checks |
+  |---|---|---|
+  | Paket A: Adrenalin + Kampf | hint, `arena.go 1a`, `cheat.onehitkill` (keep off), `arena.mode`, `adren.meter`, `adren.fill`, `adren.keep`, switch `[Input] DeviceGlyphs` | `tgA.r3slow`, `tgA.jumpoff`, `tgA.empty`, `tgA.finisher` |
+  | Paket B: Hören | hint, `snd.dump`, `claude.mark sound` | `tgB.dopple`, `tgB.wave10` |
+  | Paket C: DLC 2 aus dem Pausemenü | hint | `tgC.nocostume`, `tgC.pda` |
+  | Paket D: Debug-Ansicht | hint, `dbg.view`, `dbg.names`, `dbg.roomonly`, `dbg.metres`, `dbg.emptypots` | `tgD.labels`, `tgD.roomonly`, `tgD.near` |
+  | Paket E: Markup / Säule / Wasser (alter Baum) | hint, `level.load dlc_dungeon` / `dlc_caverns` (right twice, backup first), `draw.markup`, `draw.ledges`, `claude.mark gfx` | `tgE.pillar`, `tgE.lines`, `tgE.water` |
+  | Paket F: Fixes 13.11. (eigener Baum) | hint, `level.start dlc1`, `level.load dlc_dungeon`, `claude.mark gfx` | `tgF.start`, `tgF.spiders`, `tgF.gate`, `tgF.dry`, `tgF.pillar` |
+
+  Check rows work as the 0.22.28 ones (right OK, left Fehler, X skipped, the same press again = open); their first mark
+  adds `test.add "<id> 1411 <English label>"` (the archived Q90 checks keep the tag Q90); the TO TEST list on the page
+  skips `tg<X>.<name>` like `tp<X>.<name>`. Rows of the block carry the new flag `kQfTg` (marker only).
+- **Archive.** Then the groups in use (Teleport, Arena 1 - Kampf, Zwischensequenz), then the closed group **"Archiv /
+  Alt"** (`ts_archive`) with the rows of earlier rounds, moved unchanged as sub-groups: "Alte Testpakete 11.11. (Q90)"
+  (`tp_q90` + packages A, 1 .. 9), Teststellen (`ts_spots`), Licht (Diagnose) (`light_diag`), Diagnose (`ts_diag`),
+  hall02-Zähler (`ts_hall02`). Nothing deleted; the group keys are the same, so `[Quick] Closed` keeps applying.
+- **`kQbViewMax` 192** (was 128): with every group open the page has about 165 static rows - the Prepare / TO TEST rows
+  after them were cut before.
+- **Barrierefreiheit.** The rows "verschoben": planned rows were drawn with a 3-space prefix after the (empty) square
+  column (QbViewOf, since 0.18 - the column came in 0.22.18), the arachnophobia parts had two leading spaces in their
+  labels. Now: no prefix, no leading spaces; the arachnophobia rows are a sub-group "Arachnophobie" of "Sonstige
+  (Phobien)" (master switch first - the parts act only while it is on); **every planned row is in the closed group
+  "Geplant (noch ohne Funktion)"** at the end, its category in front (Sehen / Hören / Verstehen / Steuerung / Phobien).
+  The groups Sehen and Hören had planned rows only and are gone. The planned row "Untertitel groß" became "Sehen:
+  Sprechername" (size and bar exist: group Verstehen). The prefix change applies to planned rows on every page (Gegner,
+  Koop).
+- **Big menu window off for an INI before 0.22.18.** 0.22.18 (coordinator decision, section 0.22.18 "Defaults ... for new
+  users: only the bar") made `[Menu] Enabled` the big window (default 0) and moved the old master switch to `[Menu] Load`;
+  Set-TruMenu keeps an edited INI. The owner's INI is from before 0.22.18 (comment "0 = load but hook nothing", no
+  `Load` line), so its `Enabled=1` - meant as "load" - opened the big window: `TruMenu.log` 13. / 14.11. "0.22.18: big
+  menu window on" at all 12 starts, `menu opened (pad)` 18:10:13. Now an INI **without `[Menu] Load`** never opens the big
+  window; `Load` keeps its default 1 (an old `Enabled=0` does not unload TruMenu). Start line `0.22.44: TruMenu.ini has no
+  [Menu] Load ...`; L3 + R3 logs `menu not opened (pad): TruMenu.ini without [Menu] Load ...`. For the big window: add
+  `Load=1` and `Enabled=1` under `[Menu]`.
+- **DeviceGlyphs row.** Page Spiel-Einstellungen, group Steuerung: "Tasten-Hinweise nach Gerät (Neustart)" = the page
+  Fixes row `TruMenu | Input | DeviceGlyphs` (group "Eingabe (TruMenu)"); also in Paket A. Read at the start (patch of
+  0x5a7c20), so a change acts after a restart. The owner's INI has no `[Input]` section: the default 1 applies (log
+  `0.22.38 PD: [Input] DeviceGlyphs 1` at 23:11 and 01:36).
+- Checks: `trumenu_ini_check` `check_02244`; `check_02228` (the TP block now inside `ts_archive`, `tp_q90` a sub-group) and
+  `check_02243` (version part) adapted; `trumenu_quick_check` model `persist` knows the old-INI rule, `QB_VIEW_MAX` 192.
+
+### TO TEST 0.22.44
+
+1. Start, `TruMenu.log`: `0.22.18: big menu window off ...` and `0.22.44: TruMenu.ini has no [Menu] Load ...` (with the
+   current INI). L3 + R3: no big window, log `menu not opened (pad): TruMenu.ini without [Menu] Load ...`.
+2. Negative: add `Load=1` under `[Menu]` (keep `Enabled=1`), restart: the big window opens with L3 + R3 again, no
+   `0.22.44` line. Remove `Load=1` again if the window is not wanted.
+3. Bar page Tests: first `[-] Testanleitung 14.11.: Pakete A - F` with six closed packages `[+] Paket A: Adrenalin +
+   Kampf` .. `[+] Paket F: ...`; then Teleport, Arena 1, Zwischensequenz; last `[+] Archiv / Alt`.
+4. Paket A open: Arena 1a (right twice), Adrenalin voll / voll halten, Ein Treffer; a check right = OK (green), again
+   right = offen; `TruMenu.log` `tests: test.mark tgA.r3slow ok`, `TruMenu.tests.txt` has `tgA.r3slow ... 1411 ...`.
+5. Archiv / Alt open: the old packages and groups as sub-groups, each closed / open as before.
+6. Every group open (also the archive): the page still ends with "Vorbereiten" / "TO TEST" rows.
+7. Bar page Barrierefreiheit (bar language en and de): live rows aligned with each other (no extra indent);
+   "Arachnophobie" a sub-group under Sonstige; last `[+] Geplant (noch ohne Funktion)` with 10 grey rows "geplant".
+8. Bar page Spiel-Einstellungen, group Steuerung: "Tasten-Hinweise nach Gerät (Neustart)" shows the INI value (1); left
+   writes `DeviceGlyphs=0` into TruMenu.ini (as page Fixes).
+9. Long menu (only with step 2): section "Quick bar pages" / Tests and Barrierefreiheit show the same groups.
+
 ## 0.22.43 - W5: markup drawn where the engine uses it, type + id labels (2026-11-14)
 
 Built into `work\asi\menu0266`, not installed, no live test (finding in the workspace
@@ -5410,7 +5478,7 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 
 | Section / key | Default | Meaning |
 |---|---|---|
-| `[Menu] Enabled` | 0 (0.22.18; was 1) | 0.22.18: 1 = the big menu window may open (ToggleButtons / ToggleKey), 0 = never - the bar, ring and items work. Before 0.22.18: 0 = load but hook nothing |
+| `[Menu] Enabled` | 0 (0.22.18; was 1) | 0.22.18: 1 = the big menu window may open (ToggleButtons / ToggleKey), 0 = never - the bar, ring and items work. Before 0.22.18: 0 = load but hook nothing. 0.22.44: in an INI without `[Menu] Load` (written before 0.22.18) Enabled never opens the window - add `Load=1` for that |
 | `[Menu] Load` | 1 | 0.22.18: 0 = load but hook nothing (the old meaning of `[Menu] Enabled=0`) |
 | `[Menu] LogLevel` | 1 | 0 errors, 1 info, 2 every toggle / item, 3 debug; `TruMenu.log` next to `tru.exe` |
 | `[Menu] ToggleButtons` | 192 (0x00C0) | XInput button mask that opens / closes the menu (all buttons of the mask together) |
