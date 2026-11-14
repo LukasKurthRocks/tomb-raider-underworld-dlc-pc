@@ -947,6 +947,8 @@ def check_quick(ini_path, radial_path):
                 if arg not in RM_PASSES: problems.append(where + ': dbg.flatpass needs one of %s' % ' / '.join(RM_PASSES))
             elif item == 'gfx.next':         # 0.22.16: "gfx.next <RegistryName>" (RadialOn: GnOn, the registry value)
                 if arg not in gn_names(src): problems.append(where + ': gfx.next needs a name of kGnDefs')
+            elif item in W8_CAT_ITEMS:       # 0.22.50: "snd.logcat / snd.catmute / snd.catsolo <kind>" (RadialOn: W8RowOn)
+                if arg not in W8_CATS: problems.append(where + ': %s needs one of %s' % (item, ' / '.join(W8_CATS)))
             elif items[item] != 'bool' or arg: problems.append(where + ': a bool row needs a bool item without argument')
         elif kind == 'kQbValue' and item not in QB_VALUE_ITEMS:
             problems.append(where + ': a value row needs one of %s' % ', '.join(QB_VALUE_ITEMS))
@@ -1840,7 +1842,21 @@ SW_LIVE = {
     ('TruMenu', 'Sonar', 'FloorMarkers'): 'void SoReadSwitch(',
     ('TruMenu', 'Sonar', 'AllFloors'): 'void SoReadSwitch(',             # TruMenu 0.22.49
     ('TruMenu', 'Sonar', 'TriangleCap'): 'void SoReadSwitch(',
+    # TruMenu 0.22.50 (the sound log box filters, about once a second from W8Tick)
+    ('TruMenu', 'Sound', 'LogLara'): 'void W8ReadSwitch(',
+    ('TruMenu', 'Sound', 'LogEnemies'): 'void W8ReadSwitch(',
+    ('TruMenu', 'Sound', 'LogWorld'): 'void W8ReadSwitch(',
+    ('TruMenu', 'Sound', 'LogObjects'): 'void W8ReadSwitch(',
+    ('TruMenu', 'Sound', 'LogUi'): 'void W8ReadSwitch(',
+    ('TruMenu', 'Sound', 'LogSpeech'): 'void W8ReadSwitch(',
+    ('TruMenu', 'Sound', 'LogMusic'): 'void W8ReadSwitch(',
+    ('TruMenu', 'Sound', 'LogOnlyAudible'): 'void W8ReadSwitch(',
+    ('TruMenu', 'Sound', 'LogCollapse'): 'void W8ReadSwitch(',
+    ('TruMenu', 'Sound', 'LogMaxDist'): 'void W8ReadSwitch(',
 }
+# TruMenu 0.22.50: the bar's bool rows with a category argument (RadialOn -> W8RowOn) and the categories (kW8CatKey)
+W8_CAT_ITEMS = ('snd.logcat', 'snd.catmute', 'snd.catsolo')
+W8_CATS = ('lara', 'enemies', 'world', 'objects', 'ui', 'speech', 'music')
 # Q75 (2026-11-11): keys the plugin re-reads at run time only when they were 1 at the game start (the code is patched
 # only then; a 1 after a start with 0 needs a restart). No "when" form of TruMenu says that: live-if:<Key> asks the key's
 # value after the write (SwIsLive), so a row naming its own key would claim live for 0 -> 1 and restart for 1 -> 0 -
@@ -5249,6 +5265,10 @@ W2_HASH_02243 = '36d8966b52c39b9ad58c38c6abd83d97fab0f632d52917a750d475160264ad8
 W2_PACKAGES = (('a', 'Paket A: Adrenalin + Kampf', (('arena.go', '1a'), ('adren.fill', ''), ('adren.keep', ''),
                                                     ('cheat.onehitkill', ''), ('adren.meter', ''))),
                ('b', 'Paket B: Hoeren', (('snd.dump', ''),)),            # read_cpp: umlaut escapes -> ae / oe / ue
+               # 0.22.50: Paket B2 Ton-Log (README 0.22.50 TO TEST)
+               ('b2', 'Paket B2: Ton-Log', (('snd.list', ''), ('snd.logcollapse', ''), ('snd.logaudible', ''),
+                                            ('snd.catmute', 'enemies'), ('snd.catsolo', 'lara'), ('snd.solonew', ''),
+                                            ('snd.mute', 'all 0'), ('snd.fmod', ''), ('snd.hooks', ''))),
                ('c', 'Paket C: DLC 2 aus dem Pausemenue', ()),
                ('d', 'Paket D: Debug-Ansicht', (('dbg.roomonly', ''), ('dbg.metres', ''))),
                ('e', 'Paket E: Markup / Saeule / Wasser', (('draw.markup', ''), ('level.load', 'dlc_dungeon'))),
@@ -5311,8 +5331,8 @@ def check_02244(switches_path):
                 if 'kQfSub' in tail or pkg is not None: problems.append(where + ': tg_1411 = the first row, level 0')
                 pkg = ''
                 continue
-            m = re.fullmatch(r'tg_([a-g])', arg)   # 0.22.48: + g
-            if not m or 'kQfSub' not in tail: problems.append(where + ': a package group tg_<a-g> with kQfSub'); continue
+            m = re.fullmatch(r'tg_([a-g]|b2)', arg)   # 0.22.48: + g; 0.22.50: + b2
+            if not m or 'kQfSub' not in tail: problems.append(where + ': a package group tg_<a-g|b2> with kQfSub'); continue
             if arg not in starts: problems.append(where + ': %s missing in kQbStartClosed' % arg)
             pkg = m.group(1)
             if not de.startswith(labels[pkg]): problems.append(where + ': label must start "%s" (the guide)' % labels[pkg])
@@ -5324,9 +5344,10 @@ def check_02244(switches_path):
             if item != '-' or arg: problems.append(where + ': a note row has id "-" and no argument')
             if pkg in seen: seen[pkg]['note'] += 1
         elif kind == 'kQbCheck':
-            if item != 'test.mark' or not re.fullmatch(r'tg[A-G]\.[a-z0-9]+', arg) or len(arg) > 63:
-                problems.append(where + ': a check row is test.mark tg<A-G>.<name>')
-            elif arg[2].lower() != pkg: problems.append(where + ': check id of another package (group tg_%s)' % pkg)
+            cm = re.fullmatch(r'tg([A-G]|B2)\.[a-z0-9]+', arg)   # 0.22.50: + B2
+            if item != 'test.mark' or not cm or len(arg) > 63:
+                problems.append(where + ': a check row is test.mark tg<A-G|B2>.<name>')
+            elif cm.group(1).lower() != pkg: problems.append(where + ': check id of another package (group tg_%s)' % pkg)
             if arg in ids: problems.append(where + ': check id twice')
             ids.add(arg)
             if pkg in seen: seen[pkg]['check'] += 1
@@ -5420,11 +5441,12 @@ def check_02244(switches_path):
     if 'TruMenu:Input:DeviceGlyphs' not in sw_keys: problems.append('switches: TruMenu | Input | DeviceGlyphs missing')
     header, opt_rows = table(src)
     # 0.22.44 added none, 0.22.45 the three [Sound] wave log keys, 0.22.47 the seven sound monitor / sonar keys, 0.22.48
-    # the three [Sonar] keys, 0.22.49 [Sonar] AllFloors
-    if len(opt_rows) != 283 + len(W6_KEYS_02245) + len(W7_KEYS_02247) + len(SO_KEYS_02248) + 2:
+    # the three [Sonar] keys, 0.22.49 [Sonar] AllFloors + TriangleCap, 0.22.50 the 11 [Sound] keys of W8_KEYS_02250
+    if len(opt_rows) != 283 + len(W6_KEYS_02245) + len(W7_KEYS_02247) + len(SO_KEYS_02248) + 2 + len(W8_KEYS_02250):
         problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.44 adds no INI key (283), 0.22.45 adds %d, 0.22.47 adds %d, '
-                        '0.22.48 adds %d, 0.22.49 adds 2' % (len(opt_rows), len(W6_KEYS_02245), len(W7_KEYS_02247),
-                                                             len(SO_KEYS_02248)))
+                        '0.22.48 adds %d, 0.22.49 adds 2, 0.22.50 adds %d' % (len(opt_rows), len(W6_KEYS_02245),
+                                                                              len(W7_KEYS_02247), len(SO_KEYS_02248),
+                                                                              len(W8_KEYS_02250)))
     readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
     if '\n## 0.22.44 - ' not in readme or '\n### TO TEST 0.22.44' not in readme:
         problems.append('README.md: section "## 0.22.44 - ..." with "### TO TEST 0.22.44" missing')
@@ -5501,10 +5523,13 @@ def check_02245(switches_path):
     em = fn_body(src, 'DWORD W6Emitter(')
     if 'ReadDword(params - 0x14, &vt) || vt != kW6EmitterVtbl) return 0;' not in em or 'return params - 0x14;' not in em:
         problems.append('TruMenu.cpp: W6Emitter must be params - 0x14 only with the vtable 0x851240')
-    ow = fn_body(src, 'bool W6EmitterOwner(')
+    # 0.22.50: W6EmitterOwner (one walk over every instance per watched start) is gone - the same list walk lives in
+    # W7OwnBuild (at most once a second while shown, check_02250)
+    if 'bool W6EmitterOwner(' in src: problems.append('TruMenu.cpp: W6EmitterOwner must be gone (0.22.50)')
+    ow = fn_body(src, 'void W7OwnBuild(')
     for need in ('ReadDword(x.addr + 0x248, &list)', 'ReadDword(list + 0xc, &slots)', 'ReadDword(slots + i * 0xc, &handle)',
                  'ReadDword(list + 0x10, &node)', 'node != listEnd', 'ReadDword(node + 4, &handle)'):
-        if need not in ow: problems.append('TruMenu.cpp: W6EmitterOwner lacks %s' % need)
+        if need not in ow: problems.append('TruMenu.cpp: W7OwnBuild lacks %s' % need)
     vt = fn_body(src, 'void W6VoiceTick(')
     for need in ('if (W6ChMuted(v.channel, &already) && already) continue;', 'g_w6Chan[g_w6ChanN++] = {v.voice, v.channel, true};',
                  'g_w6Seen[i].channel == v.channel', 'if (!old) W6WaveLine(v);'):
@@ -5525,13 +5550,14 @@ def check_02245(switches_path):
         problems.append('TruMenu.cpp: W6TrackRuled: ambience must name the \'_amb_\' beds (SndAmbName)')
     wl = fn_body(src, 'void W6WaveLine(')
     for need in ('g_w6WaveMax > 0 && g_w6WaveLines >= g_w6WaveMax', 'CurrentUnit(unit, sizeof(unit));',
-                 'W6EmitterOwner(v.emitter, &owner, where, sizeof(where))', '"snd.wave %d START #%ld: unit %s;'):
+                 'W7VoiceSource(v.emitter, W7KindOf(group, cat), v.wave, false, src, sizeof(src));',   # 0.22.50
+                 '"snd.wave %d START #%ld: unit %s;'):
         if need not in wl: problems.append('TruMenu.cpp: W6WaveLine lacks %s' % need)
     if 'if (GetCurrentThreadId() != g_snGameThread) {' not in fn_body(src, 'bool RunW6Now('):
         problems.append('TruMenu.cpp: snd.now must run on the game thread only (FMOD queries, as snd.dump)')
     if 'if (GetCurrentThreadId() == g_snGameThread) W6Tick();' not in fn_body(src, 'void W6Apply('):
         problems.append('TruMenu.cpp: W6Apply may call W6Tick on the game thread only')
-    for fn in ('bool W6ChMute(', 'bool W6ChMuted(', 'DWORD W6Emitter(', 'bool W6EmitterOwner(', 'void W6WaveLine(',
+    for fn in ('bool W6ChMute(', 'bool W6ChMuted(', 'DWORD W6Emitter(', 'void W7OwnBuild(', 'void W6WaveLine(',
                'void W6CgTick(', 'void W6TrackTick(', 'void W6TrackBack(', 'void W6VoiceTick(', 'void W6Tick(',
                'bool W6Parse(', 'bool RunW6Mute(', 'bool RunW6Solo(', 'bool RunW6Now(', 'bool RunW6MusicStop(',
                'bool RunW6MusicNext(', 'void W6Check('):
@@ -5554,14 +5580,18 @@ def check_02245(switches_path):
     for r in qb_rows(src):
         if r[0] == 'kQbTests' and r[4] == 'kQbGroup': grp = r[3]
         elif r[0] == 'kQbTests' and grp == 'tg_b': tg.add((r[2], r[3]))
+    # 0.22.50 C: snd.ambmute / music.mute rows merged into the one "Ambient aus" / "Musik aus" (media.muteambient /
+    # media.mutemusic, check_02250) - the items stay, their rows are no longer wanted here
+    merged = (('snd.ambmute', ''), ('music.mute', ''))
     for it in W6_TGB_02245:
-        if it not in tg: problems.append('TruMenu.cpp: Paket B (tg_b) lacks the row %s %s' % it)
+        if it not in tg and it not in merged: problems.append('TruMenu.cpp: Paket B (tg_b) lacks the row %s %s' % it)
     se, grp = set(), None
     for r in qb_rows(src):
         if r[0] == 'kQbSettings' and r[4] == 'kQbGroup': grp = r[3]
         elif r[0] == 'kQbSettings' and grp == 'ton_einzeln': se.add((r[2], r[3]))
     for it in W6_SET_02245:
-        if it not in se: problems.append('TruMenu.cpp: page Spiel-Einstellungen group ton_einzeln lacks %s %s' % it)
+        if it not in se and it not in merged:
+            problems.append('TruMenu.cpp: page Spiel-Einstellungen group ton_einzeln lacks %s %s' % it)
     readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
     if '\n## 0.22.45 - ' not in readme or '\n### TO TEST 0.22.45' not in readme:
         problems.append('README.md: section "## 0.22.45 - ..." with "### TO TEST 0.22.45" missing')
@@ -6061,8 +6091,8 @@ def check_02249(switches_path):
     problems = []
     src = read_cpp()
     ver = src[:src.find('\n', src.find('kVersion = '))]
-    if '"TruMenu 0.22.49 (sonar all floors + map info' not in ver:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.49 (sonar all floors + map info"')
+    if '0.22.49 (sonar all floors + map info' not in ver:   # 0.22.50: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.49 part "0.22.49 (sonar all floors + map info"')
     # ---- (1) AllFloors
     offline = []
     if os.path.exists(SO_CHECKS_02249):
@@ -6205,6 +6235,253 @@ def check_02249(switches_path):
     if SO_HASH_02248 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.48 build hash (work/asi/menu0271) is missing')
     return problems, ('AllFloors (A1 0x6e429b, %d byte checks = precheck_02249), map info read only, adrenaline labels '
                       '(%d checked) + stays full (INI keys only), snd.sonar log line' % (len(rows), len(SO_LABELS_02249)))
+
+
+W8_CHECKS_02250 = os.path.join(ROOT, 'work', 'menu50_1411', 'precheck_02250.txt')
+W8_HASH_02249 = 'fa98427c3e4cac0d22886b05c5012232c6faf098b183a6c3d86663e1cbc8340d'   # work/asi/menu0272
+W8_KEYS_02250 = (('SourceHooks', '1'), ('LogLara', '1'), ('LogEnemies', '1'), ('LogWorld', '1'), ('LogObjects', '1'),
+                 ('LogUi', '1'), ('LogSpeech', '1'), ('LogMusic', '1'), ('LogOnlyAudible', '0'), ('LogCollapse', '1'),
+                 ('LogMaxDist', '0'))   # [Sound]
+# item, type, game thread (queued)
+W8_ITEMS_02250 = (('snd.logcat', 'action', 'false'), ('snd.logaudible', 'bool', 'false'),
+                  ('snd.logcollapse', 'bool', 'false'), ('snd.logdist', 'action', 'false'),
+                  ('snd.catmute', 'action', 'true'), ('snd.catsolo', 'action', 'true'), ('snd.solonew', 'action', 'true'),
+                  ('snd.fmod', 'action', 'true'), ('snd.hooks', 'info', 'false'))
+# the stubs, in order (comments stripped)
+W8_PLAY_STUB = ('push dword ptr [esp + 4]', 'call dword ptr [g_w8PlayFn]', 'pushad', 'pushfd', 'push esi', 'push eax',
+                'call W8OnPlay', 'popfd', 'popad', 'ret 4')
+# E1 replaces the 6 bytes AFTER the create call (mov eax,[esp+0x18]; test eax,eax) - one return address deeper = +0x1c
+W8_EMIT_STUB = ('mov eax, dword ptr [esp + 0x1c]', 'pushad', 'pushfd', 'push dword ptr [ebp + 0xc]', 'push eax',
+                'call W8OnEmit', 'popfd', 'popad', 'test eax, eax', 'ret')
+
+
+def check_02250(switches_path):
+    """0.22.50 (owner wishes 2026-11-14 live; workspace docs/Befund-TruMenu-02250-1411.md, design docs/Befund-FMOD-Kanaele-
+    1411.md): (1) kW8Checks = the 27 rows of precheck_02250.txt, W8Check right after SoCheck, W8ReadOptions right after
+    SoReadOptions, W8Tick in SnTick before W6Tick; (2) V1 = the call redirect 0x591351 -> VoicePool::Play 0x58bfc0 only
+    through AiPatchOn (rel32 over the game's), E1 = the 6 bytes at 0x5b99fc after the untouched create call (TruTrace keys
+    on its return address) only through W8E1Set (the game's bytes in, read back), both back in W8Shutdown
+    (DLL_PROCESS_DETACH); the stubs are exactly the source sequences, the callbacks __stdcall with two arguments, no write
+    of game memory in the W8 code but these two; (3) FMOD read without a call: W8FmOf as the validator (slot >> 16 & 0xfff, +0x148, +0x14c, 0x1b8,
+    +0x70, +0x30, +0x74, real +0x68 / +0x64), W8ForUsed over SystemI +0x150; (4) the monitor: W8Extras in SnBuild before
+    the publish, the FMOD count / "Fremdkanal (DSP)" / music slot rows, filled square = audible; (5) the box: on / off box
+    from FMOD's bit, the loop mark as primitives, collapsed lines (same wave + source), the filters; (6) the owner walk at
+    most once a second and only while shown, the source from hook E1 first; (7) category rules: kW6Cat, whole groups in
+    W6CgTick, the channels outside the pool in W8ExtraMutes; (8) one Ambient aus / Musik aus; (9) page Kapitel from the
+    main menu through ChapSteps (mission start, DLC starts as the DLC menu, refused in a level), cp.jump; (10) items,
+    help, keys, switches, group ton_log; README 0.22.50 + TO TEST; Set-TruMenu knows the 0.22.49 hash"""
+    problems = []
+    src = read_cpp()
+    code = re.sub(r'//[^\n]*', '', src)
+    ver = src[:src.find('\n', src.find('kVersion = '))]
+    if '"TruMenu 0.22.50 (sound log readable + FMOD channels + source hooks' not in ver:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.50 (sound log readable + FMOD channels + '
+                        'source hooks"')
+    # ---- (1) checks, order
+    offline = []
+    if os.path.exists(W8_CHECKS_02250):
+        for line in open(W8_CHECKS_02250, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/menu50_1411/precheck_02250.txt (the offline byte list) is missing')
+    rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kW8Checks')]
+    if rows != offline or len(rows) != 27:
+        problems.append('TruMenu.cpp: kW8Checks (%d rows) must be the 27 rows of precheck_02250.txt in order' % len(rows))
+    if 'g_w8Ok = g_w7Ok && DvChecks(kW8Checks,' not in fn_body(src, 'void W8Check('):
+        problems.append('TruMenu.cpp: W8Check must set g_w8Ok = g_w7Ok && DvChecks(kW8Checks, ...)')
+    if not re.search(r'\n    SoCheck\(\);[^\n]*\n    W8Check\(\);', src):
+        problems.append('TruMenu.cpp: the load must call W8Check right after SoCheck')
+    if not re.search(r'\n    SoReadOptions\(ini\);[^\n]*\n    W8ReadOptions\(ini\);', src):
+        problems.append('TruMenu.cpp: ReadOptions must call W8ReadOptions(ini) right after SoReadOptions(ini)')
+    st = re.sub(r'//[^\n]*', '', fn_body(src, 'void SnTick('))
+    if not 0 <= st.find('W8Tick();') < st.find('W6Tick();'):
+        problems.append('TruMenu.cpp: SnTick must call W8Tick() before W6Tick()')
+    # ---- (2) hooks
+    for want in ('AiPatch g_w8Patches[1] = {\n    {0x00591351, 0x0058bfc0, true, "V1 voice -> emitter 0x591351", 0, 0, false},\n};',
+                 'DWORD g_w8PlayFn = 0x0058bfc0;', 'const DWORD kW8E1 = 0x005b99fc;',
+                 'const BYTE kW8E1Game[6] = {0x8b, 0x44, 0x24, 0x18, 0x85, 0xc0};'):
+        if want not in src: problems.append('TruMenu.cpp: %s missing' % want)
+    if re.search(r'0x005b99f7, 0x005935d0|e8 d4 9b fd ff', code):
+        problems.append('TruMenu.cpp: the create call 0x5b99f7 must stay the game\'s (TruTrace keys on its return address)')
+    ck = fn_body(src, 'void W8Check(')
+    for want in ('g_w8Patches[0].hook = reinterpret_cast<DWORD>(&W8PlayStub) - (g_w8Patches[0].site + 5);',
+                 'g_w8Patches[0].game = g_w8Patches[0].target - (g_w8Patches[0].site + 5);',
+                 'const DWORD rel = reinterpret_cast<DWORD>(&W8EmitStub) - (kW8E1 + 5);', 'g_w8E1New[0] = 0xe8;',
+                 'g_w8E1New[5] = 0x90;'):
+        if want not in ck: problems.append('TruMenu.cpp: W8Check lacks %s' % want)
+    es = fn_body(src, 'bool W8E1Set(')
+    if 'if (!W8E1Bytes(from) || !WriteBytes(kW8E1, to, 6) || !W8E1Bytes(to)) return false;' not in es or \
+            'const BYTE *from = on ? kW8E1Game : g_w8E1New, *to = on ? g_w8E1New : kW8E1Game;' not in es:
+        problems.append('TruMenu.cpp: W8E1Set must write only over the expected bytes and read back')
+    tk = fn_body(src, 'void W8Tick(')
+    for want in ('if (!AiPatchOn(p, o, sizeof(o))) { ok = false; break; }', 'for (AiPatch &p : g_w8Patches) AiPatchOff(p);',
+                 'if (ok && !W8E1Set(true)) {', 'W8E1Set(false);', 'g_w8HooksOn = true;',
+                 'if (g_w8HooksTried || !g_w8HooksWanted) return;'):
+        if want not in tk: problems.append('TruMenu.cpp: W8Tick lacks %s' % want)
+    sd = fn_body(src, 'void W8Shutdown(')
+    if 'for (AiPatch &p : g_w8Patches) AiPatchOff(p);' not in sd or 'W8E1Set(false);' not in sd:
+        problems.append('TruMenu.cpp: W8Shutdown must put V1 (AiPatchOff) and E1 (W8E1Set(false)) back')
+    dm = src[src.find('reason == DLL_PROCESS_DETACH'):]
+    if 'W8Shutdown();' not in dm[:dm.find('return TRUE;')]: problems.append('TruMenu.cpp: DLL_PROCESS_DETACH must call W8Shutdown')
+    for name, seq in (('W8PlayStub', W8_PLAY_STUB), ('W8EmitStub', W8_EMIT_STUB)):
+        body = re.sub(r'//[^\n]*', '', fn_body(src, '__declspec(naked) void %s(' % name))
+        lines = [l.strip() for l in body.split('\n') if l.strip() and l.strip() not in ('__asm {', '}', '{')]
+        lines = [l for l in lines if not l.startswith('__declspec')]
+        if lines != list(seq): problems.append('TruMenu.cpp: %s must be exactly %s (got %s)' % (name, ' / '.join(seq), lines))
+    for cb in ('void __stdcall W8OnPlay(DWORD voice, DWORD node) {', 'void __stdcall W8OnEmit(DWORD handle, DWORD inst) {'):
+        if cb not in src: problems.append('TruMenu.cpp: callback %s missing (__stdcall, two arguments)' % cb)
+    sec = src[src.find('// ---- 0.22.50 W8 core'):src.find('// ---- who caused it:')]
+    sec2 = src[src.find('// ---- 0.22.50 W8: checks'):src.find('// ---- end of 0.22.50 W8 ----')]
+    if not sec or not sec2: problems.append('TruMenu.cpp: the sections "0.22.50 W8 core" / "0.22.50 W8" missing')
+    both = re.sub(r'//[^\n]*', '', sec + sec2)
+    for bad in ('WriteDword(', 'WriteByte(', 'SoWrite(', 'VirtualProtect('):
+        if bad in both: problems.append('TruMenu.cpp: the W8 sections must not call %s' % bad)
+    if both.count('WriteBytes(') != 1 or 'WriteBytes(' not in es:
+        problems.append('TruMenu.cpp: in the W8 sections only W8E1Set may call WriteBytes (once)')
+    # ---- (3) FMOD reads
+    fm = fn_body(src, 'bool W8FmOf(')
+    for want in ('(handle >> 16) & 0xfff', 'ReadDword(sys + 0x148, &count)', 'ReadDword(sys + 0x14c, &arr)',
+                 'arr + slot * 0x1b8', 'ReadDword(c + 0x70, &h) || h != handle', 'ReadDword(c + 0x30, &real) || !real',
+                 'ReadDword(c + 0x74, flags)', 'ReadDword(real + 0x68, rflags);', 'ReadDword(real + 0x64, mode);'):
+        if want not in fm: problems.append('TruMenu.cpp: W8FmOf lacks %s' % want)
+    fu = fn_body(src, 'template <typename F> int W8ForUsed(')
+    for want in ('ReadDword(sys + 0x150, &p)', 'const DWORD head = sys + 0x150;', 'p && p != head && steps <= count',
+                 'ReadDword(p, &next)', 'ReadDword(p + 0x30, &real) && real'):
+        if want not in fu: problems.append('TruMenu.cpp: W8ForUsed lacks %s' % want)
+    if any(w in code for w in ('kFmChSetMode', 'setLoopCount')):
+        problems.append('TruMenu.cpp: no FMOD mode / loop setter is called (the loop mark only reads +0x64)')
+    # ---- (4) monitor
+    sb = re.sub(r'//[^\n]*', '', fn_body(src, 'int SnBuild('))
+    if not 0 <= sb.find('W8Extras(cats, groups);') < sb.find('EnterCriticalSection(&g_snLock);'):
+        problems.append('TruMenu.cpp: SnBuild must call W8Extras before it publishes the snapshot')
+    for want in ('v.fmOk = W8FmOf(v.channel, &fci, &ffl, &frf, &fmode);', 'v.fmMute = v.fmOk && (ffl & 8) != 0;',
+                 'v.loop = v.fmOk && (fmode & 6) != 0;', 'const DWORD hooked = W8VoiceEmitter(v.voice, v.channel);'):
+        if want not in sb: problems.append('TruMenu.cpp: SnBuild lacks %s' % want)
+    qr = fn_body(src, 'int W7QbRows(')
+    for want in ('Kanaele belegt (%d Pool, %d fremd)', '"Fremdkanal (DSP)"', '"Musik-Slot"',   # read_cpp: umlauts -> ae
+                 'view(name, state, count, c, muted ? red : grey, muted ? 2 : 1,', 'const bool muted = x.fmOk ? x.fmMute :'):
+        if want not in qr: problems.append('TruMenu.cpp: W7QbRows lacks %s' % want)
+    if 'const bool muted = w.square == 2;' not in fn_body(src, 'void W7MenuRows('):
+        problems.append('TruMenu.cpp: W7MenuRows: an outline square (2) = muted')
+    # ---- (5) the box
+    dl = fn_body(src, 'void DrawSoundLog(')
+    for want in ('W8Box(dl, p, h, !e.fmMute, c);', 'if (e.loop) W8LoopIcon(', 'if (!W8LineShown(e.cat, e.fmMute, e.fmPause, '
+                 'e.dist)) continue;', 'const bool collapse = g_w8Collapse != 0;', '" \\303\\227%d"',
+                 'if (!v.loop || !v.playing || v.ending) continue;'):
+        if want not in dl: problems.append('TruMenu.cpp: DrawSoundLog lacks %s' % want)
+    li = fn_body(src, 'void W8LoopIcon(')
+    if not li or re.search(r'AddText|\\342\\206|\\xe2', li): problems.append('TruMenu.cpp: W8LoopIcon: primitives only')
+    ag = fn_body(src, 'void W8AggAdd(')
+    if 'a.wave == h.wave && !strcmp(a.src, h.src) && (h.wave >= 0 || !strcmp(a.name, h.name))' not in ag or \
+            'a.count = count + 1;' not in ag:
+        problems.append('TruMenu.cpp: W8AggAdd: same wave + same source (a stream: same name) = one line, count up')
+    if 'W8AggAdd(h);' not in fn_body(src, 'void W7HistAdd(') or 'W8AggRefresh();' not in fn_body(src, 'void W7HistEnd('):
+        problems.append('TruMenu.cpp: W7HistAdd must collapse (W8AggAdd), W7HistEnd refresh (W8AggRefresh)')
+    # ---- (6) owner walk / source
+    ow = fn_body(src, 'bool W7Owner(')
+    if '(!g_w7OwnAt || now - g_w7OwnAt > 1000) && W8Visible()' not in ow:
+        problems.append('TruMenu.cpp: W7Owner: the walk at most once a second and only while shown (W8Visible)')
+    vs = fn_body(src, 'void W7VoiceSource(')
+    if not 0 <= vs.find('W8EmitterInst(emitter, &er)') < vs.find('W7Owner(emitter, &ow)'):
+        problems.append('TruMenu.cpp: W7VoiceSource must ask hook E1 before the owner list')
+    if 'ForInstances(' in fn_body(src, 'void W6WaveLine('): problems.append('TruMenu.cpp: W6WaveLine must not walk the instances')
+    # ---- (7) category rules
+    if 'kW6Cat };' not in src or '"category"};' not in src: problems.append('TruMenu.cpp: rule kind kW6Cat missing')
+    if 'wn += W8CatPureGroups(static_cast<int>(g_w6Rules[i].value), want + wn, kW6CgMax - wn);' not in fn_body(src, 'void W6CgTick('):
+        problems.append('TruMenu.cpp: W6CgTick must mute the whole sub-trees of a category rule')
+    vt = fn_body(src, 'void W6VoiceTick(')
+    if 'if (catRule || g_w6SoloOn) W8ExtraMutes(poolCh, poolN, tgroups, catRule);' not in vt:
+        problems.append('TruMenu.cpp: W6VoiceTick must reach the channels outside the pool (W8ExtraMutes)')
+    em = fn_body(src, 'void W8ExtraMutes(')
+    if not 0 <= em.find('if (fl & 2) return;') < em.find('W6ChMute(h, true)') or 'g_w6Chan[g_w6ChanN++] = {0, h, true};' not in em:
+        problems.append('TruMenu.cpp: W8ExtraMutes: never over a foreign mute bit, keep what TruMenu muted')
+    # ---- (8) one Ambient aus / Musik aus
+    if not re.search(r'\{"media\.muteambient", "bool", "0\.20[^}]*?, true, ValW6Amb, RunW6Amb\},', src, re.S):
+        problems.append('TruMenu.cpp: item media.muteambient must be the one Ambient aus (ValW6Amb / RunW6Amb, game thread)')
+    if not re.search(r'\{"snd\.ambmute", "bool", "0\.22\.45[^}]*?, true, ValW6Amb, RunW6Amb\},', src, re.S):
+        problems.append('TruMenu.cpp: item snd.ambmute must stay the same switch')
+    settings = [(r[2], r[3]) for r in qb_rows(src) if r[0] == 'kQbSettings']
+    for item, n_want in (('media.muteambient', 1), ('media.mutemusic', 1), ('snd.ambmute', 0), ('music.mute', 0)):
+        if settings.count((item, '')) != n_want:
+            problems.append('TruMenu.cpp: page Spiel-Einstellungen has %d %s rows (want %d)' % (settings.count((item, '')),
+                                                                                              item, n_want))
+    if 'IniKeep("Media", "MuteAmbient", on ? "1" : "0");' not in fn_body(src, 'bool RunW6Mute('):
+        problems.append('TruMenu.cpp: snd.mute ambience must keep [Media] MuteAmbient')
+    if 'if (g_w6Ok && g_sndMuteAmb && g_w6RuleN < kW6RuleMax) {' not in fn_body(src, 'void W6Check('):
+        problems.append('TruMenu.cpp: W6Check must turn [Media] MuteAmbient=1 into the ambience rule')
+    # ---- (9) page Kapitel from the main menu
+    cs = fn_body(src, 'bool ChapSteps(')
+    for want in ('*menu = stateOk && state == 10;', 'Out(steps, n, "save.backup kapitel;level.start %s", dlc);',
+                 'Out(steps, n, "save.backup kapitel;level.start %s 0", unit);', 'if (dlcStart && InLevel()) {',
+                 'Out(steps, n, "save.backup kapitel;level.load %s", unit);'):
+        if want not in cs: problems.append('TruMenu.cpp: ChapSteps lacks %s' % want)
+    if '"dlc_level1_start") ? "dlc1" : !_stricmp(unit, "dlc_level2_start") ? "dlc2"' not in fn_body(src, 'bool ChapDlcStart('):
+        problems.append('TruMenu.cpp: ChapDlcStart must map the two DLC start units to dlc1 / dlc2')
+    if '!_stricmp(r.id, "level.load") && !ChapSteps(r.arg, steps, sizeof(steps), &menu, o, sizeof(o))' not in \
+            fn_body(src, 'void QbActRow('):
+        problems.append('TruMenu.cpp: QbActRow: a level.load backup row goes through ChapSteps')
+    if 'ChapSteps(r.arg, steps, sizeof(steps), &menu, o,' not in fn_body(src, 'void PageQbRow('):
+        problems.append('TruMenu.cpp: the long menu backup rows go through ChapSteps')
+    cj = fn_body(src, 'bool RunCpJump(')
+    if 'if (menu) Out(go, sizeof(go), "level.start %s 0", unit);' not in cj:
+        problems.append('TruMenu.cpp: cp.jump from the main menu must use the mission start')
+    # ---- (10) items, help, keys, switches, bar
+    for item, typ, gt in W8_ITEMS_02250:
+        if not re.search(r'\{"%s", "%s", "0\.22\.50[^}]*?,\s+%s,\s+[A-Za-z0-9_<>]+,\s+[A-Za-z0-9_<>]+\},' %
+                         (re.escape(item), typ, gt), src, re.S):
+            problems.append('TruMenu.cpp: item %s (%s, game thread %s) missing in kItems' % (item, typ, gt))
+        if item == 'snd.logdist': continue   # its bar row is the switch row LogMaxDist (the hint of TruMenu.switches.txt)
+        hm = re.search(r'\{"%s", "\*?", "((?:[^"\\]|\\.)*)"\}' % re.escape(item), src)
+        if not hm: problems.append('TruMenu.cpp: kQbHelp row %s missing' % item)
+        else:
+            de, en = unescape(hm.group(1)).split('|')
+            if len(de) > 60 or len(en) > 60: problems.append('TruMenu.cpp: help of %s over 60 characters' % item)
+    header, opt_rows = table(src)
+    keys = {(s, k): d for s, k, d, _ in opt_rows}
+    for key, default in W8_KEYS_02250:
+        if keys.get(('Sound', key)) != default: problems.append('TruMenu.cpp: kOpts [Sound] %s=%s missing' % (key, default))
+    sw_rows = {}
+    for line in open(switches_path, encoding='utf-8').read().splitlines():
+        f = [x.strip() for x in line.split('|')]
+        if line.startswith('#') or len(f) < 9 or f[0] == 'group': continue
+        sw_rows['%s:%s:%s' % (f[0], f[1], f[2])] = f
+    for key, default in W8_KEYS_02250:
+        f = sw_rows.get('TruMenu:Sound:%s' % key)
+        when = 'restart' if key == 'SourceHooks' else 'live'
+        if not f or f[6] != when or f[7] != default or len(f) < 10 or f[9] != 'TruMenu 0.22.50':
+            problems.append('switches: row TruMenu | Sound | %s | ... | %s | %s | ... | TruMenu 0.22.50 missing' %
+                            (key, when, default))
+    if 'group | tmtonlog | ' not in open(switches_path, encoding='utf-8').read():
+        problems.append('switches: group tmtonlog missing')
+    se, grp = set(), None
+    for r in qb_rows(src):
+        if r[0] != 'kQbSettings': continue
+        if r[4] == 'kQbGroup': grp = r[3]; continue
+        if grp == 'ton_log': se.add((r[2], r[3], r[4]))
+    want_rows = [('snd.logcollapse', '', 'kQbBool'), ('snd.logaudible', '', 'kQbBool'),
+                 ('sw.set', 'TruMenu:Sound:LogMaxDist', 'kQbSwitch'), ('snd.solonew', '', 'kQbAction'),
+                 ('snd.mute', 'all 0', 'kQbAction'), ('snd.fmod', '', 'kQbAction'), ('snd.hooks', '', 'kQbInfo')]
+    for c in W8_CATS:
+        want_rows += [('snd.logcat', c, 'kQbBool'), ('snd.catmute', c, 'kQbBool'), ('snd.catsolo', c, 'kQbBool')]
+    for it in want_rows:
+        if it not in se: problems.append('TruMenu.cpp: page Spiel-Einstellungen group ton_log lacks %s %s (%s)' % it)
+    cats = re.findall(r'"([a-z]+)"', src[src.find('const char *const kW8CatKey[kW8Cats] = {'):].split('};')[0])
+    if tuple(cats) != W8_CATS: problems.append('TruMenu.cpp: kW8CatKey must be %s' % ' / '.join(W8_CATS))
+    if not re.search(r'const signed char kW8GroupCat\[80\] = \{', src): problems.append('TruMenu.cpp: kW8GroupCat[80] missing')
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.50 - ' not in readme or '\n### TO TEST 0.22.50' not in readme:
+        problems.append('README.md: section "## 0.22.50 - ..." with "### TO TEST 0.22.50" missing')
+    for key, _ in W8_KEYS_02250:
+        if '`[Sound] %s`' % key not in readme: problems.append('README.md: options row `[Sound] %s` missing' % key)
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if W8_HASH_02249 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.49 build hash (work/asi/menu0272) is missing')
+    return problems, ('sound log readable (%d byte checks = precheck_02250; hooks V1 / E1 through AiPatch, stubs exact; '
+                      'FMOD read without a call; monitor + box; owner walk throttled; category rules; one Ambient aus / '
+                      'Musik aus; Kapitel from the main menu; %d items, %d keys, ton_log %d rows)' %
+                      (len(rows), len(W8_ITEMS_02250), len(W8_KEYS_02250), len(se)))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -6842,6 +7119,10 @@ def main(argv):
     for p in cproblems49: print('Q02249 %s' % p)
     if not cproblems49: print('ok: 0.22.49 %s' % csummary49)
     problems += cproblems49
+    cproblems50, csummary50 = check_02250(opt.get('--switches', SWITCHES))   # 0.22.50 (sound log readable, Kapitel)
+    for p in cproblems50: print('Q02250 %s' % p)
+    if not cproblems50: print('ok: 0.22.50 %s' % csummary50)
+    problems += cproblems50
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

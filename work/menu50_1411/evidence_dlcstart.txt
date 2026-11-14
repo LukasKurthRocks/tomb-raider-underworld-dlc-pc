@@ -1,0 +1,15 @@
+# TruMenu 0.22.50 D (page Kapitel / DLC starts): why the game's mission start sets the DLC player and level.load does not.
+# Run: ../bin/pyt -t 120 tools/pe_bytes_check.py ../data/pc/tru.exe --file work/menu50_1411/evidence_dlcstart.txt
+# Listings: work/menu50_1411/dis_77e170.txt (uigamedata f27 = 0x77e170), dis_556940.txt (the new-game block).
+# f27(unit, select, 0, newgame): 4th argument [ebp+0x14] tested; 0 -> skip the new-game block (je 0x77e411)
+0077e189 807d1400
+0077e199 0f8472020000
+# .. newgame 1: 0x556940(0) - the new-game block of the game data [0xc59264]
+0077e27b 6a00
+0077e283 e8b886ddff
+# 0x556940: ebx = 0, then (straight line, no jump / ret in 0x556940 .. 0x556ae8) the chosen costume words +0x210 /
+# +0x20e / +0x20c = 0 -> the level load 0x5de2b0 takes the unit's default costume (0x5de379; ENGINE section 19)
+005569a1 33db
+00556abe 66899910020000
+00556acb 66899a0e020000
+00556ad7 6689980c020000

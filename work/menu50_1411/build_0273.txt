@@ -1,0 +1,14 @@
+Built work\asi\menu0273\TruMenu.asi (2250752 bytes, x86 DLL, sha256 b1262935dc898fd7f55201d943c9ddd6dd2a686093292f0084797e6c93154ced) - TruMenu 0.22.50
+  Build-TruAsi.ps1 -Name TruMenu -OutDir work/asi/menu0273 from Git Bash (the last of several builds of the session in the
+  same folder; the raw outputs are in _archiv\, not in the repo - they hold local paths)
+  warnings: 2 (both imgui_demo.cpp), 0 in TruMenu.cpp; imports / exports = 0.22.49 (tools/pe_import_export_diff.py: 151
+  functions, same 6 exports, no new DLL - imports_exports_0272_0273.txt)
+  INI / switches / radial / tour in the build folder = source (cmp)
+Byte checks: tools/pe_bytes_check.py --file work/menu50_1411/precheck_02250.txt -> 27 checks, 0 mismatches on
+  data\pc\tru.exe (precheck_02250_result.txt); the installed exe has the same SHA256 (6905b046...)
+  evidence_dlcstart.txt (page Kapitel / DLC start): 8 checks, 0 mismatches (evidence_dlcstart_result.txt)
+Stubs: work/menu50_1411/stub_bytes.py on the build: W8PlayStub / W8EmitStub one match each, both callbacks ret 8 (stub_bytes.txt)
+trumenu_ini_check: exit 0, 60 ok lines, 0 others (ini_check_final.txt); negative cases m50_negative_tests.py: 51 cases +
+  1 positive, 0 failed (m50_negative_tests.txt)
+trumenu_quick_check: exit 1 - only "menupages: 28 page keys" FAIL (old, not this change; as in 0.22.45 .. 0.22.49)
+trumenu_readability_check: exit 0

@@ -303,3 +303,18 @@ TruMenu | Sonar | FloorMarkers | bool | Sonar komplett: alle Stockwerk-Marker | 
 # 2026-11-14: TruMenu 0.22.49 - AllFloors draws the other floors' map units the sonar loaded itself (no extra load)
 TruMenu | Sonar | AllFloors | bool | Alle verbundenen Bereiche | All connected areas | live | 0 | Geladene Nachbar-Stockwerke auch (mit FullMap) // Loaded neighbour floors too (with FullMap) | TruMenu 0.22.49
 TruMenu | Sonar | TriangleCap | int:0..1000000:50000 | Sonar komplett: Dreiecks-Grenze | Full map: triangle cap | live | 300000 | Dreiecke je Bild (Spiel 93572, bis dahin = Spiel) // Triangles per frame (game 93572, up to it = game) | TruMenu 0.22.49
+
+# 2026-11-14: TruMenu 0.22.50 - the sound log box: [Sound] Log* re-read about once a second (W8ReadSwitch) = live;
+# SourceHooks (the two code redirects V1 / E1) is read at the start (bar page Spiel-Einstellungen, group Ton-Log)
+group | tmtonlog | Ton-Log (TruMenu) | Sound log (TruMenu)
+TruMenu | Sound | SourceHooks | bool | Ton-Quelle genau (2 Hooks) | Exact sound source (2 hooks) | restart | 1 | Stimme -> Emitter -> Objekt / Lara; 0 = nur Liste // Voice -> emitter -> object / Lara; 0 = list only | TruMenu 0.22.50
+TruMenu | Sound | LogLara | bool | Ton-Log: Lara zeigen | Sound log: show Lara | live | 1 | Laras Körper, Ausrüstung, Waffen // Lara's body, gear, weapons | TruMenu 0.22.50
+TruMenu | Sound | LogEnemies | bool | Ton-Log: Gegner zeigen | Sound log: show enemies | live | 1 | Gegner und Kreaturen // Enemies and creatures | TruMenu 0.22.50
+TruMenu | Sound | LogWorld | bool | Ton-Log: Welt / Umgebung zeigen | Sound log: show world / ambience | live | 1 | Umgebung, Wind, Wasser, Tiere // Ambience, wind, water, animals | TruMenu 0.22.50
+TruMenu | Sound | LogObjects | bool | Ton-Log: Objekte zeigen | Sound log: show objects | live | 1 | Mechanik, Fallen, Trümmer, Explosionen // Mechanisms, traps, debris, explosions | TruMenu 0.22.50
+TruMenu | Sound | LogUi | bool | Ton-Log: PDA / UI zeigen | Sound log: show PDA / UI | live | 1 | HUD, Menü, PDA / Sonar, Fernglas // HUD, menu, PDA / sonar, binoculars | TruMenu 0.22.50
+TruMenu | Sound | LogSpeech | bool | Ton-Log: Sprache zeigen | Sound log: show speech | live | 1 | Laras Stimme und Hinweise, Funk // Lara's voice and hints, radio | TruMenu 0.22.50
+TruMenu | Sound | LogMusic | bool | Ton-Log: Musik zeigen | Sound log: show music | live | 1 | Musik-Stimmen und -Ströme // Music voices and streams | TruMenu 0.22.50
+TruMenu | Sound | LogOnlyAudible | bool | Ton-Log: nur hörbare Zeilen | Sound log: audible lines only | live | 0 | Ohne Zeilen, die FMOD stumm / pausiert // Without lines FMOD mutes / pauses | TruMenu 0.22.50
+TruMenu | Sound | LogCollapse | bool | Ton-Log: Wiederholungen zusammen | Sound log: collapse repetitions | live | 1 | Gleiche Welle + Quelle = eine Zeile mit ×n // Same wave + source = one line with xn | TruMenu 0.22.50
+TruMenu | Sound | LogMaxDist | int:0..500:5 | Ton-Log: höchstens so weit weg (m) | Sound log: at most this far (m) | live | 0 | Fernere 3D-Töne ausblenden; 0 = alle // Hide 3D sounds farther away; 0 = all | TruMenu 0.22.50

@@ -190,6 +190,7 @@ Sources: `Befund-TruShadowPower-016-0611.md`, `Befund-Unit-Streaming-0611.md`, `
 | Front-end level start (2026-11-14) | The game's two paths from the menu: mission start f27 0x77e170 -> 0x5dfb20 (RequestLevelChange only in main state 1, else main state 2 itself, 0x5dfb83); save load 0x7743c0 (request doneType 10, main state 2, +0xb9 = 0 by hand). f27's 4th argument 1 = new game data (0x77e19f: player tailoring +0x3ef98.. / options 0xb / 0x2f saved, 0x556940(0) reallocates `[0xc59264]` / `[0xc59268]`, then put back - no file write there). Front-end state byte 0xfae8da (getter 0x77bbe0, 3 = main menu) is the switch of 0x5dae20 (0x5dae69). TruMenu 0.22.46 `arena.go` from the main menu = `level.start <unit> 0` | ✅ static / ⬜ live |
 | Mission start (generalbank script 104) | `uigamedata` f22 = 0x4a0f10 (byte 0xa039b8 = 1), f27 = 0x77e170 (selection byte 0xfae8d9), 0x5dfb20 copies the unit name -> RequestLevelChange or main state 2; `stdscreenmgr` f19 / f7 = 0x4be5e0 / 0x4be580 | ✅ static |
 | Xbox mission start | always `MainTracker_UILoadLevel` 0x8247d818, which also resets the chosen costume (section 19) | ✅ |
+| PC mission start vs level.load: the DLC player (2026-11-14, TruMenu 0.22.50 D, `work/menu50_1411/evidence_dlcstart.txt` 8 / 8, `dis_77e170.txt`, `dis_556940.txt`) | f27 0x77e170 tests its 4th argument `[ebp+0x14]` (0x77e189; 0 -> je 0x77e411 skips the block); with 1 it calls **0x556940(0)** (0x77e27b / 0x77e283), which sets ebx = 0 (0x5569a1) and - straight line, no jump in 0x556940 .. 0x556ae8 - zeroes the chosen costume words **+0x210 / +0x20e / +0x20c** of the game data `[0xc59264]` (0x556abe / 0x556acb / 0x556ad7); f27 puts back only the tailoring +0x3ef98 .. +0x3efb1, +0x1d8 .. +0x1ec and the block +0x3ed90 (0x204 B, `rep movsd` 0x77e36d) - not the three costume words. The next level load 0x5de2b0 then takes the unit's own default costume (0x5de379, section 19): DLC 2 units `lara_doppelganger` -> TruDlc2Player `doppelganger_casual` + DoppelgangerInit + tracker +0x1244 = 1. `GAMELOOP_RequestLevelChangeByName` (TruMenu `level.load`) never runs that block: the chosen costume stays (live 14.11. 19:14 Kapitel -> `dlc_level2_start` from `dlc_water_wheel`: "Loading DLC2 level starting unit!", Lara in the gold bikini, no doppelganger). TruMenu 0.22.50 page Kapitel: main menu = `level.start dlc1` / `dlc2` / `<unit> 0`, the DLC start rows refused in a level | ✅ static / ⬜ live (main-menu DLC rows) |
 | Reload after death | 0x5de480: `SAVE_RestoreGame(0)` at 0x5de537 -> `STREAM_LevelLoadAndInit` at 0x5de6a8 -> wait loop 0x5de6c1..0x5de6f2 (>= 3000 ms + loader busy 0x5c1da0 / `[0x9de714]`, does not wait for unrequested objects) -> player spawn 0x5d40c0 | ✅ |
 | Timings (TruTrace) | portal hop ~0.04 s, hall02 load 1.15 s, `level.load` ~9.5 s | ✅ live |
 | DLC 2 portal graph | `dlc_level2_start` 91 -> `dlc_yggdrasil_hall01` 108 -> `hall02` 107 -> `dlc_yggdrasil_end` 106; `dlc2_*` rooms 112-118 are a separate ring (only `level.load`) - the game itself reaches the ring by script: see the row "DLC 2 level chain (PK1-8)" | ✅ (`tools/stream_unit_graph.py`) |
@@ -1312,6 +1313,19 @@ file must not be copied over it (31 type-9 libs incl. 2943 / 2944 and 25 materia
   **+4** (0x591348 `mov ebx,[ebx+4]; push ebx`) - voice +0x10 is that sample object, never the entry. The id comes back
   only through a lookup entry +4 -> id. TruMenu 0.20.1 .. 0.22.46 read `(sample - table) / 0x18` (every voice "Stream",
   all `snd.now` / `snd.dump` lines of 14.11.). ✅ static / ⬜ live
+* **Exact voice -> emitter -> instance** (2026-11-14, TruMenu 0.22.50, `work/menu50_1411/precheck_02250.txt` 27 / 27,
+  `dis_591330.txt`, `dis_58bfc0.txt`, `dis_5935d0.txt`): the wave node ctor 0x591220 (thiscall, esi = the node) keeps its
+  4th argument = the emitter at **node +0x10** (0x59123c) and plays the voice itself: `push [entry+4]; mov ecx, 0x8a8108;
+  call 0x58bfc0` at **0x591351**, then `test eax,eax; mov [esi+0x14],eax; je` (no voice). VoicePool::Play 0x58bfc0 is
+  thiscall with one stack argument (`ret 4` at 0x58bff0 / 0x58c01c / 0x58c12b) and keeps esi. So {voice, voice +4,
+  node +0x10} at that call is exact for every wave, also under inner SoundPlex nodes. The anim sound event 0x5b99c0
+  (ebp frame; `[ebp+0xc]` = the instance, its list `[edi+0x248]` 0x5b9ac0) creates its emitter at **0x5b99f7** `call
+  0x5935d0` (thiscall on `[0x8a8100]`, arguments (&handle, section, float), `ret 0xc` at every exit; `*out = 0` without
+  data) and reads the handle back at **0x5b99fc** (`mov eax,[esp+0x18]; test eax,eax`, then `je 0x5b9c33` at
+  0x5b9a02; `[handle]` = the emitter). TruMenu 0.22.50 (`[Sound] SourceHooks`): V1 = the call at 0x591351 redirected
+  (rel32) to a stub that calls Play with the same argument; E1 = the 6 bytes at 0x5b99fc replaced by `call stub; nop`
+  (the create call stays the game's - TruTrace identifies this branch by its return address 0x5b99fc). ✅ static
+  (bytes, compiled stubs `stub_bytes.py`) / ⬜ live
 * Anim event kind 2 -> 0x5b9fd8 -> 0x5b69c0 (type table 0x5b6b30) -> slot object 0x593d50(slot, mode, p3, p4); instance
   sound object 0x58d6a0: count `[obj+0xa8]`, table `[obj+0xac]` (8 B per slot). TU passes a 5th argument (0x8226de00) - not
   ported ⬜. ✅
@@ -1361,6 +1375,18 @@ two-voice loop while the sonar is open; live 14.11.: 2 voices g57 vol 0.07, ever
 alrm_radar_03 (section 3382). **Group 70 (Lara's hint lines, ~500 streams) is a child of 57**: a group mute of 57
 silences her hints too. TruMenu 0.22.47 "Sonar-Ton aus" mutes 914 / 915 / 916 per channel (group 57 only as the
 fallback). ✅ data / ⬜ live (which wave is the opening ping)
+**FMOD's own channel state, every used channel** (2026-11-14, TruMenu 0.22.50, `precheck_02250.txt`, workspace
+`Befund-FMOD-Kanaele-1411.md` section 1): handle -> ChannelI without an FMOD call as the validator 0x7c7e5a (slot =
+handle >> 16 & 0xfff below SystemI +0x148, `[SystemI+0x14c] + slot * 0x1b8`, full handle = ChannelI +0x70); ChannelI
++0x74 bit 3 = the effective mute (setMute 0x7c92fb sets, 0x7c9325 clears), bit 0 own pause, +0x30 the real channel (0 =
+free), real +0x68 bit 0x20 = effectively paused (0x7c9c82), real +0x64 = the channel's mode (getter 0x7c9863 =
+`[[ci+0x30]+0x64]`, copied from the sound +0x18 at the start 0x7c88ba; FMOD Ex mode bits: 0x2 LOOP_NORMAL / 0x4
+LOOP_BIDI = loops, 0x10 = 3D). SystemI +0x150 = the list of used channels (head; node = the ChannelI; next = [node]),
+walked by System::update's setter loop 0x7bcae6 / 0x7bcb0a / 0x7bcb24. A used channel whose handle is no voice +4 of
+the pool 0x8a8108 is one the pool never sees (oscillator node 13); its game group = the group whose channel group
+(R+0x6c = node +0x1c) is its ChannelGroupI (+0x8c) or the nearest parent (+0x1c). A group's parent index is the table
+entry +0x68 (0x591fe4): a whole sub-tree can be muted with one ChannelGroupI::setMute. ✅ static / ⬜ live (loop bit of
+the game's one-shots)
 **Group DSP effect** (2026-11-10): entry +0x7c is a **u16** DSP kind and +0x80 points to its parameter block in the
 DTP (16 or 32 B of floats). The loop 0x58de50 over all groups tests `word ptr [entry+0x7c]` and, when non-zero (and
 the group's wrapper +0x5c is 0), calls 0x58dad0 -> 0x587620: `movzx` kind 1..11 -> jump table 0x5876fc -> FMOD DSP

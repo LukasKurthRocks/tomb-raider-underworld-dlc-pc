@@ -1,0 +1,57 @@
+positive (unchanged sources): 0 problem(s) ok
+case version                 : 1 problem(s) ok - TruMenu.cpp: kVersion must start with "TruMenu 0.22.50 (sound log readable + FMOD channels + source hooks"
+case check row changed       : 1 problem(s) ok - TruMenu.cpp: kW8Checks (27 rows) must be the 27 rows of precheck_02250.txt in order
+case check row dropped       : 1 problem(s) ok - TruMenu.cpp: kW8Checks (26 rows) must be the 27 rows of precheck_02250.txt in order
+case check order             : 1 problem(s) ok - TruMenu.cpp: the load must call W8Check right after SoCheck
+case V1 other target         : 1 problem(s) ok - TruMenu.cpp: AiPatch g_w8Patches[1] = {
+    {0x00591351, 0x0058bfc0, true, "V1 voice -> emitter 0x591351", 0, 0, false},
+}; missing
+case E1 other site           : 1 problem(s) ok - TruMenu.cpp: const DWORD kW8E1 = 0x005b99fc; missing
+case E1 game bytes           : 1 problem(s) ok - TruMenu.cpp: const BYTE kW8E1Game[6] = {0x8b, 0x44, 0x24, 0x18, 0x85, 0xc0}; missing
+case create call patched     : 2 problem(s) ok - TruMenu.cpp: AiPatch g_w8Patches[1] = {
+    {0x00591351, 0x0058bfc0, true, "V1 voice -> emitter 0x591351", 0, 0, false},
+}; missing
+case E1 no read back         : 1 problem(s) ok - TruMenu.cpp: W8E1Set must write only over the expected bytes and read back
+case E1 nop missing          : 1 problem(s) ok - TruMenu.cpp: W8Check lacks g_w8E1New[5] = 0x90;
+case hook rel32 wrong        : 1 problem(s) ok - TruMenu.cpp: W8Check lacks g_w8Patches[0].hook = reinterpret_cast<DWORD>(&W8PlayStub) - (g_w8Patches[0].site + 5);
+case V1 not put back         : 1 problem(s) ok - TruMenu.cpp: W8Shutdown must put V1 (AiPatchOff) and E1 (W8E1Set(false)) back
+case E1 not put back         : 1 problem(s) ok - TruMenu.cpp: W8Shutdown must put V1 (AiPatchOff) and E1 (W8E1Set(false)) back
+case detach without W8       : 1 problem(s) ok - TruMenu.cpp: DLL_PROCESS_DETACH must call W8Shutdown
+case play stub ret           : 1 problem(s) ok - TruMenu.cpp: W8PlayStub must be exactly push dword ptr [esp + 4] / call dword ptr [g_w8PlayFn] / pushad / pushfd / push esi / push eax / call W8OnPlay / popfd / popad / ret 4 (got ['push dword ptr [esp + 4]', 'call dword ptr [g_w8PlayFn]', 'pushad', 'pushfd', 'push esi', 'push eax', 'call W8OnPlay', 'popfd', 'popad', 'ret'])
+case play stub no copy       : 1 problem(s) ok - TruMenu.cpp: W8PlayStub must be exactly push dword ptr [esp + 4] / call dword ptr [g_w8PlayFn] / pushad / pushfd / push esi / push eax / call W8OnPlay / popfd / popad / ret 4 (got ['call dword ptr [g_w8PlayFn]', 'pushad', 'pushfd', 'push esi', 'push eax', 'call W8OnPlay', 'popfd', 'popad', 'ret 4'])
+case emit stub offset        : 1 problem(s) ok - TruMenu.cpp: W8EmitStub must be exactly mov eax, dword ptr [esp + 0x1c] / pushad / pushfd / push dword ptr [ebp + 0xc] / push eax / call W8OnEmit / popfd / popad / test eax, eax / ret (got ['mov eax, dword ptr [esp + 0x18]', 'pushad', 'pushfd', 'push dword ptr [ebp + 0xc]', 'push eax', 'call W8OnEmit', 'popfd', 'popad', 'test eax, eax', 'ret'])
+case emit stub no test       : 1 problem(s) ok - TruMenu.cpp: W8EmitStub must be exactly mov eax, dword ptr [esp + 0x1c] / pushad / pushfd / push dword ptr [ebp + 0xc] / push eax / call W8OnEmit / popfd / popad / test eax, eax / ret (got ['mov eax, dword ptr [esp + 0x1c]', 'pushad', 'pushfd', 'push dword ptr [ebp + 0xc]', 'push eax', 'call W8OnEmit', 'popfd', 'popad', 'ret'])
+case callback cdecl          : 1 problem(s) ok - TruMenu.cpp: callback void __stdcall W8OnPlay(DWORD voice, DWORD node) { missing (__stdcall, two arguments)
+case W8 writes memory        : 1 problem(s) ok - TruMenu.cpp: the W8 sections must not call WriteDword(
+case slot mask               : 1 problem(s) ok - TruMenu.cpp: W8FmOf lacks (handle >> 16) & 0xfff
+case handle not compared     : 1 problem(s) ok - TruMenu.cpp: W8FmOf lacks ReadDword(c + 0x70, &h) || h != handle
+case used list head          : 1 problem(s) ok - TruMenu.cpp: W8ForUsed lacks const DWORD head = sys + 0x150;
+case extras after publish    : 1 problem(s) ok - TruMenu.cpp: SnBuild must call W8Extras before it publishes the snapshot
+case mute from rule          : 1 problem(s) ok - TruMenu.cpp: W7QbRows lacks const bool muted = x.fmOk ? x.fmMute :
+case square old meaning      : 1 problem(s) ok - TruMenu.cpp: W7QbRows lacks view(name, state, count, c, muted ? red : grey, muted ? 2 : 1,
+case box from rule           : 1 problem(s) ok - TruMenu.cpp: DrawSoundLog lacks W8Box(dl, p, h, !e.fmMute, c);
+case loop as glyph           : 1 problem(s) ok - TruMenu.cpp: W8LoopIcon: primitives only
+case collapse key            : 1 problem(s) ok - TruMenu.cpp: W8AggAdd: same wave + same source (a stream: same name) = one line, count up
+case owner every 250 ms      : 1 problem(s) ok - TruMenu.cpp: W7Owner: the walk at most once a second and only while shown (W8Visible)
+case owner before hook       : 1 problem(s) ok - TruMenu.cpp: W7VoiceSource must ask hook E1 before the owner list
+case cat groups gone         : 1 problem(s) ok - TruMenu.cpp: W6CgTick must mute the whole sub-trees of a category rule
+case no extra mutes          : 1 problem(s) ok - TruMenu.cpp: W6VoiceTick must reach the channels outside the pool (W8ExtraMutes)
+case foreign mute bit        : 1 problem(s) ok - TruMenu.cpp: W8ExtraMutes: never over a foreign mute bit, keep what TruMenu muted
+case ambience old item       : 1 problem(s) ok - TruMenu.cpp: item media.muteambient must be the one Ambient aus (ValW6Amb / RunW6Amb, game thread)
+case duplicate music row     : 1 problem(s) ok - TruMenu.cpp: page Spiel-Einstellungen has 1 music.mute rows (want 0)
+case ambience not kept       : 1 problem(s) ok - TruMenu.cpp: snd.mute ambience must keep [Media] MuteAmbient
+case chapter DLC as unit     : 1 problem(s) ok - TruMenu.cpp: ChapSteps lacks Out(steps, n, "save.backup kapitel;level.start %s", dlc);
+case chapter DLC in a level  : 1 problem(s) ok - TruMenu.cpp: ChapSteps lacks if (dlcStart && InLevel()) {
+case chapter row old path    : 1 problem(s) ok - TruMenu.cpp: QbActRow: a level.load backup row goes through ChapSteps
+case cp.jump unit.go         : 1 problem(s) ok - TruMenu.cpp: cp.jump from the main menu must use the mission start
+case item thread             : 1 problem(s) ok - TruMenu.cpp: item snd.catmute (action, game thread true) missing in kItems
+case item help               : 1 problem(s) ok - TruMenu.cpp: kQbHelp row snd.solonew missing
+case key default             : 1 problem(s) ok - TruMenu.cpp: kOpts [Sound] LogCollapse=1 missing
+case settings row            : 1 problem(s) ok - TruMenu.cpp: page Spiel-Einstellungen group ton_log lacks snd.catsolo speech (kQbBool)
+case category key            : 1 problem(s) ok - TruMenu.cpp: kW8CatKey must be lara / enemies / world / objects / ui / speech / music
+case hooks live              : 1 problem(s) ok - switches: row TruMenu | Sound | SourceHooks | ... | restart | 1 | ... | TruMenu 0.22.50 missing
+case collapse default        : 1 problem(s) ok - switches: row TruMenu | Sound | LogCollapse | ... | live | 1 | ... | TruMenu 0.22.50 missing
+case dist restart            : 1 problem(s) ok - switches: row TruMenu | Sound | LogMaxDist | ... | live | 0 | ... | TruMenu 0.22.50 missing
+case lara since              : 1 problem(s) ok - switches: row TruMenu | Sound | LogLara | ... | live | 1 | ... | TruMenu 0.22.50 missing
+case group gone              : 1 problem(s) ok - switches: group tmtonlog missing
+51 cases + 1 positive, 0 failed

@@ -1,0 +1,7 @@
+W8PlayStub: 1 match(es)
+  file offset 0xd2810: ff 74 24 04 ff 15 74 b5 20 10 60 9c 56 50 e8 1d ff ff ff 9d 61 c2 04 00
+  callback at file offset 0xd2740, first ret: 8 (want 8 = __stdcall, 2 arguments)
+W8EmitStub: 1 match(es)
+  file offset 0xd1ca0: 8b 44 24 1c 60 9c ff 75 0c 50 e8 41 09 00 00 9d 61 85 c0 c3
+  callback at file offset 0xd25f0, first ret: 8 (want 8 = __stdcall, 2 arguments)
+stubs ok

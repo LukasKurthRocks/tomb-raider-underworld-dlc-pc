@@ -182,6 +182,9 @@ Technical detail (addresses, structs, tools) is in [ENGINE.md](ENGINE.md); the S
 | Streams | Cutscene, voice, event and music streams (`.mul`) use the game's own IMA ADPCM decoder; DLC 1 / 2 have 25 music tracks | ✅ | ENGINE §18.4 |
 | Speech languages | Speech exists in EN / FR / DE / IT / ES; Dutch has text only (English speech). Mercenary barks (490 lines) exist only in the ship units | ✅ data | ENGINE §18.5 "Language census", §18.5 |
 | Checkpoint chime | Base checkpoints chime in group 55 (pauses with the pause menu), DLC 1 units in group 5 (does not) | ✅ data / effect 🔶 | ENGINE §1 "Checkpoint chime DTP 906 / PC 3512" |
+| Sound source | Every wave sound knows the emitter that started it, and an animation sound knows the character it belongs to at the moment it is created - but the game never keeps that link afterwards for most animation sounds (only some stay in the character's sound list) | ✅ static | ENGINE §18.2 "Exact voice -> emitter -> instance" |
+| Mute / pause / loop | The sound engine keeps its own "muted" state per channel (set by a muted group above it as well), its own pause and whether the channel loops; a muted group also silences sounds that start in it later | ✅ static | ENGINE §18.3 "FMOD's own channel state" |
+| Channels outside the voice list | A few sounds (the oscillator sound type) play on channels the game's voice list never sees; only a group mute or the channel itself reaches them | ✅ static / live 🔶 | ENGINE §18.3 "FMOD's own channel state"; Befund-FMOD-Kanaele-1411 |
 
 ## 10. Options and controls
 
@@ -227,6 +230,7 @@ Technical detail (addresses, structs, tools) is in [ENGINE.md](ENGINE.md); the S
 | Costume packs | Wetsuit pack: Wetsuit, Blue Wetsuit; Classic pack: Classic Lara, Legend Lara; Designer pack: Fashion Winner, People's Choice | ✅ data | COSTUMES.md |
 | Difficulty | Player tailoring = EnemyHP, AmmoAdj, PlayerHP, SavingGrabAdj and a fifth value; each 0-2, 1 = Medium (default) | ✅ static | Befund-DLC-Schwierigkeit-1111 |
 | TU mission start | Starting a DLC mission on the TU resets tailoring to Medium and the chosen costume; DLC 2+ starts skip the outfit selection. PC 1.1 keeps both and always offers outfits | ✅ static / PC live | ENGINE §4.2 "Dialog accept case 8"; Befund-Hauptmenue-Schwierigkeit-1111 |
+| Mission start vs direct level change | A mission start (the menu's way into a level) starts with fresh game data and clears the chosen outfit, so the level's own default outfit loads - in DLC 2 that is the Doppelgänger, which only then becomes the player. A direct level change keeps the game data and the current outfit, so DLC 2 entered that way has Lara in her current outfit and no Doppelgänger. (The PC's own menu then lets the player pick an outfit again where its rule offers the selection) | ✅ static / live (direct change) | ENGINE §4.2 "PC mission start vs level.load: the DLC player" |
 
 ## 13. Xbox vs PC and the title update (game level)
 

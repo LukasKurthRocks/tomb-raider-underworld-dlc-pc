@@ -1,0 +1,55 @@
+# TruMenu 0.22.50 (W8: readable sound log, FMOD's own channel list, the two source hooks) - kW8Checks, in this order.
+# Run: ../bin/pyt -t 120 tools/pe_bytes_check.py ../data/pc/tru.exe --file work/menu50_1411/precheck_02250.txt
+# Listings: work/menu50_1411/dis_591330.txt, dis_58bfc0.txt, dis_5935d0.txt, dis_7bcae0.txt, work/fmod_1411/dis_5b99c0.txt,
+# work/fmod_1411/dis_channeli_all.txt; design: workspace docs\Befund-FMOD-Kanaele-1411.md sections 1 / 4.
+#
+# --- V1: voice -> emitter. The wave node ctor 0x591220 (thiscall, esi = the node): +8 params, +0xc group params,
+# +0x10 = its 4th argument = the emitter the walker 0x5920b0 passes down
+0059122e 8b7c2420 894608 8b442414 896e0c 897e10
+# .. VoicePool::Play(sample = [wave entry + 4]) at 0x591351 (the call rel32 TruMenu redirects), then test eax,
+# node +0x14 = the voice, je (no voice)
+00591348 8b5b04 53 b908818a00 e86aacffff 85c0 894614 0f8466ffffff
+# VoicePool::Play 0x58bfc0: thiscall (ecx = the pool 0x8a8108), one stack argument - ret 4 at its three exits; esi pushed
+0058bfc0 55 8bec 83e4f0 83ec14 53 56 8bf1
+0058bff0 c20400
+0058c01c c20400
+0058c12b c20400
+#
+# --- E1: emitter -> instance. The anim sound event 0x5b99c0 (kind 0; ebp frame, [ebp+8] = the payload, [ebp+0xc] = the
+# instance): the emitter create call at 0x5b99f7 (left untouched - TruTrace tells this branch by its return address
+# 0x5b99fc), then at 0x5b99fc the 6 bytes TruMenu replaces (mov eax,[esp+0x18] = the handle; test eax,eax) and the je
+005b99c0 55 8bec 83e4f0 83ec34 53 56 8b7508
+005b99e4 8b4604 51 d91c24 50 8d4c2420 51 8b0d00818a00 e8d49bfdff 8b442418 85c0
+005b9a02 0f842b020000
+# .. [ebp+0xc] is the instance: its sound list [inst+0x248] (edi = [ebp+0xc])
+005b9a1f 8b7d0c
+005b9ac0 8b8f48020000
+# the emitter create 0x5935d0: thiscall (the sound manager [0x8a8100]), (&handle out, section, float) - ret 0xc at
+# every exit; *out = 0 when there is no section data
+005935d0 53 57 8b7c2410 85ff 8bd9 750f 8b44240c 5f c70000000000 5b c20c00
+005936bf c20c00
+00593712 c20c00
+#
+# --- FMOD Ex (linked into tru.exe): every channel, not only the voice pool's
+# SystemI +0x150 = the list of used channels, walked as System::update's setter loop 0x7bcae6 does (head, ChannelI =
+# node, next = [node], end = the head)
+007bcae6 8d9e50010000 8b3b
+007bcb0a 8bcf e897c90000
+007bcb24 8b3f 3bfb 75cc
+# handle -> ChannelI as the validator 0x7c7e5a: slot = handle >> 16 & 0xfff, < count +0x148, array +0x14c, 0x1b8 bytes
+# each, reuse count = ChannelI +0x70
+007c7e65 c1ee10 81e6ff0f0000
+007c7ea9 3bb048010000 7de4 69f6b8010000 03b04c010000
+007c7ec1 8b4670 3b4508
+# ChannelI +0x74 bit 3 = FMOD's effective mute (setMute 0x7c92b5 sets it with the group chain, clears it on unmute)
+007c92fb 834e7408 395e2c 7e38 8b0f d9ee 8b01 51 d91c24 ff503c
+007c9325 d986b8000000 836674f7
+# real channel +0x68 bit 0x20 = effectively paused (ChannelI::setPaused 0x7c9beb)
+007c9c82 83486820
+# real channel +0x64 = the channel's mode (getter 0x7c9863 = [[ChannelI+0x30]+0x64]; copied from the sound's +0x18 at
+# the channel start 0x7c88ba): FMOD_LOOP_NORMAL 0x2 / FMOD_LOOP_BIDI 0x4 = loops, FMOD_3D 0x10
+007c9870 8b4130 85c0 7504 6a24 ebf2 8b4064 8902 33c0 c20400
+007c88ba 8b4b18 894864
+# ChannelI +0x8c = its channel group (setMute's chain), ChannelGroupI +0x1c = the parent (addGroup 0x7c4a30)
+007c92d4 834e7402 eb04 836674fd 8b868c000000 385858 7509 8b401c 3bc3 75f4
+007c4acf 897e1c

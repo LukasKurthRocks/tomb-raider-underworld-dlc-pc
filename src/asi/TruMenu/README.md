@@ -2928,6 +2928,126 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.50 - the sound log readable, every FMOD channel, two source hooks, one Ambient aus, Kapitel from the main menu (2026-11-14)
+
+Built into `work\asi\menu0273`, not installed, no live test (owner live wishes of 14.11.; report in the workspace
+`docs\Befund-TruMenu-02250-1411.md`, design `docs\Befund-FMOD-Kanaele-1411.md`). 27 byte checks `kW8Checks`
+(`work\menu50_1411\precheck_02250.txt`, 0 mismatches on `data\pc\tru.exe`; start line `0.22.50 sound log: checks ok (27
+rows) ...`), two small code redirects (V1 5 bytes, E1 6 bytes; only with `[Sound] SourceHooks=1`, the default).
+
+- **The bottom-right box, line by line** (`snd.list` + `snd.logview`): `[box] [kind icon] [loop mark] 19:14:02
+  viking_axe_hit ×3  <- viking_thrall #8783  |  g29 Gegner-Ausrüstung  12 m`.
+  - The **box** is FMOD's own state, not TruMenu's rule: filled = audible, an outline = muted (ChannelI +0x74 bit 3 =
+    FMOD's effective mute - the channel's own bit or a muted channel group above it), as every bool row of the bar.
+    It is read without an FMOD call (handle -> ChannelI exactly as the validator 0x7c7e5a: slot = handle >> 16 & 0xfff,
+    `[SystemI+0x14c] + slot * 0x1b8`, the full handle at +0x70) at the start and every 200 ms while the channel lives;
+    an ended sound keeps its last state.
+  - The **group** as text (`g29 Gegner-Ausrüstung`, `g69 Lara-Stimme`, `g14 Welt-Standard` - the monitor's table).
+  - The **loop mark** (an open circle with an arrow, draw-list primitives - the bar font has no such glyph): the real
+    channel's mode +0x64 has FMOD_LOOP_NORMAL 0x2 / FMOD_LOOP_BIDI 0x4 (getter 0x7c9863, copied from the sound at the
+    channel start 0x7c88ba).
+  - **Repetitions collapse** (`[Sound] LogCollapse`, default 1): same wave + same source (a stream: same name) = one
+    line with `×n` and the newest time; every new start moves it to the top. 0 = one line per start (0.22.47).
+  - **"läuft gerade"** block on top: the looping channels now (from the voice list), one line per wave + source with
+    `×n` while they play; below only the new sounds.
+  - Header: `(n voices, k playing; FMOD u, others x)`; a yellow filter line names what is hidden.
+- **Source** (`[Sound] SourceHooks`): two `call rel32` redirects through AiPatch (only over the game's rel32 - another
+  value = refused, nothing written, one line; back only over ours, at unload `W8Shutdown`), written once on the game
+  thread (first pad poll):
+  - **V1 0x591351** = `call VoicePool::Play` inside the wave node ctor 0x591220 (esi = the node; node +0x10 = the
+    emitter = the ctor's 4th argument). `W8PlayStub` calls Play with the same argument (thiscall, `ret 4`), then
+    records {voice, voice +4 = its channel, emitter} - exact for every wave, also under inner SoundPlex nodes where the
+    0.22.47 params walk gave "emitter ?".
+  - **E1 0x5b99fc** = the 6 bytes right after `call 0x5935d0` (the emitter create, 0x5b99f7) inside the anim sound
+    event 0x5b99c0 (`[ebp+0xc]` = the instance): `mov eax,[esp+0x18]; test eax,eax` (the handle the create wrote) ->
+    `call W8EmitStub; nop`. The create call itself stays the game's: **TruTrace** (installed) tells this anim sound
+    branch by that call's return address 0x5b99fc and checks the bytes up to it - a redirected call would hide it.
+    `W8EmitStub` does the same mov / test (one return address deeper: `[esp+0x1c]`) around the record {emitter ->
+    instance, intro, object, section id}. These emitters leave `[inst+0x248]` at once (payload byte 1 bit 0, 0x5b9aad)
+    - the 0.22.47 list could never name them. A lookup trusts a record only while the emitter still has the emitter
+    vtable 0x851240 and the same section id. Written by `W8E1Set` only over the game's 6 bytes (read back), back only
+    over ours.
+  - Both stubs keep every register and the flags as the game's code would; their compiled bytes are checked by
+    `work\menu50_1411\stub_bytes.py` (one match each, both callbacks `__stdcall` with `ret 8`).
+  - Source text: the player instance = `Lara`, else `<object> #<intro>`; then the owner list of `[inst+0x248]`;
+    `Level / Skript` only when that list is fresh (else `Emitter (Quelle offen)` - no wrong answer).
+- **Faster menu** (owner: "Menü wird langsamer"): `W7OwnBuild` (a walk over every instance) runs at most once a second
+  and only while the box or the monitor rows are drawn (was every 250 ms whenever a source was asked); `W6EmitterOwner`
+  (one more walk over every instance per watched-wave start) is gone - the wave 10 log line takes the source from
+  hook E1 / the owner list.
+- **Filters** (bar page Spiel-Einstellungen / Ton / **Ton-Log (unten rechts)**, items, live, INI-backed - the items
+  write TruMenu.ini, `W8ReadSwitch` re-reads it about once a second): per kind show / hide (`snd.logcat
+  <lara|enemies|world|objects|ui|speech|music> [1|0]`, `[Sound] LogLara` .. `LogMusic`), `snd.logaudible`
+  (`LogOnlyAudible`), `snd.logcollapse` (`LogCollapse`), `snd.logdist <m>` (`LogMaxDist`, a switch row). The kind of a
+  sound comes from its group (`kW8GroupCat`, proposal by group content: Lara = body / gear / weapons, enemies = creatures
+  + enemy gear / voices, world = ambience 14 .. 24 + effect nodes, objects = mechanisms / traps / debris / explosions,
+  PDA / UI = HUD / menu / PDA / binoculars, speech = voices / Lara's voice + hints / radio / cutscenes) - the music /
+  speech slider categories win.
+- **Quick hearing** (same group): per kind **Stumm** (`snd.catmute <kind> [1|0]` = `snd.mute cat:<kind>`) and **Solo**
+  (`snd.catsolo <kind> [1|0]` = `snd.solo cat:<kind>`), **Neuester Ton solo** (`snd.solonew`: the wave, else the emitter,
+  of the newest start = the top line), **Alles zurück** (`snd.mute all 0`). A category rule mutes (a) every largest
+  sub-tree of groups that lies wholly in the kind with FMOD's `ChannelGroupI::setMute` (parent = group entry +0x68; 57
+  PDA is no such sub-tree - its child 70 is Lara's hints), so channels started later and **channels outside the voice
+  pool** in those groups are muted too, (b) every pool voice of the kind per channel, (c) every used FMOD channel outside
+  the pool (oscillator / DSP, `SystemI+0x150`) of the kind through its own handle (ChannelI +0x70) - never over a
+  foreign mute bit, back only what TruMenu muted. Music = the one "Musik aus" (`media.mutemusic`). A solo mutes the DSP
+  channels too (a wave solo: all of them - they have no wave).
+- **Monitor** (Ton-Monitor / Aktive Stimmen): `-- FMOD: n Kanäle belegt (p Pool, x fremd)` from FMOD's own list of used
+  channels (`SystemI+0x150`, walked as System::update's loop 0x7bcae6); each voice row shows FMOD's mute / pause bits
+  and `(Schleife)`; rows `Fremdkanal (DSP)` with group and state (right twice = their whole group); the music slots as
+  rows of their own (`Musik-Slot n: <track>` - läuft / startet / von TruMenu gestoppt / Musik aus). Squares as the bar:
+  filled = audible. `snd.fmod`: every used channel to TruMenu.log (pool / EXTRA, flags, mode, group, volume).
+- **One "Ambient aus", one "Musik aus"** (owner: two of each): `media.muteambient` and `snd.ambmute` are now the same
+  switch - `snd.mute ambience` = sound groups 15 .. 24 (FMOD channel group mute) **and** the `_amb_` srmusic beds - kept
+  in `[Media] MuteAmbient` (W6Check turns a kept 1 into the rule at the start; `snd.mute all 0` ends it too); without
+  the W6 checks the 0.20 bed stop is the fallback. "Musik aus (Kanäle)" (`music.mute`) was the same command as "Musik
+  aus" (`media.mutemusic`) - one row now. Old names stay as items. Page Spiel-Einstellungen / Ton: "Musik aus",
+  "Ambient aus (Umgebung + DLC-2-Betten)"; group "Ton einzeln" without the two duplicates; Paket B: copies.
+- **Page Kapitel from the main menu** (owner: the chapter rows used `level.load`, refused in the front end since
+  0.22.46; live 19:14 Kapitel -> `dlc_level2_start` from `dlc_water_wheel` loaded the unit with Lara in her gold bikini,
+  no doppelganger): `ChapSteps` decides when the row is pressed - main menu (main state 10) = the game's mission start
+  (`save.backup kapitel;level.start dlc1|dlc2` for the two DLC start rows = exactly the DLC menu's start with the title
+  update's outfit rule, `level.start <unit> 0` for every other unit as `arena.go`); in a level = `level.load` as
+  before, but the two DLC start rows are **refused** there ("nur aus dem Hauptmenü ... level.load behält Laras
+  Kostüm"). Why: the mission start (f27(unit, select, 0, 1), 4th argument 1 = new game data) clears the chosen costume
+  (game data +0x20c / +0x20e / +0x210 - the TU's `MainTracker_UILoadLevel` 0x8247d818 -> reset 0x821fe9a8), so the unit's
+  default costume loads (DLC 2: `lara_doppelganger` -> TruDlc2Player `doppelganger_casual` + DoppelgangerInit + tracker
+  +0x1244 = 1); a `level.load` keeps the game data, so the current outfit stays and DoppelgangerInit never runs. No
+  verified way back to the main menu from a level exists in TruMenu - so a refusal, not a half-set player. `cp.jump`
+  from the main menu uses `level.start <unit> 0` instead of `unit.go`. Covered: the static chapter rows, the unit rows of
+  every chapter group, favourites `level.load <unit>`, the Tests rows with `level.load` + backup, the long menu's
+  backup rows. The regress lists (`tests/regress/dlc1.txt` steps 3 / dlc1-treasure, `dlc2.txt` step 4) prepare with
+  `level.load` **inside** the DLC (after the DLC start of step 2) - unchanged.
+- Page Tests: **"Paket B2: Ton-Log"** (copies of the Ton-Log / Ton-Monitor rows, checks B2.1 - B2.7).
+- Options: `[Sound] SourceHooks`, `LogLara`, `LogEnemies`, `LogWorld`, `LogObjects`, `LogUi`, `LogSpeech`, `LogMusic`,
+  `LogOnlyAudible`, `LogCollapse`, `LogMaxDist`; switch group `tmtonlog`. Items: `snd.logcat`, `snd.logaudible`,
+  `snd.logcollapse`, `snd.logdist`, `snd.catmute`, `snd.catsolo`, `snd.solonew`, `snd.fmod`, `snd.hooks`.
+- Checks: `trumenu_ini_check` `check_02250`; `check_02244` (Paket B2, key count), `check_02245` (W6EmitterOwner gone,
+  merged rows), `check_02249` version part adapted; negative cases `work\menu50_1411\m50_negative_tests.py`.
+
+### TO TEST 0.22.50
+
+| # | Where | Do | Expected |
+|---|---|---|---|
+| 1 | start | read `TruMenu.log` | `0.22.50 sound log: checks ok (27 rows); [Sound] SourceHooks 1 ...`; at the first pad poll `0.22.50 sound log: source hooks on - V1 0x591351 ... E1 0x5b99fc after the create call 0x5b99f7 ...` (no `refused`); TruTrace's sound category still reports anim sounds (kind 1) |
+| 2 | Spiel-Einstellungen / Ton / Ton-Log | "Ton-Anzeige unten rechts" on, walk, fight in l7 (Arena 1a) | lines `[■][icon] 19:.. name ×n <- viking_thrall #8783  \|  g29 Gegner-Ausrüstung  12 m`; Lara's breath / voice `<- Lara`; a click in the menu `<- UI` |
+| 3 | same | repeated sound (steps, axe) | one line with `×n`, it jumps to the top on every new start (B2.3) |
+| 4 | Sonar open (PDA) | look at the top of the box | block "läuft gerade" with the loop mark: `computer_hum_12` / `_04` (g57); the ping without the loop mark |
+| 5 | Ton-Log | "Stumm: Gegner" right | `snd.mute: group 27 / 28 / 29 ... muted` lines; enemy lines turn to an outline box, `(stumm)`; enemies silent; left = back (B2.4) |
+| 6 | Ton-Log | "Solo: Lara" right | only Lara's body / gear / weapons audible; voices / ambience outline boxes; again = off |
+| 7 | Ton-Log | "Neuester Ton solo" | log `snd.solonew ... -> snd.solo w<id>`; only that sound; "Alles zurück" = everything back |
+| 8 | Ton-Log | "Zeigen: Welt / Umgebung" left, "Nur hörbare Zeilen" right, "Höchstens so weit weg" 20 | ambience lines gone, muted lines gone, far 3D sounds gone; yellow filter line; `TruMenu.ini` `[Sound] LogWorld=0`, `LogOnlyAudible=1`, `LogMaxDist=20` |
+| 9 | Ton-Monitor / Aktive Stimmen | read the head | `-- FMOD: n Kanäle belegt (p Pool, x fremd)`; music slot rows; a muted voice row = outline square, `stumm` |
+| 10 | anywhere | "Alle FMOD-Kanäle ins Log" | `snd.fmod ...` lines, `pool` / `EXTRA`; with an oscillator sound: `EXTRA` + a `Fremdkanal (DSP)` row in the monitor |
+| 11 | menu with the monitor open for a minute | navigate | not slower than with the monitor closed (B2.5); `snd.hooks`: owner list walks about 1 per second while shown, 0 while closed |
+| 12 | Spiel-Einstellungen / Ton | read the rows | ONE "Musik aus", ONE "Ambient aus (Umgebung + DLC-2-Betten)"; "Ton einzeln" without them (B2.6); Ambient aus on: wind / water / animals go, `_amb_` bed stops, restart: still on (`[Media] MuteAmbient=1`) |
+| 13 | main menu, page Kapitel | "1 Mittelmeer" right twice | log `shortcut 'save.backup kapitel;level.start l1_seatop 0' (main menu: the game's mission start)`; the level starts (B2.7) |
+| 14 | main menu, page Kapitel | "DLC 2 Laras Schatten" right twice | `level.start dlc2`; DLC 2 starts as from the DLC menu: doppelganger, `TruDlc2Player ... DoppelgangerInit finished`; `arena.mode`: doppelganger byte 1 |
+| 15 | main menu, page Kapitel | "DLC 1 Unter der Asche" right twice | `level.start dlc1`; the outfit / weapon screen as in the DLC menu |
+| 16 | in a level (DLC 1), page Kapitel | `dlc_level2_start` right twice | refused: "DLC 2 nur aus dem Hauptmenü (Pause -> Hauptmenü, dann diese Zeile) ..." - nothing loads |
+| 17 | in a level | a base-game unit row | `level.load` as before |
+| 18 | main menu, Kapitel, a checkpoint row | right twice | `cp.jump`: `level.start <unit> 0;wait.unit ...;player.goto ...` |
+
 ## 0.22.49 - sonar: all connected areas + map of this unit; adrenaline options, "Adrenalin bleibt voll" (2026-11-14)
 
 Built into `work\asi\menu0272`, not installed, no live test (owner live notes of 14.11. 16:28 - 16:33, Arena 1a; report in
@@ -5967,6 +6087,17 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Sonar] FloorMarkers` | 0 | 0.22.48 (`sonar.markers`): only with `FullMap=1`: 1 = every stair / floor-change marker of the loaded units (0x6e40c6), not only the ones a ping saw; 0 = the game's. Live |
 | `[Sonar] AllFloors` | 0 | 0.22.49 (`sonar.allfloors`, "Alle verbundenen Bereiche"): only with `FullMap=1`: 1 = the sonar frame 0x6e4130 also draws the map units of other floors that the sonar loaded itself (0x6e429b `74 1d` -> `90 90`: the floor test `[unit+0xb0] & [0xedf268]` skipped). Loaded are only the units the game's own open path asks for - the floor's units and their direct portal neighbours of any floor - so no load is added and streaming is not touched; display only. Live |
 | `[Sonar] TriangleCap` | 300000 | 0.22.49 ("Sonar komplett: Dreiecks-Grenze"): only with `FullMap=1`: the sonar's per-frame triangle budget - TruMenu writes `cap - 1` into the imm32 of `cmp dword [0xee03e8], 0x16d83` (0x6dfa6f); values up to 93572 = the game's bytes, at most 1000000. A budget only (the triangles are flushed in batches of 2000 into the render device's growing dynamic vertex pool, 84 bytes each: 300000 = about 25 MB of vertex buffers per sonar frame). Live |
+| `[Sound] SourceHooks` | 1 | 0.22.50: 1 = the two small code redirects that name a sound's source exactly - V1 0x591351 (the wave node's `call VoicePool::Play` -> a stub: voice -> the node's emitter +0x10) and E1 0x5b99fc (the 6 bytes after the anim sound event's untouched `call 0x5935d0` -> a stub: emitter -> the event's instance `[ebp+0xc]`); written on the game thread only over the game's bytes, put back at unload; 0 = the owner list of `[inst+0x248]` only. Read at the start |
+| `[Sound] LogLara` | 1 | 0.22.50 (`snd.logcat lara`): the sound box shows Lara's body / gear / weapons sounds. Live |
+| `[Sound] LogEnemies` | 1 | 0.22.50 (`snd.logcat enemies`): enemies and creatures. Live |
+| `[Sound] LogWorld` | 1 | 0.22.50 (`snd.logcat world`): world and ambience (groups 14 .. 24 and the effect nodes). Live |
+| `[Sound] LogObjects` | 1 | 0.22.50 (`snd.logcat objects`): objects, mechanisms, traps, debris, explosions. Live |
+| `[Sound] LogUi` | 1 | 0.22.50 (`snd.logcat ui`): HUD, menu, PDA / sonar, binoculars. Live |
+| `[Sound] LogSpeech` | 1 | 0.22.50 (`snd.logcat speech`): Lara's voice and hints, radio, cutscene speech. Live |
+| `[Sound] LogMusic` | 1 | 0.22.50 (`snd.logcat music`): music voices and streams. Live |
+| `[Sound] LogOnlyAudible` | 0 | 0.22.50 (`snd.logaudible`): 1 = the box hides lines FMOD mutes or pauses (ChannelI +0x74 bit 3 / real channel +0x68 bit 0x20). Live |
+| `[Sound] LogCollapse` | 1 | 0.22.50 (`snd.logcollapse`): 1 = same wave + same source = one line with `×n` and the newest time, moving to the top on every new start; 0 = one line per start. Live |
+| `[Sound] LogMaxDist` | 0 | 0.22.50 (`snd.logdist`): the box hides 3D sounds farther from Lara than n metres (0 = every distance), 0 .. 500. Live |
 
 ## Build, install, test (Windows)
 
