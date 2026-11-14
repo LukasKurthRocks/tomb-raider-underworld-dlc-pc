@@ -1,0 +1,30 @@
+positive (unchanged source): 0 problem(s) ok
+case version             : 1 problem(s) ok - TruMenu.cpp: kVersion must start with "TruMenu 0.22.46 (arena from the main menu"
+case check row changed   : 1 problem(s) ok - TruMenu.cpp: kFeChecks (10 rows) must be the 10 rows of precheck_02246.txt in order
+case check row dropped   : 1 problem(s) ok - TruMenu.cpp: kFeChecks (9 rows) must be the 10 rows of precheck_02246.txt in order
+case FeCheck order       : 1 problem(s) ok - TruMenu.cpp: the load must call FeCheck right after g_pendingOk = PendingCheck()
+case FeCheck no pending  : 1 problem(s) ok - TruMenu.cpp: FeCheck must test every kFeChecks row after the main state / pending checks and log
+case stale any state     : 1 problem(s) ok - TruMenu.cpp: FeStaleRequest = g_feOk and main state 10 only
+case front end 1         : 1 problem(s) ok - TruMenu.cpp: FeInFrontEnd = g_feOk and main state 6 / 10
+case pending ignores b9  : 1 problem(s) ok - TruMenu.cpp: LevelChangePending may skip +0xb9 only through FeStaleRequest
+case load not refused    : 1 problem(s) ok - TruMenu.cpp: LoadUnit must refuse the front end before the request
+case select ignored      : 1 problem(s) ok - TruMenu.cpp: RunLevelStart must hold int select = given >= 0 ? given : MissionSelectArg(unit);
+case select 0 unchecked  : 1 problem(s) ok - TruMenu.cpp: RunLevelStart must hold if (given == 0 && !g_outfitRuleOk) {
+case select any word     : 1 problem(s) ok - TruMenu.cpp: RunLevelStart must hold words > 2 || (words == 2 && given < 0)
+case runner no unit      : 1 problem(s) ok - TruMenu.cpp: ShortcutTick must wait for the unit of level.start <unit> 0|1 and log "level up"
+case runner no log       : 1 problem(s) ok - TruMenu.cpp: ShortcutTick must wait for the unit of level.start <unit> 0|1 and log "level up"
+case menu branch late    : 1 problem(s) ok - TruMenu.cpp: RunArenaGo: pending test, main menu -> ArenaGoMenu, no level / cutscene refused, then the 0.22.32 mode read
+case no level allowed    : 1 problem(s) ok - TruMenu.cpp: RunArenaGo: pending test, main menu -> ArenaGoMenu, no level / cutscene refused, then the 0.22.32 mode read
+case cutscene allowed    : 1 problem(s) ok - TruMenu.cpp: RunArenaGo: pending test, main menu -> ArenaGoMenu, no level / cutscene refused, then the 0.22.32 mode read
+case in-level steps      : 1 problem(s) ok - TruMenu.cpp: RunArenaGo: the in-level steps must stay (0.22.32)
+case menu steps load     : 1 problem(s) ok - TruMenu.cpp: ArenaGoMenu must hold "save.backup kapitel;level.start %s 0;wait.unit %s;cheat.flight 1;player.goto %ld force;"         "%sarena.mode %s"
+case menu select 1       : 1 problem(s) ok - TruMenu.cpp: ArenaGoMenu must hold "save.backup kapitel;level.start %s 0;wait.unit %s;cheat.flight 1;player.goto %ld force;"         "%sarena.mode %s"
+case menu no ohk         : 1 problem(s) ok - TruMenu.cpp: ArenaGoMenu must hold ohk ? "cheat.onehitkill 0;" : ""
+case ohk without gate    : 1 problem(s) ok - TruMenu.cpp: ArenaGoMenu must hold const bool ohk = g_cheatsEnabled && g_ohkOk;
+case menu no gates       : 1 problem(s) ok - TruMenu.cpp: ArenaGoMenu must hold if (!g_feOk || !g_missionOk || !g_experimental) {
+case menu any fe state   : 1 problem(s) ok - TruMenu.cpp: ArenaGoMenu must hold if (fe != 3) {
+case menu movie ok       : 1 problem(s) ok - TruMenu.cpp: ArenaGoMenu must hold movie && ReadByte(kW3BinkLoop, &loop) && !loop
+case menu writes         : 1 problem(s) ok - TruMenu.cpp: bool ArenaGoMenu must not write game memory
+case mode no ohk         : 1 problem(s) ok - TruMenu.cpp: arena.mode must log the unit and the one-hit kill byte
+case Paket A note        : 1 problem(s) ok - TruMenu.cpp: the Paket A note must name the main menu
+28 cases + 1 positive, 0 failed

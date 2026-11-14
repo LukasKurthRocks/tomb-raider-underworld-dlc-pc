@@ -1,0 +1,2 @@
+0x005df8d3  cmp byte ptr [edi + 0xb9], 0
+0x006d987c  cmp byte ptr [ecx + 0xb9], 0

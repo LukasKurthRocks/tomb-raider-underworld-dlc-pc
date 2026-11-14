@@ -225,6 +225,8 @@ TruQoL | Startup | SkipIntro | bool | Start-Intro überspringen | Skip start-up 
 TruQoL | Fixes | FrontEndPauseBit | bool | Hauptmenü-Uhren nach Pause normal | Main menu clocks normal after pause | live | 0 | Altes Pause-Bit im Hauptmenü löschen (Teaser nach 40 s) // Clears the stale pause bit in the main menu (teaser 40 s) | TruQoL 0.1.4
 # 2026-11-11 (Q69): TruQoL 0.1.6 - RetryOnLock patches the save / load CreateFileW call 0x6db6d0 once at the start (restart)
 TruQoL | Save | RetryOnLock | bool | Speichern: bei gesperrter Datei erneut versuchen | Save: retry a locked file | restart | 0 | Anderes Programm haelt die Datei: bis 10 x 100 ms warten // Another program holds the file: up to 10 x 100 ms | TruQoL 0.1.6
+# 2026-11-14 (PT.2, row added with TruMenu 0.22.46): TruQoL 0.1.8 - ReleaseWalk patches the render device's release walk 0x47ab90 once at the start (restart)
+TruQoL | Fixes | ReleaseWalk | bool | Absturz beim Neuladen (Freigabe-Liste) | Reload crash (release list) | restart | 0 | Freigaben per Index statt Zeiger (0x47ab90; Pranger) // Releases by index, not pointer (0x47ab90; pillory) | TruQoL 0.1.8
 
 # 2026-11-11 (Q36): TruMenu 0.22.24 - its own [Rescue] FallNet in TruMenu.ini (re-read about once a second = live)
 group | rettung | Rettung (TruMenu) | Rescue (TruMenu)

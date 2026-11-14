@@ -1,0 +1,153 @@
+0077c190  e8eb23d4ff           call    0x4be580
+0077c195  e84624d4ff           call    0x4be5e0
+0077c19a  e8714dd2ff           call    0x4a0f10
+0077c19f  c70560ede70008000000 mov     dword ptr [0xe7ed60], 8
+0077c1a9  c3                   ret     
+0077c1aa  cc                   int3    
+0077c1ab  cc                   int3    
+0077c1ac  cc                   int3    
+0077c1ad  cc                   int3    
+0077c1ae  cc                   int3    
+0077c1af  cc                   int3    
+0077c1b0  e98b70d0ff           jmp     0x483240
+0077c1b5  cc                   int3    
+0077c1b6  cc                   int3    
+0077c1b7  cc                   int3    
+0077c1b8  cc                   int3    
+0077c1b9  cc                   int3    
+0077c1ba  cc                   int3    
+0077c1bb  cc                   int3    
+0077c1bc  cc                   int3    
+0077c1bd  cc                   int3    
+0077c1be  cc                   int3    
+0077c1bf  cc                   int3    
+0077c1c0  a0dfe8fa00           mov     al, byte ptr [0xfae8df]
+0077c1c5  c3                   ret     
+0077c1c6  cc                   int3    
+0077c1c7  cc                   int3    
+0077c1c8  cc                   int3    
+0077c1c9  cc                   int3    
+0077c1ca  cc                   int3    
+0077c1cb  cc                   int3    
+0077c1cc  cc                   int3    
+0077c1cd  cc                   int3    
+0077c1ce  cc                   int3    
+0077c1cf  cc                   int3    
+0077c1d0  8a442404             mov     al, byte ptr [esp + 4]
+0077c1d4  a2dfe8fa00           mov     byte ptr [0xfae8df], al
+0077c1d9  c3                   ret     
+0077c1da  cc                   int3    
+0077c1db  cc                   int3    
+0077c1dc  cc                   int3    
+0077c1dd  cc                   int3    
+0077c1de  cc                   int3    
+0077c1df  cc                   int3    
+0077c1e0  51                   push    ecx
+0077c1e1  a158dbfa00           mov     eax, dword ptr [0xfadb58]
+0077c1e6  85c0                 test    eax, eax
+0077c1e8  7504                 jne     0x77c1ee
+0077c1ea  32c0                 xor     al, al
+0077c1ec  59                   pop     ecx
+0077c1ed  c3                   ret     
+0077c1ee  d98010090000         fld     dword ptr [eax + 0x910]
+0077c1f4  a194f0e700           mov     eax, dword ptr [0xe7f094]
+0077c1f9  8b4850               mov     ecx, dword ptr [eax + 0x50]
+0077c1fc  d9e0                 fchs    
+0077c1fe  0fbf91b2000000       movsx   edx, word ptr [ecx + 0xb2]
+0077c205  891424               mov     dword ptr [esp], edx
+0077c208  db0424               fild    dword ptr [esp]
+0077c20b  ded9                 fcompp  
+0077c20d  dfe0                 fnstsw  ax
+0077c20f  f6c441               test    ah, 0x41
+0077c212  7a07                 jp      0x77c21b
+0077c214  b801000000           mov     eax, 1
+0077c219  59                   pop     ecx
+0077c21a  c3                   ret     
+0077c21b  33c0                 xor     eax, eax
+0077c21d  59                   pop     ecx
+0077c21e  c3                   ret     
+0077c21f  cc                   int3    
+0077c220  56                   push    esi
+0077c221  8b742408             mov     esi, dword ptr [esp + 8]
+0077c225  68c0f0e700           push    0xe7f0c0
+0077c22a  8bce                 mov     ecx, esi
+0077c22c  e85f68d2ff           call    0x4a2a90
+0077c231  8bc6                 mov     eax, esi
+0077c233  5e                   pop     esi
+0077c234  c20400               ret     4
+0077c237  cc                   int3    
+0077c238  cc                   int3    
+0077c239  cc                   int3    
+0077c23a  cc                   int3    
+0077c23b  cc                   int3    
+0077c23c  cc                   int3    
+0077c23d  cc                   int3    
+0077c23e  cc                   int3    
+0077c23f  cc                   int3    
+0077c240  a0d9e8fa00           mov     al, byte ptr [0xfae8d9]
+0077c245  c3                   ret     
+0077c246  cc                   int3    
+0077c247  cc                   int3    
+0077c248  cc                   int3    
+0077c249  cc                   int3    
+0077c24a  cc                   int3    
+0077c24b  cc                   int3    
+0077c24c  cc                   int3    
+0077c24d  cc                   int3    
+0077c24e  cc                   int3    
+0077c24f  cc                   int3    
+0077c250  8a442404             mov     al, byte ptr [esp + 4]
+0077c254  a2d9e8fa00           mov     byte ptr [0xfae8d9], al
+0077c259  c3                   ret     
+0077c25a  cc                   int3    
+0077c25b  cc                   int3    
+0077c25c  cc                   int3    
+0077c25d  cc                   int3    
+0077c25e  cc                   int3    
+0077c25f  cc                   int3    
+0077c260  e97b94e5ff           jmp     0x5d56e0
+0077c265  cc                   int3    
+0077c266  cc                   int3    
+0077c267  cc                   int3    
+0077c268  cc                   int3    
+0077c269  cc                   int3    
+0077c26a  cc                   int3    
+0077c26b  cc                   int3    
+0077c26c  cc                   int3    
+0077c26d  cc                   int3    
+0077c26e  cc                   int3    
+0077c26f  cc                   int3    
+0077c270  e9db94e5ff           jmp     0x5d5750
+0077c275  cc                   int3    
+0077c276  cc                   int3    
+0077c277  cc                   int3    
+0077c278  cc                   int3    
+0077c279  cc                   int3    
+0077c27a  cc                   int3    
+0077c27b  cc                   int3    
+0077c27c  cc                   int3    
+0077c27d  cc                   int3    
+0077c27e  cc                   int3    
+0077c27f  cc                   int3    
+0077c280  8a442404             mov     al, byte ptr [esp + 4]
+0077c284  3c09                 cmp     al, 9
+0077c286  7323                 jae     0x77c2ab
+0077c288  a2dae8fa00           mov     byte ptr [0xfae8da], al
+0077c28d  e8ee22d4ff           call    0x4be580
+0077c292  e8c922d4ff           call    0x4be560
+0077c297  e84490d4ff           call    0x4c52e0
+0077c29c  c60540f1e7000a       mov     byte ptr [0xe7f140], 0xa
+0077c2a3  c60543f1e70000       mov     byte ptr [0xe7f143], 0
+0077c2aa  c3                   ret     
+0077c2ab  0fb6c0               movzx   eax, al
+0077c2ae  89442404             mov     dword ptr [esp + 4], eax
+0077c2b2  e9e994ecff           jmp     0x6457a0
+0077c2b7  cc                   int3    
+0077c2b8  cc                   int3    
+0077c2b9  cc                   int3    
+0077c2ba  cc                   int3    
+0077c2bb  cc                   int3    
+0077c2bc  cc                   int3    
+0077c2bd  cc                   int3    
+0077c2be  cc                   int3    
+0077c2bf  cc                   int3    

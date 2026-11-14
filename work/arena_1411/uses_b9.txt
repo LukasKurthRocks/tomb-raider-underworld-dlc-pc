@@ -1,0 +1,11 @@
+0x005de864  cmp byte ptr [0xe7f141], bl
+0x005de86c  mov byte ptr [0xe7f141], bl
+0x005de9e9  mov byte ptr [0xe7f140], 0
+0x005dea49  mov byte ptr [0xe7f140], 8
+0x005df88a  mov byte ptr [0xe7f141], al
+0x005df88f  mov byte ptr [0xe7f140], bl
+0x005dfba0  cmp byte ptr [0xe7f141], 0
+0x005dfc07  cmp byte ptr [0xe7f140], 3
+0x007744ce  mov byte ptr [0xe7f141], 0
+0x0077c29c  mov byte ptr [0xe7f140], 0xa
+0x0077e48a  mov byte ptr [0xe7f140], 2

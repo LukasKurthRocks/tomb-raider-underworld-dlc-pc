@@ -2928,6 +2928,79 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.46 - arena from the main menu, GameTracker+0xb9 in the front end (2026-11-14)
+
+Built into `work\asi\menu0269`, not installed, no live test (finding in the workspace
+`docs\Befund-Arena-Hauptmenue-1411.md`). Owner live 2026-11-14 12:07, Paket A "Arena 1a" from the main menu: `arena.go
+1a: refused: level change pending (GameTracker+0xb9 = 1)`. 10 byte checks `kFeChecks`
+(`work\arena_1411\precheck_02246.txt`, start line `0.22.46 front end: checks ok (10 rows)`), no hook, no patch, no INI
+key.
+
+- **What the `+0xb9 = 1` in the main menu was** (TruMenu.log of that session + static reading, `tools/pe_abs_uses.py`
+  0xe7f140 / 0xe7f141, `tools/pe_disp_scan.py` +0xb8 / +0xb9, `tools/pe_dis.py`): the first click at 12:07:21 was
+  accepted; its step `unit.go l7_helheim03` became `level.load l7_helheim03` (`level change to 'l7_helheim03' requested`
+  12:07:21.658). That call (GAMELOOP_RequestLevelChangeByName 0x5df8c0 -> 0x5df760) sets `+0xb9 = 1` and the doneType
+  `+0xb8` (0x5df88a). A request is served **only in main state 1** (0x5e0050: `+0xb8` != 0 / 8 -> 0x5dab40, its only
+  caller); the main-menu handler (state 10, 0x5dae20) gets no tracker. `+0xb9` goes back to 0 only at the start of main
+  state 2 (0x5de864) and in the game's own front-end save load (0x7743c0: request doneType 10, main state 2, `+0xb9 = 0`
+  by hand at 0x7744ce). So TruMenu's own level.load left a request nobody served; every later click was refused by it,
+  until the owner's own new game (12:09:00) went through state 2. The game's mission start (`f27` -> 0x5dfb20) never
+  calls the request outside state 1 - it sets main state 2 itself.
+- **`LevelChangePending`**: in main state 10 (with `kFeChecks` ok) `+0xb9` no longer counts as pending (an unserved
+  request the next level start clears); everywhere else as before. `status.state` says so.
+- **`level.load`** is refused in the front end (main state 6 / 10): `refused: front end (main state 10) - the game serves
+  a level change request only in a level (main state 1); from the main menu: level.start <unit> 0 (the mission start) or
+  arena.go <spot>` - before, it left the dead request (also the tour's "Laden ..." and `unit.go` steps in the main menu).
+- **`level.start <unit> [0|1]`**: an optional second word = f27's own second argument (the outfit / weapon selection byte
+  `[0xfae8d9]`, 0x77e193): 0 = none (as the title update starts `dlc_level2..6_start`), 1 = the selection; without it the
+  0.7.2 rule. 0 needs the 0.7.2 selection-byte check (`g_outfitRuleOk`). In a shortcut, `level.start <unit> 0|1` waits for
+  that unit (as `level.load`); every finished level wait now logs `shortcut '...': level up - unit ..., player present, no
+  level change pending (n s after the request)`.
+- **`arena.go <spot>` from the main menu** (main state 10, front-end state `0xfae8da` = 3, no one-shot Bink movie): one
+  shortcut `save.backup kapitel;level.start <unit> 0;wait.unit <unit>;cheat.flight 1;player.goto <intro> force;
+  cheat.onehitkill 0;arena.mode <spot>` (`cheat.onehitkill 0` only with `[Cheats] Enabled=1` and its check ok - else the
+  log says it was not switched). The level start is the PC generalbank script 104 mission start (uigamedata f22, f27(unit,
+  0, 0, 1), stdscreenmgr f19 + f7): f27's 4th argument 1 = new game data in memory (0x77e19f: 0x556940(0) with the player
+  tailoring / options kept and put back - no profile change, TruMenu writes no save; a checkpoint may write the game's
+  Autosave as in every level, the backup comes first); a fresh level = a new player tracker = doppelganger flag 0 =
+  main-game mode. Log: `arena.go 1a: main menu (main state 10, front-end state 3) -> the game's mission start of
+  l7_helheim03 (...)`, then the runner's step lines, `level up`, `unit l7_helheim03 streamed`, the goto, `cheat: one-hit
+  kill OFF (...)`, `arena.mode 1a (...): ... fits the main-game spot (adrenaline runs); unit l7_helheim03, one-hit kill
+  byte 0x00e91ffd = 0`. DLC 2 spot 1c from the main menu: allowed with a warning (a direct unit start has no doppelganger).
+- **Refusals** (one answer line each): main menu checks failed / experimental off / mission path not verified; front-end
+  state != 3 (title screen, a sub menu, the intro); a one-shot movie (credits / teaser); no level and not the main menu
+  (main state 6 / loading); in a level: a cutscene plays (cinematic test 0x453f00); as before a pending level change
+  (main state 2 / 9, `+0xb9` in a level).
+- **In a level** the steps are those of 0.22.32 (`unit.go` / `level.load` by the doppelganger flag, `arena.mode` last).
+- **`arena.mode`** logs the unit and the one-hit kill byte in the same line (`WARNING one-hit kill is ON` when set).
+- Bar page Tests / Paket A: the note reads "Hauptmenü oder Hauptspiel; One-Hit-Kill geht aus".
+- Switches file: row `TruQoL | Fixes | ReleaseWalk` (TruQoL 0.1.8, PT.2 - it was missing, `trumenu_ini_check` Q0215).
+- Checks: `trumenu_ini_check` `check_02246`; `check_02245` version part adapted; negative cases
+  `work\arena_1411\arena_negative_tests.py`.
+
+### TO TEST 0.22.46
+
+1. Start, `TruMenu.log`: `0.22.46 front end: checks ok (10 rows); GameTracker+0xb9 in the main menu = ...`.
+2. Main menu, bar Tests / Paket A: "Arena 1a: Helheim-Halle" right twice. Expected: the menu goes, the loading screen,
+   Lara in the Helheim hall on the floor (z about -3216), flight on. Log in this order: `arena.go 1a: main menu ...`,
+   `shortcut 'arena 1a (l7_helheim03, main menu)' 2/7: level.start l7_helheim03 0 -> ok queued ...`, `item level.start:
+   mission start 'l7_helheim03': ... f27('l7_helheim03', 0, 0, 1) ... no outfit / weapon selection - second word 0`,
+   `level up - unit l7_helheim03`, `unit l7_helheim03 streamed`, `cheat: one-hit kill OFF`, `arena.mode 1a ... byte 0
+   ... fits the main-game spot (adrenaline runs); unit l7_helheim03, one-hit kill byte 0x00e91ffd = 0`, `shortcut ...
+   done`. Note: which outfit Lara wears; does a cutscene or the outfit screen come (it should not)?
+3. Then Paket A as before (adrenaline full, LT + R3, jump-off headshot): adrenaline runs = main-game mode.
+4. Main menu again (pause -> main menu), "1d: Valgrind" - the same lines with `l5_valgrind` / CP 7329.
+5. The old case: main menu, command bar `level.load l7_helheim03` -> refused with the front-end reason, nothing waits;
+   then "Arena 1a" works at once (before: `refused: level change pending (GameTracker+0xb9 = 1)`).
+6. `status.state` in the main menu: "in a level ..." no; after step 5 not "level change pending".
+7. Saves: the manual saves unchanged after the run (file times in the save folder; `TruMenu.saves\<time>_kapitel` holds
+   the backup); note whether `Autosave.TRUSave` changed.
+8. Negative: title screen ("press start") -> `arena.go 1a` refused (`front-end state ...`); a sub menu (options) open ->
+   refused; during a cutscene in a level -> refused (`a cutscene plays`); `level.start l7_helheim03 2` and
+   `level.start l7_helheim03 0 x` -> usage; one-hit kill on in the main menu? (needs a level - set it in a level, quit to
+   the main menu, "Arena 1a": arrives with `one-hit kill OFF`).
+9. In a level (main game), "Arena 1a": as 0.22.32 (`unit.go` / portal or `level.load`), log ends with `arena.mode 1a`.
+
 ## 0.22.45 - W6: hearing tests faster - single sounds / tracks off, ambience off, wave 10 log line (2026-11-14)
 
 Built into `work\asi\menu0268`, not installed, no live test (finding in the workspace `docs\Befund-W6-Toene-1411.md`;

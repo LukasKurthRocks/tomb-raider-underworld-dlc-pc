@@ -5445,8 +5445,8 @@ def check_02245(switches_path):
     0.22.45 with TO TEST; Set-TruMenu knows the 0.22.44 hash"""
     problems = []
     src = read_cpp()
-    if '"TruMenu 0.22.45 (W6 sound switches' not in src[:src.find('\n', src.find('kVersion = '))]:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.45 (W6 sound switches"')
+    if '0.22.45 (W6 sound switches' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.46: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.45 part "0.22.45 (W6 sound switches"')
     offline = []
     if os.path.exists(W6_CHECKS_02245):
         for line in open(W6_CHECKS_02245, encoding='utf-8'):
@@ -5552,6 +5552,108 @@ def check_02245(switches_path):
                       'validate, groups / ambience ChannelGroupI::setMute, tracks srmusic stop; wave log; %d items, %d '
                       'keys, Paket B %d rows, ton_einzeln %d rows)' % (len(rows), len(W6_ITEMS_02245), len(W6_KEYS_02245),
                                                                      len(W6_TGB_02245), len(W6_SET_02245)))
+
+
+FE_CHECKS_02246 = os.path.join(ROOT, 'work', 'arena_1411', 'precheck_02246.txt')
+FE_HASH_02245 = '95246e56abd1950bf8623b683cd4d301578c58b738351c008990d22afce77639'
+FE_MENU_STEPS_02246 = ('"save.backup kapitel;level.start %s 0;wait.unit %s;cheat.flight 1;player.goto %ld force;"\n'
+                       '        "%sarena.mode %s"')
+FE_LEVEL_STEPS_02232 = '"save.backup kapitel;%s %s;wait.unit %s;cheat.flight 1;player.goto %ld force;arena.mode %s"'
+
+
+def check_02246():
+    """0.22.46 (arena from the main menu, owner live 2026-11-14 12:07; workspace docs/Befund-Arena-Hauptmenue-1411.md):
+    kFeChecks = precheck_02246.txt (10 rows: the request 0x5df760 sets +0xb9 / +0xb8, 0x5df8c0 ignores a request while
+    +0xb9 is set, only main state 1 serves one (0x5e0050 -> 0x5dab40), the dispatcher table entries 1 / 10, the state-10
+    handler without the tracker and its switch on 0xfae8da, state 2 clears +0xb9 (0x5de864), the game's front-end save
+    load clears it itself (0x7744ce), the front-end state getter); FeCheck right after PendingCheck; LevelChangePending
+    ignores +0xb9 only through FeStaleRequest (main state 10); level.load refused in the front end (FeInFrontEnd, main
+    state 6 / 10) after the pending test and before the request; level.start takes a second word 0|1 as f27's selection
+    argument (0 only with g_outfitRuleOk); the shortcut runner waits for the unit of "level.start <unit> 0|1" and logs
+    "level up"; RunArenaGo: main menu -> ArenaGoMenu before the mode read, no level -> refused, a cutscene -> refused,
+    the in-level steps unchanged; ArenaGoMenu: gates (g_feOk, mission path, experimental), front-end state 3, no one-shot
+    movie, steps backup / level.start <unit> 0 / wait.unit / flight / player.goto force / cheat.onehitkill 0 (cheats on) /
+    arena.mode, one log line, nothing written by itself; arena.mode logs the unit and the one-hit kill byte; Paket A
+    note names the main menu; README 0.22.46 with TO TEST; Set-TruMenu knows the 0.22.45 hash"""
+    problems = []
+    src = read_cpp()
+    if '"TruMenu 0.22.46 (arena from the main menu' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.46 (arena from the main menu"')
+    offline = []
+    if os.path.exists(FE_CHECKS_02246):
+        for line in open(FE_CHECKS_02246, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/arena_1411/precheck_02246.txt (the offline byte list) is missing')
+    m = re.search(r'const FeRow kFeChecks\[\] = \{(.*?)\n\};', src, re.S)
+    rows = [(a.lower(), ''.join(LIT.findall(b)).replace(' ', '').lower()) for a, b in
+            re.findall(r'\{0x([0-9a-fA-F]{8}), ((?:"[0-9a-f ]+"\s*)+)\}', m.group(1) if m else '')]
+    if rows != offline or len(rows) != 10:
+        problems.append('TruMenu.cpp: kFeChecks (%d rows) must be the 10 rows of precheck_02246.txt in order' % len(rows))
+    if not re.search(r'\n    g_pendingOk = PendingCheck\(\);\n    FeCheck\(\);', src):
+        problems.append('TruMenu.cpp: the load must call FeCheck right after g_pendingOk = PendingCheck()')
+    fc = fn_body(src, 'void FeCheck(')
+    if 'g_feOk = g_mainStateOk && g_pendingOk;' not in fc or '!HexBytesAt(r.at, r.hex)' not in fc or 'Log(' not in fc:
+        problems.append('TruMenu.cpp: FeCheck must test every kFeChecks row after the main state / pending checks and log')
+    st = fn_body(src, 'bool FeStaleRequest(')
+    if 'g_feOk && g_mainStateOk && ReadDword(kMainState, &state) && state == 10' not in st:
+        problems.append('TruMenu.cpp: FeStaleRequest = g_feOk and main state 10 only')
+    fe = fn_body(src, 'bool FeInFrontEnd(')
+    if '(*state == 6 || *state == 10)' not in fe or 'g_feOk && g_mainStateOk' not in fe:
+        problems.append('TruMenu.cpp: FeInFrontEnd = g_feOk and main state 6 / 10')
+    lp = fn_body(src, 'bool LevelChangePending(')
+    if 'if (((busy >> 8) & 0xff) && !FeStaleRequest()) {' not in lp or lp.count('FeStaleRequest') != 1:
+        problems.append('TruMenu.cpp: LevelChangePending may skip +0xb9 only through FeStaleRequest')
+    lu = fn_body(src, 'bool LoadUnit(')
+    i_p, i_f, i_c = lu.find('LevelChangePending(why, sizeof(why))'), lu.find('if (FeInFrontEnd(&feState)) {'), \
+        lu.find('reinterpret_cast<LevelChangeFn>(kLevelChange)')
+    if not 0 <= i_p < i_f < i_c: problems.append('TruMenu.cpp: LoadUnit must refuse the front end before the request')
+    ls = fn_body(src, 'bool RunLevelStart(')
+    for want in ('int select = given >= 0 ? given : MissionSelectArg(unit);', 'if (given == 0 && !g_outfitRuleOk) {',
+                 'words > 2 || (words == 2 && given < 0)'):
+        if want not in ls: problems.append('TruMenu.cpp: RunLevelStart must hold %s' % want)
+    sc = fn_body(src, 'void ShortcutTick(')
+    if 'if (!_strnicmp(step, "level.start ", 12)) {' not in sc or 'StartUnitName(u, g_scWaitUnit, sizeof(g_scWaitUnit))' \
+            not in sc or 'level up - unit %s' not in sc:
+        problems.append('TruMenu.cpp: ShortcutTick must wait for the unit of level.start <unit> 0|1 and log "level up"')
+    go = fn_body(src, 'bool RunArenaGo(')
+    i_l, i_m, i_r, i_c, i_mode = go.find('LevelChangePending(why, sizeof(why))'), \
+        go.find('if (stateOk && state == 10) return ArenaGoMenu(a, o, n);'), go.find('if (!InLevel()) {'), \
+        go.find('if (CinematicNow()) {'), go.find('ArenaModeRead(m);')
+    if not 0 <= i_l < i_m < i_r < i_c < i_mode:
+        problems.append('TruMenu.cpp: RunArenaGo: pending test, main menu -> ArenaGoMenu, no level / cutscene refused, '
+                        'then the 0.22.32 mode read')
+    if FE_LEVEL_STEPS_02232 not in go: problems.append('TruMenu.cpp: RunArenaGo: the in-level steps must stay (0.22.32)')
+    am = fn_body(src, 'bool ArenaGoMenu(')
+    for want in (FE_MENU_STEPS_02246, 'ohk ? "cheat.onehitkill 0;" : ""', 'const bool ohk = g_cheatsEnabled && g_ohkOk;',
+                 'if (!g_feOk || !g_missionOk || !g_experimental) {', 'ReadByte(kFeStateByte, &fe);', 'if (fe != 3) {',
+                 'movie && ReadByte(kW3BinkLoop, &loop) && !loop', 'Log(1, "arena.go %s: main menu',
+                 'if (!ShortcutStart(steps, title, o, n)) return false;'):
+        if want not in am: problems.append('TruMenu.cpp: ArenaGoMenu must hold %s' % want.replace('\n', ' '))
+    for fn in ('bool ArenaGoMenu(', 'bool FeStaleRequest(', 'bool FeInFrontEnd(', 'void FeCheck(', 'bool RunArenaMode('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('(')); continue
+        if any(w in body for w in ('WriteByte(', 'PutByte(', 'WriteDword(', 'reinterpret_cast<volatile', 'LcPatch(')):
+            problems.append('TruMenu.cpp: %s must not write game memory' % fn.strip('('))
+    mo = fn_body(src, 'bool RunArenaMode(')
+    if 'one-hit kill byte 0x%08lx = %d%s' not in mo or 'CurrentUnit(unit, sizeof(unit));' not in mo:
+        problems.append('TruMenu.cpp: arena.mode must log the unit and the one-hit kill byte')
+    note, grp = None, None
+    for r in qb_rows(src):
+        if r[0] == 'kQbTests' and r[4] == 'kQbGroup': grp = r[3]
+        elif r[0] == 'kQbTests' and grp == 'tg_a' and r[4] == 'kQbNote' and note is None: note = r[1]
+    if not note or 'Hauptmen' not in note: problems.append('TruMenu.cpp: the Paket A note must name the main menu')
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.46 - ' not in readme or '\n### TO TEST 0.22.46' not in readme:
+        problems.append('README.md: section "## 0.22.46 - ..." with "### TO TEST 0.22.46" missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if FE_HASH_02245 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.45 build hash (work/asi/menu0268) is missing')
+    return problems, ('arena from the main menu (%d byte checks = precheck_02246; +0xb9 in main state 10 = unserved '
+                      'request, level.load refused in the front end, arena.go -> level.start <unit> 0 + wait + spot + '
+                      'one-hit kill off + arena.mode)' % len(rows))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -6173,6 +6275,10 @@ def main(argv):
     for p in cproblems45: print('Q02245 %s' % p)
     if not cproblems45: print('ok: 0.22.45 %s' % csummary45)
     problems += cproblems45
+    cproblems46, csummary46 = check_02246()   # 0.22.46 (arena from the main menu)
+    for p in cproblems46: print('Q02246 %s' % p)
+    if not cproblems46: print('ok: 0.22.46 %s' % csummary46)
+    problems += cproblems46
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

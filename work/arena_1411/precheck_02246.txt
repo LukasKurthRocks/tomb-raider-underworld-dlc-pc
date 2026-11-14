@@ -1,0 +1,21 @@
+# TruMenu 0.22.46 (arena from the main menu): kFeChecks = the code behind the front-end reading of GameTracker+0xb9,
+# in the order of the table in TruMenu.cpp. Disassembly: work/arena_1411/dis_*.txt (tools/pe_dis.py), uses of
+# 0xe7f140 / 0xe7f141: work/arena_1411/uses_b9.txt (tools/pe_abs_uses.py), +0xb9 register uses: disp_b9.txt.
+# 0x5df760 (request, doneType): +0xb9 = 1 (al = 1), +0xb8 = doneType
+005df88a a241f1e700 881d40f1e700
+# 0x5df8c0 GAMELOOP_RequestLevelChangeByName: a request while +0xb9 is set is ignored
+005df8d3 80bfb900000000 754d
+# main state 1 (0x5e0050): doneType +0xb8 != 0 and != 8 -> 0x5dab40 (the only place a request is served)
+005e0055 8a86b8000000 84c0 7414 3c08 7410 8b442408 56 50 e8d2aaffff
+# dispatcher jump table: state 1 -> 0x5e00e1 (0x5e0050 with the tracker), state 10 -> 0x5e014f
+005e015c e1005e00
+005e0180 4f015e00
+# state 10: 0x5dae20 without the tracker argument; it switches on the front-end state byte 0xfae8da
+005e014f e8ccacffff
+005dae69 0fb60ddae8fa00 8d41ff 83c414 83f807
+# main state 2 (0x5de7e0): +0xb9 cleared at the start of every level start
+005de864 381d41f1e700 7406 881d41f1e700
+# the game s own front-end load (0x7743c0, save load): request (doneType 10), main state 2, +0xb9 = 0 by hand
+007744a7 6a0a 6888f0e700 68c0f0e700 e808b4e6ff 83c41c 5f 5e c70560ede70002000000 c605f2f1e70001 c60541f1e70000
+# front-end state getter (uigamedata): byte 0xfae8da (3 = main menu)
+0077bbe0 a0dae8fa00 c3
