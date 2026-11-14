@@ -77,8 +77,8 @@ h2drift: birth +8 = 2, restore +8 = 0, the dispatcher counts only 2 - the live r
 fixhall02: refused in another unit / without values / broken / with a living tutorial thrall (Idle, Regenerate, RegenerateDeath, no brain), dead = the four count states, kill flag, gone, hidden; tutorial 2 only below 2 and first; the next 11268 check breaks the wall  ok
 scriptval: H2ValueAddr = the interpreter's op14 address of "R.+8" (22809 f0) for 2000 random memories, 0 when the script or its member data is missing (op2f then stores nothing)  ok
 switches: SwNext (bool left / right / X toggle, int steps / ends / wrap / out-of-range INI, choice prev / next / wrap / unknown), RunSwSet (listed key, type / range, INI exists, unchanged = no write, live / restart / live-if)  ok
-swfold: one group open at a time (right / X opens and closes the others, left / X closes, no change = no action); shipped file 235 rows in 16 groups: largest page 60 rows <= 320 (all open would be 251)  ok
-ringparity: 172 ring entries (frozen at 172), 762 bar rows, 0 entries without a bar row; the rule (bool 0 / 1, choice list, same argument)  ok
+swfold: one group open at a time (right / X opens and closes the others, left / X closes, no change = no action); shipped file 237 rows in 16 groups: largest page 60 rows <= 320 (all open would be 253)  ok
+ringparity: 172 ring entries (frozen at 172), 770 bar rows, 0 entries without a bar row; the rule (bool 0 / 1, choice list, same argument)  ok
 cosbar: 4 rows + the open list (36 -> 40 rows), only the current one marked, no level = every row refused, labels for dlc_costume_a..p only, records with an object id; own page <= 64 rows (list cut after 60), Lara page over 64 from N = 38, 17 pages  ok
 cosdebounce: 5 taps / a held right switch once 0.5 s after the last step, two steps 0.7 s apart twice, wraps at both ends, X at once, full circle = nothing; negative model (switch on every step: 5 switches) caught  ok
 flighthint: shown only with FlightHint=1 + flight on + menu closed + a level (1 of 16 cases); 2000 random corner layouts: the line never overlaps a bottom-right window  ok
@@ -283,7 +283,7 @@ ntclock: bit cleared at wall 30 s: gap game / wall stays 15.01 s (+- 0.05) for 6
 ntclock: 60 Hz, no pause bit: frame time 0.5 measured, marker off, game clock 60.00 s = wall 60.00 s ok
 ntclock: bit set, frame time 1.0: no marker; bit clear, 0.5: no marker; both: marker  ok
 ntclock: checks failed: "Pause-Bit: nicht prüfbar (TruMenu.log)" / "Pause bit: not checkable (TruMenu.log)" ok
-swcap: shipped file: 235 rows in 16 groups all shown, no limit line (277 free of 512)             ok
+swcap: shipped file: 237 rows in 16 groups all shown, no limit line (275 free of 512)             ok
 swcap: 161 rows: 0.22.22 cap 160 shows 160 (log "line 164 skipped (too many switch lines)"), 0.22.23 shows 161, no limit line ok
 swcap: 600 rows: 512 shown, one line "exceeds the limit of 512 switch lines: 88 switch line(s) from line 523 on" ok
 swcap: negative model 0.22.22 on 600 rows: 5 of 440 dropped rows named (5-line cap) - caught      ok

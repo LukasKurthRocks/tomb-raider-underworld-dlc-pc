@@ -1859,6 +1859,8 @@ SW_LIVE = {
     ('TruMenu', 'Sonar', 'FadeFar'): 'void S5ReadSwitch(',
     ('TruMenu', 'Sonar', 'TintOthers'): 'void S5ReadSwitch(',
     ('TruMenu', 'PDA', 'ShadowPdaAsBasePda'): 'void S5ReadSwitch(',
+    ('TruMenu', 'Sound', 'ReverbFollowsMute'): 'void W9ReadSwitch(',   # TruMenu 0.22.51 W9 (the game's reverb send)
+    ('TruMenu', 'Sound', 'ReverbOff'): 'void W9ReadSwitch(',
 }
 # TruMenu 0.22.50: the bar's bool rows with a category argument (RadialOn -> W8RowOn) and the categories (kW8CatKey)
 W8_CAT_ITEMS = ('snd.logcat', 'snd.catmute', 'snd.catsolo')
@@ -1873,9 +1875,9 @@ SW_START_GATED = {
 }
 SW_START_GATED_HINT = ('live nur wenn 1 beim Start', 'live if 1 at start')
 SW_MAX, SW_GROUP_MAX = 512, 24              # 0.22.23: 512 rows (was 160 - the shipped file had 159)
-QB_VIEW_MAX = 320                            # kQbViewMax: rows of one bar page (page Fixes: group rows + the open group);
+QB_VIEW_MAX = 384                            # kQbViewMax: rows of one bar page (page Fixes: group rows + the open group);
                                              # 0.22.44 (W2): 256 (was 128) - page Tests 227 static rows; 0.22.48: 320 -
-                                             # page Tests 259 static rows (Paket A copies, Paket G)
+                                             # page Tests 259 static rows (Paket A copies, Paket G); 0.22.51: 384 - 306
 RING_FROZEN = 172                            # 0.21.5: the ring is frozen - no new entries
 
 
@@ -6371,14 +6373,16 @@ def check_02250(switches_path):
                  'v.loop = v.fmOk && (fmode & 6) != 0;', 'const DWORD hooked = W8VoiceEmitter(v.voice, v.channel);'):
         if want not in sb: problems.append('TruMenu.cpp: SnBuild lacks %s' % want)
     qr = fn_body(src, 'int W7QbRows(')
+    # 0.22.51 W9: the square = audible incl. the game's reverb send (x.aud), was FMOD's dry mute bit alone
     for want in ('Kanaele belegt (%d Pool, %d fremd)', '"Fremdkanal (DSP)"', '"Musik-Slot"',   # read_cpp: umlauts -> ae
-                 'view(name, state, count, c, muted ? red : grey, muted ? 2 : 1,', 'const bool muted = x.fmOk ? x.fmMute :'):
+                 'view(name, state, count, c, muted ? red : grey, muted ? 2 : 1,', 'const bool muted = x.fmOk ? !x.aud :'):
         if want not in qr: problems.append('TruMenu.cpp: W7QbRows lacks %s' % want)
     if 'const bool muted = w.square == 2;' not in fn_body(src, 'void W7MenuRows('):
         problems.append('TruMenu.cpp: W7MenuRows: an outline square (2) = muted')
     # ---- (5) the box
     dl = fn_body(src, 'void DrawSoundLog(')
-    for want in ('W8Box(dl, p, h, !e.fmMute, c);', 'if (e.loop) W8LoopIcon(', 'if (!W8LineShown(e.cat, e.fmMute, e.fmPause, '
+    # 0.22.51 W9: box and filter by e.aud (audible incl. the reverb path), was !e.fmMute / e.fmMute
+    for want in ('W8Box(dl, p, h, e.aud, c);', 'if (e.loop) W8LoopIcon(', 'if (!W8LineShown(e.cat, !e.aud, e.fmPause, '
                  'e.dist)) continue;', 'const bool collapse = g_w8Collapse != 0;', '" \\303\\227%d"',
                  'if (!v.loop || !v.playing || v.ending) continue;'):
         if want not in dl: problems.append('TruMenu.cpp: DrawSoundLog lacks %s' % want)
@@ -6496,11 +6500,16 @@ def check_02250(switches_path):
 
 # TruMenu 0.22.51 (S5 sonar view + base PDA, X default, cmd suggestions, DLC start from a level)
 S5_CHECKS_02251 = os.path.join(ROOT, 'work', 'menu51_1411', 'precheck_02251.txt')
-S5_KEYS_02251 = (('Sonar', 'FadeFar', '0'), ('Sonar', 'TintOthers', '0'), ('PDA', 'ShadowPdaAsBasePda', '0'))
+S5_KEYS_02251 = (('Sonar', 'FadeFar', '0'), ('Sonar', 'TintOthers', '0'), ('PDA', 'ShadowPdaAsBasePda', '0'),
+                 ('Sound', 'ReverbFollowsMute', '1'), ('Sound', 'ReverbOff', '0'))   # the last two: W9 (reverb)
 # item, type, game thread (queued)
 S5_ITEMS_02251 = (('sonar.fade', 'action', 'true'), ('sonar.tint', 'bool', 'true'), ('sonar.area', 'action', 'true'),
                   ('sonar.why', 'action', 'true'), ('sonar.view', 'info', 'false'), ('pda.basepda', 'bool', 'true'),
-                  ('pda.state', 'info', 'false'))
+                  ('pda.state', 'info', 'false'), ('snd.reverbmute', 'bool', 'true'), ('snd.reverboff', 'bool', 'true'),
+                  ('snd.reverb', 'info', 'false'))
+W9_CHECKS_02251 = os.path.join(ROOT, 'work', 'menu51_1411', 'precheck_02251_reverb.txt')
+W9_SEND_STUB = ('pushad', 'pushfd', 'push esi', 'call W9VoiceMuted', 'test eax, eax', 'je w9_keep',
+                'mov dword ptr [esp + 0x2c], 0', 'w9_keep:', 'popfd', 'popad', 'jmp dword ptr [g_w9SetMixFn]')
 S5_FOG_STUB = ('mov eax, dword ptr [g_s5FogFar]', 'test eax, eax', 'je s5f_go', 'mov dword ptr [esp + 0x14], eax',
                'mov eax, dword ptr [g_s5FogNear]', 'mov dword ptr [esp + 0x10], eax', 'lock inc dword ptr [g_s5FogCalls]',
                's5f_go:', 'jmp dword ptr [g_s5FogFn]')
@@ -6698,6 +6707,68 @@ def check_02251(switches_path):
     if 'kUgdF22' in lg: problems.append('TruMenu.cpp: LevelStartInGame must not call uigamedata f22 (case 8 does not)')
     if not 0 <= lg.find('(kUgdF27)') < lg.find('(kScrF7)') < lg.find('(kScrF19)'):
         problems.append('TruMenu.cpp: LevelStartInGame: f27, then f7, then f19 (the case-8 order)')
+    # ---- (i) W9: the game's reverb send (workspace docs/Befund-Ton-ausserhalb-FMOD-1411.md)
+    offline9 = []
+    if os.path.exists(W9_CHECKS_02251):
+        for line in open(W9_CHECKS_02251, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline9.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/menu51_1411/precheck_02251_reverb.txt (the offline byte list) is missing')
+    rows9 = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kW9Checks')]
+    if rows9 != offline9 or len(rows9) != 11:
+        problems.append('TruMenu.cpp: kW9Checks (%d rows) must be the 11 rows of precheck_02251_reverb.txt in order' % len(rows9))
+    for pat, what in ((r'\n    S5Check\(\);[^\n]*\n    W9Check\(\);', 'the load must call W9Check right after S5Check'),
+                      (r'\n    S5ReadOptions\(ini\);[^\n]*\n    W9ReadOptions\(ini\);', 'W9ReadOptions right after S5ReadOptions'),
+                      (r'\n    S5Tick\(\);[^\n]*\n    W9Tick\(\);', 'PadHook must call W9Tick() right after S5Tick()'),
+                      (r'\n        S5Shutdown\(\);[^\n]*\n        W9Shutdown\(\);', 'W9Shutdown right after S5Shutdown')):
+        if not re.search(pat, src): problems.append('TruMenu.cpp: %s' % what)
+    for want in ('const DWORD kW9R1 = 0x00591591, kW9R2 = 0x005841bf, kW9Holder = 0x00ccde98;',
+                 'const BYTE kW9R1Game[5] = {0xe8, 0x5d, 0x8a, 0x22, 0x00};',
+                 'const BYTE kW9R2Game[5] = {0xe8, 0x2f, 0x5e, 0x23, 0x00};', 'DWORD g_w9SetMixFn = 0x007b9ff3;'):
+        if want not in src: problems.append('TruMenu.cpp: %s missing' % want)
+    body = re.sub(r'//[^\n]*', '', fn_body(src, '__declspec(naked) void W9SendStub('))
+    lines = [l.strip() for l in body.split('\n') if l.strip() and l.strip() not in ('__asm {', '}', '{')]
+    lines = [l for l in lines if not l.startswith('__declspec')]
+    if lines != list(W9_SEND_STUB):
+        problems.append('TruMenu.cpp: W9SendStub must be exactly %s (got %s)' % (' / '.join(W9_SEND_STUB), lines))
+    if 'int __stdcall W9VoiceMuted(DWORD voice) {' not in src or \
+            '!W8FmOf(handle, &ci, &fl, &rf, &mode) || !(fl & 8)) return 0;' not in fn_body(src, 'int __stdcall W9VoiceMuted('):
+        problems.append('TruMenu.cpp: W9VoiceMuted (__stdcall, one argument) must zero only FMOD-muted voices (bit 3)')
+    wa = fn_body(src, 'void W9Apply(')
+    for want in ('SoWrite(kW9R1, want ? kW9R1Game : g_w9R1New, want ? g_w9R1New : kW9R1Game, 5)',
+                 'SoWrite(kW9R2, want ? kW9R2Game : g_w9R2New, want ? g_w9R2New : kW9R2Game, 5)',
+                 'const bool want = g_w9Follow != 0;'):
+        if want not in wa: problems.append('TruMenu.cpp: W9Apply lacks %s' % want)
+    sec9 = src[src.find('// ---- 0.22.51 W9: the game'):src.find('// ---- end of 0.22.51 W9 ----')]
+    if not sec9: problems.append('TruMenu.cpp: the section "0.22.51 W9" is missing')
+    for bad in ('WriteDword(', 'WriteByte(', 'WriteBytes(', 'VirtualProtect('):
+        if bad in re.sub(r'//[^\n]*', '', sec9): problems.append('TruMenu.cpp: the W9 section must not call %s' % bad)
+    au = fn_body(src, 'bool W9Audible(')
+    for want in ('if (paused) return false;', 'return dryOn || (send > 0.0f && W9RevOutNow() > 0.0f);'):
+        if want not in au: problems.append('TruMenu.cpp: W9Audible lacks %s' % want)
+    rt = fn_body(src, 'void W9RevTick(')
+    for want in ('if (g_w9RevOff && !g_w9RevConn && level > 0.0f) {', 'g_w9RevOld = level;',
+                 'if (level == 0.0f && W9SetMix(conn, g_w9RevOld))'):
+        if want not in rt: problems.append('TruMenu.cpp: W9RevTick lacks %s' % want)
+    if 'W9Levels(v.voice, fci, &v.dry, &v.send);' not in fn_body(src, 'int SnBuild(') or \
+            'W9Levels(a.voice, ci, &a.dry, &a.send);' not in fn_body(src, 'void W8AggRefresh('):
+        problems.append('TruMenu.cpp: the snapshot and the collapsed lines must read the send (W9Levels)')
+    if 'W9RevRow(de, sends, mutedSends, smax, name, sizeof(name), state, sizeof(state));' not in fn_body(src, 'int W7QbRows('):
+        problems.append('TruMenu.cpp: the monitor needs the reverb row (W9RevRow)')
+    dl9 = fn_body(src, 'void DrawSoundLog(')
+    for want in ('W8Box(dl, p, h, e.aud, c);', 'W8Box(dl, p, h, v.aud, c);', 'W9SendText(e.fmMute, e.send, de, rev, sizeof(rev));'):
+        if want not in dl9: problems.append('TruMenu.cpp: DrawSoundLog lacks %s (0.22.51: audible incl. the reverb)' % want)
+    for tbl, grp_want in (('kQbSettings', None), ('kQbTests', 'tg_b2')):
+        have, grp = set(), None
+        for r in qb_rows(src):
+            if r[0] != tbl: continue
+            if r[4] == 'kQbGroup': grp = r[3]; continue
+            if grp_want is None or grp == grp_want: have.add((r[2], r[4]))
+        for it in (('snd.reverbmute', 'kQbBool'), ('snd.reverboff', 'kQbBool'), ('snd.reverb', 'kQbInfo')):
+            if it not in have: problems.append('TruMenu.cpp: %s %s lacks %s (%s)' % (tbl, grp_want or '', it[0], it[1]))
     # ---- (9) README, Set-TruMenu
     readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
     if '\n## 0.22.51 - ' not in readme or '\n### TO TEST 0.22.51' not in readme:

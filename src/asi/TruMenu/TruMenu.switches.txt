@@ -323,3 +323,7 @@ TruMenu | Sound | LogMusic | bool | Ton-Log: Musik zeigen | Sound log: show musi
 TruMenu | Sound | LogOnlyAudible | bool | Ton-Log: nur hörbare Zeilen | Sound log: audible lines only | live | 0 | Ohne Zeilen, die FMOD stumm / pausiert // Without lines FMOD mutes / pauses | TruMenu 0.22.50
 TruMenu | Sound | LogCollapse | bool | Ton-Log: Wiederholungen zusammen | Sound log: collapse repetitions | live | 1 | Gleiche Welle + Quelle = eine Zeile mit ×n // Same wave + source = one line with xn | TruMenu 0.22.50
 TruMenu | Sound | LogMaxDist | int:0..500:5 | Ton-Log: höchstens so weit weg (m) | Sound log: at most this far (m) | live | 0 | Fernere 3D-Töne ausblenden; 0 = alle // Hide 3D sounds farther away; 0 = all | TruMenu 0.22.50
+# 2026-11-14: TruMenu 0.22.51 - the game's own reverb (every voice sends into it; FMOD's mute does not reach that path);
+# re-read about once a second (W9ReadSwitch)
+TruMenu | Sound | ReverbFollowsMute | bool | Hall folgt Stumm | Reverb follows mute | live | 1 | Stumme Töne ohne Spiel-Hall // Muted sounds without the game's reverb | TruMenu 0.22.51
+TruMenu | Sound | ReverbOff | bool | Hall aus | Reverb off | live | 0 | Spiel-Hall ganz aus // The game's reverb off | TruMenu 0.22.51

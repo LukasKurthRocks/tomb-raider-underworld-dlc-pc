@@ -1,0 +1,24 @@
+# TruMenu 0.22.51 (i): the game's reverb send of every pool voice (W9) - kW9Checks, in this order.
+# Run: ../bin/pyt -t 120 tools/pe_bytes_check.py ../data/pc/tru.exe --file work/menu51_1411/precheck_02251_reverb.txt
+# Finding: workspace docs\Befund-Ton-ausserhalb-FMOD-1411.md (live 20:50 - 21:10, 9 / 9 checks); listings (local):
+# work/menu51_1411/dis_591540.txt, dis_584130.txt, dis_7b9ff3.txt, dis_7cca59.txt.
+#
+# --- R1: the voice update 0x591480: esi = the voice; [esi+8] = its send (DSPConnection channel head -> reverb),
+# [esi+0x1c] = params; setMix(send, params +0xc x volume) through the wrapper 0x7b9ff3 (stdcall: conn, float)
+00591573 8b4608 85c0 741c 8b4e1c d9410c 51 d84c2410 d95c2414 d9442414 d91c24 50 e85d8a2200
+# --- R2: the attach 0x584130 (thiscall, esi = ecx = the voice): addInput(reverb, channel head, &voice+8) 0x584188, then
+# setMix([voice+8], params +0xc x Channel::getVolume) 0x5841bf
+00584130 83ec08 53 56 8bf1 8b4e04
+00584188 e84e512300
+005841a6 8b561c d9420c 8b07 d84c2418 51 d95c2414 d9442414 d91c24 50 e82f5e2300
+# --- the wrapper 0x7b9ff3: validate 0x7c4cd3 (non-null), then DSPConnectionI::setMix 0x7cca59 (thiscall, float, ret 4)
+007b9ff3 55 8bec 8d4508 50 ff7508 e8d1ac0000 85c0 59 59 750f d9450c 51 8b4d08 d91c24 e8422a0100 5d c20800
+007c4cd3 8b4c2408 85c9 7504 6a25 58 c3 8b442404 85c0 7504 6a24 58 c3 8901 33c0 c3
+# .. setMix clamps to 0 .. 1 and stores the level at +0xec
+007cca86 d981ec000000 d94508 dae9
+007cca9f d999ec000000
+# --- the reverb: holder [0xccde98] (+0 = the SFX Reverb DSP, created 0x586fda), made an input of the master head 0x58223b
+00586ff8 a398decc00
+0058223b e89b702300
+# --- the channel's DSP head = real +0x98 (Channel::getDSPHead 0x801d54, not the sound)
+00801d54 8b8198000000

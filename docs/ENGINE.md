@@ -1391,6 +1391,24 @@ the pool 0x8a8108 is one the pool never sees (oscillator node 13); its game grou
 (R+0x6c = node +0x1c) is its ChannelGroupI (+0x8c) or the nearest parent (+0x1c). A group's parent index is the table
 entry +0x68 (0x591fe4): a whole sub-tree can be muted with one ChannelGroupI::setMute. ✅ static / ⬜ live (loop bit of
 the game's one-shots)
+**Game reverb send** (2026-11-14, live 20:50 - 21:10 at the DLC 2 Eitr beam; workspace `Befund-Ton-ausserhalb-FMOD-1411.md`;
+TruMenu 0.22.51 W9, `work/menu51_1411/precheck_02251_reverb.txt` 11 / 11): sound init 0x586db0 creates one FMOD SFX
+Reverb (`createDSPByType(0x12)` 0x586fda), holder `[0xccde98]` (+0 = the DSP), added as an input of the master group's
+DSP head (0x58223b), DryLevel -10000 (0x58224f, `[0x85057c]`). Each pool voice gets a send: voice +8 = DSPConnection
+(channel DSP head -> reverb, `DSP::addInput` 0x584188 in the attach 0x584130, voice = ecx = esi), voice +0xc = the holder,
+level = params (+0x1c) +0xc x the game volume, set at 0x5841bf and after every voice update at **0x591591** (0x591480; both
+`call 0x7b9ff3` = DSPConnection::setMix wrapper, stdcall (conn, float): validate 0x7c4cd3, then DSPConnectionI::setMix
+0x7cca59 thiscall, clamps 0 .. 1, level +0xec; the only other caller 0x587d72 = the oscillator). The send leaves the
+channel head before the dry connection (real +0x2f8 -> +0xec), so `ChannelI::setMute` (0x7c92b5: real setVolume(0)) and
+`ChannelGroupI::setMute` 0x7c48cd (byte +0x58, children +0x20, channels +0x24) do not reach it: a muted voice stays
+audible as reverb (live: 15 muted loops of s26892 with sends 0.0012 .. 0.3355, the tru.exe Core Audio session peak 0.28
+.. 0.38). Reverb -> master: the reverb's output list +0x30 (node = DSPConnectionI +0xc; DSPConnectionI +0xe0 source,
++0xe4 target, +0xec level), level 1.0, untouched after the init. **ChannelSoftware +0x98 = the channel's DSP head**
+(real vtable +0x8c 0x801d54 `Channel::getDSPHead`), not the sound. One FMOD system only (System_Create 0x7b919d, single
+caller 0x586dff; index starts at 1); FMOD's own reverb (SystemI +0x9b24 / +0x9d6c) has no instance live. TruMenu 0.22.51:
+R1 0x591591 / R2 0x5841bf -> a stub that sends 0 for a voice whose ChannelI +0x74 bit 3 is set ([Sound]
+ReverbFollowsMute), "Hall aus" = setMix(reverb -> master, 0) with the old level kept ([Sound] ReverbOff). ✅ static +
+live (graph) / ⬜ live (the TruMenu fix)
 **Group DSP effect** (2026-11-10): entry +0x7c is a **u16** DSP kind and +0x80 points to its parameter block in the
 DTP (16 or 32 B of floats). The loop 0x58de50 over all groups tests `word ptr [entry+0x7c]` and, when non-zero (and
 the group's wrapper +0x5c is 0), calls 0x58dad0 -> 0x587620: `movzx` kind 1..11 -> jump table 0x5876fc -> FMOD DSP

@@ -2,10 +2,10 @@ positive (unchanged sources): 0 problem(s) ok
 case version                 : 1 problem(s) ok - TruMenu.cpp: kVersion must start with "TruMenu 0.22.51 (sonar view + base PDA + X default + DLC start from a level"
 case check row changed       : 1 problem(s) ok - TruMenu.cpp: kS5Checks (22 rows) must be the 22 rows of precheck_02251.txt in order
 case check row dropped       : 1 problem(s) ok - TruMenu.cpp: kS5Checks (21 rows) must be the 22 rows of precheck_02251.txt in order
-case check order             : 1 problem(s) ok - TruMenu.cpp: the load must call S5Check right after W8Check
-case tick missing            : 1 problem(s) ok - TruMenu.cpp: PadHook must call S5Tick() right after SoTick()
-case options missing         : 1 problem(s) ok - TruMenu.cpp: ReadOptions must call S5ReadOptions(ini) right after W8ReadOptions(ini)
-case detach without S5       : 1 problem(s) ok - TruMenu.cpp: DLL_PROCESS_DETACH must call S5Shutdown right after W8Shutdown
+case check order             : 2 problem(s) ok - TruMenu.cpp: the load must call S5Check right after W8Check
+case tick missing            : 2 problem(s) ok - TruMenu.cpp: PadHook must call S5Tick() right after SoTick()
+case options missing         : 2 problem(s) ok - TruMenu.cpp: ReadOptions must call S5ReadOptions(ini) right after W8ReadOptions(ini)
+case detach without S5       : 2 problem(s) ok - TruMenu.cpp: DLL_PROCESS_DETACH must call S5Shutdown right after W8Shutdown
 case D1 other site           : 1 problem(s) ok - TruMenu.cpp: const DWORD kS5D1 = 0x006e42ac, kS5F1 = 0x006e4d94, kS5F2 = 0x006e4bf9; missing
 case F1 game bytes           : 1 problem(s) ok - TruMenu.cpp: const BYTE kS5F1Game[5] = {0xe8, 0xa7, 0xb0, 0xed, 0xff}; missing
 case F2 not written          : 2 problem(s) ok - TruMenu.cpp: S5Apply lacks SoWrite(kS5F2, wantF ? kS5F2Game : g_s5F2New, wantF ? g_s5F2New : kS5F2Game, 5)
@@ -38,8 +38,24 @@ case in-level f22            : 1 problem(s) ok - TruMenu.cpp: LevelStartInGame m
 case in-level arg4           : 1 problem(s) ok - TruMenu.cpp: LevelStartInGame lacks reinterpret_cast<MissionStartFn>(kUgdF27)(args, select, 0, 1);
 case in-level any unit       : 1 problem(s) ok - TruMenu.cpp: LevelStartInGame lacks _stricmp(name, "dlc_level1_start") && _stricmp(name, "dlc_level2_start")
 case in-level ui ungated     : 1 problem(s) ok - TruMenu.cpp: LevelStartInGame lacks && !g_menuPaused && !g_radPaused;
+case W9 check row            : 1 problem(s) ok - TruMenu.cpp: kW9Checks (10 rows) must be the 11 rows of precheck_02251_reverb.txt in order
+case W9 check order          : 1 problem(s) ok - TruMenu.cpp: the load must call W9Check right after S5Check
+case W9 tick missing         : 1 problem(s) ok - TruMenu.cpp: PadHook must call W9Tick() right after S5Tick()
+case W9 detach               : 1 problem(s) ok - TruMenu.cpp: W9Shutdown right after S5Shutdown
+case W9 R1 site              : 1 problem(s) ok - TruMenu.cpp: const DWORD kW9R1 = 0x00591591, kW9R2 = 0x005841bf, kW9Holder = 0x00ccde98; missing
+case W9 R2 bytes             : 1 problem(s) ok - TruMenu.cpp: const BYTE kW9R2Game[5] = {0xe8, 0x2f, 0x5e, 0x23, 0x00}; missing
+case W9 stub offset          : 1 problem(s) ok - TruMenu.cpp: W9SendStub must be exactly pushad / pushfd / push esi / call W9VoiceMuted / test eax, eax / je w9_keep / mov dword ptr [esp + 0x2c], 0 / w9_keep: / popfd / popad / jmp dword ptr [g_w9SetMixFn] (got ['pushad', 'pushfd', 'push esi', 'call W9VoiceMuted', 'test eax, eax', 'je w9_keep', 'mov dword ptr [esp + 0x28], 0', 'w9_keep:', 'popfd', 'popad', 'jmp dword ptr [g_w9SetMixFn]'])
+case W9 stub no voice        : 1 problem(s) ok - TruMenu.cpp: W9SendStub must be exactly pushad / pushfd / push esi / call W9VoiceMuted / test eax, eax / je w9_keep / mov dword ptr [esp + 0x2c], 0 / w9_keep: / popfd / popad / jmp dword ptr [g_w9SetMixFn] (got ['pushad', 'pushfd', 'call W9VoiceMuted', 'test eax, eax', 'je w9_keep', 'mov dword ptr [esp + 0x2c], 0', 'w9_keep:', 'popfd', 'popad', 'jmp dword ptr [g_w9SetMixFn]'])
+case W9 mutes all            : 1 problem(s) ok - TruMenu.cpp: W9VoiceMuted (__stdcall, one argument) must zero only FMOD-muted voices (bit 3)
+case W9 R2 unchecked         : 2 problem(s) ok - TruMenu.cpp: W9Apply lacks SoWrite(kW9R2, want ? kW9R2Game : g_w9R2New, want ? g_w9R2New : kW9R2Game, 5)
+case W9 audible rule         : 1 problem(s) ok - TruMenu.cpp: W9Audible lacks return dryOn || (send > 0.0f && W9RevOutNow() > 0.0f);
+case W9 rev not kept         : 1 problem(s) ok - TruMenu.cpp: W9RevTick lacks g_w9RevOld = level;
+case W9 box old              : 1 problem(s) ok - TruMenu.cpp: DrawSoundLog lacks W8Box(dl, p, h, e.aud, c); (0.22.51: audible incl. the reverb)
+case W9 no rev row           : 1 problem(s) ok - TruMenu.cpp: the monitor needs the reverb row (W9RevRow)
 case fade range              : 1 problem(s) ok - switches: FadeFar must be int:-1..2000:50
 case tint default            : 1 problem(s) ok - switches: row TruMenu | Sonar | TintOthers | ... | live | 0 | ... | TruMenu 0.22.51 missing
 case pda restart             : 1 problem(s) ok - switches: row TruMenu | PDA | ShadowPdaAsBasePda | ... | live | 0 | ... | TruMenu 0.22.51 missing
 case fade since              : 1 problem(s) ok - switches: row TruMenu | Sonar | FadeFar | ... | live | 0 | ... | TruMenu 0.22.51 missing
-43 cases + 1 positive, 0 failed
+case reverb default          : 1 problem(s) ok - switches: row TruMenu | Sound | ReverbFollowsMute | ... | live | 1 | ... | TruMenu 0.22.51 missing
+case reverb off restart      : 1 problem(s) ok - switches: row TruMenu | Sound | ReverbOff | ... | live | 0 | ... | TruMenu 0.22.51 missing
+59 cases + 1 positive, 0 failed

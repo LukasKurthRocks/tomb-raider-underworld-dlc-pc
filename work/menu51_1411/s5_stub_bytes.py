@@ -25,6 +25,18 @@ UNIT = re.compile(rb'\x8b\x44\x24\x04\x8b\x0d' + A + rb'\x85\xc9\x74(.)\x3b\xc1\
                   rb'\xc3\xff\x25' + A, re.S)
 
 
+W9 = re.compile(rb'\x60\x9c\x56\xe8' + A + rb'\x85\xc0\x74(.)\xc7\x44\x24\x2c\x00\x00\x00\x00\x9d\x61\xff\x25' + A, re.S)
+
+
+def first_ret(data, off):
+    import capstone
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+    for ins in md.disasm(data[off:off + 0x600], off):
+        if ins.mnemonic == 'ret':
+            return ins.op_str or '0'
+    return None
+
+
 def rel8(m, group, data):
     """the target file offset of a short jump whose displacement byte is the given group"""
     at = m.start(group)
@@ -54,6 +66,20 @@ def main(argv):
         print('  file offset 0x%x: %d bytes' % (m.start(), m.end() - m.start()))
         print('  je draw -> 0x%x / 0x%x (want 0x%x), je plain -> 0x%x / 0x%x (want 0x%x)' % (t1, t2, draw, t3, t4, plain))
         ok = ok and t1 == draw and t2 == draw and t3 == plain and t4 == plain
+    # 0.22.51 W9SendStub: pushad; pushfd; push esi; call W9VoiceMuted (stdcall, 1 argument: its first ret = ret 4);
+    # test eax,eax; je keep; mov dword [esp+2Ch],0; keep: popfd; popad; jmp [g_w9SetMixFn]
+    hits = list(W9.finditer(data))
+    print('W9SendStub: %d match(es)' % len(hits))
+    ok = ok and len(hits) == 1
+    for m in hits:
+        keep = rel8(m, 2, data)
+        want = m.end() - 8                           # the popfd after the mov
+        callee = m.start() + 3 + 5 + int.from_bytes(m.group(1), 'little', signed=True)
+        ret = first_ret(data, callee)
+        print('  file offset 0x%x: %s' % (m.start(), data[m.start():m.end()].hex(' ')))
+        print('  je keep -> 0x%x (want 0x%x); W9VoiceMuted at 0x%x, first ret %s (want 4 = __stdcall, 1 argument)' %
+              (keep, want, callee, ret))
+        ok = ok and keep == want and ret in ('4', '0x4')
     print('stubs %s' % ('ok' if ok else 'NOT as the source says'))
     return 0 if ok else 1
 

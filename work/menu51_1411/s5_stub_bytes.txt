@@ -1,7 +1,10 @@
 S5FogStub: 1 match(es)
-  file offset 0xb0600: a1 9c 95 91 10 85 c0 74 14 89 44 24 14 a1 98 95 91 10 89 44 24 10 f0 ff 05 a8 95 91 10 ff 25 ac 17 21 10
-  je go -> 0xb061d (want the jmp at 0xb061d)
+  file offset 0xb0ca0: a1 08 f0 91 10 85 c0 74 14 89 44 24 14 a1 04 f0 91 10 89 44 24 10 f0 ff 05 14 f0 91 10 ff 25 1c 38 21 10
+  je go -> 0xb0cbd (want the jmp at 0xb0cbd)
 S5UnitStub: 1 match(es)
-  file offset 0xb15a0: 98 bytes
-  je draw -> 0xb15ba / 0xb15ba (want 0xb15ba), je plain -> 0xb15fc / 0xb15fc (want 0xb15fc)
+  file offset 0xb1c30: 98 bytes
+  je draw -> 0xb1c4a / 0xb1c4a (want 0xb1c4a), je plain -> 0xb1c8c / 0xb1c8c (want 0xb1c8c)
+W9SendStub: 1 match(es)
+  file offset 0xd75a0: 60 9c 56 e8 e8 00 00 00 85 c0 74 08 c7 44 24 2c 00 00 00 00 9d 61 ff 25 ec 36 21 10
+  je keep -> 0xd75b4 (want 0xd75b4); W9VoiceMuted at 0xd7690, first ret 4 (want 4 = __stdcall, 1 argument)
 stubs ok

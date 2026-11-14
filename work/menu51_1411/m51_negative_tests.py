@@ -15,8 +15,8 @@ SRC = T.read_cpp()
 SW = T.SWITCHES
 SW_TEXT = open(SW, encoding='utf-8').read()
 CPP_CASES = [
-    ('version', 'const char *const kVersion = "TruMenu 0.22.51 (sonar view + base PDA + X default + DLC start from a level,',
-     'const char *const kVersion = "TruMenu 0.22.51 (sonar view,'),
+    ('version', 'const char *const kVersion = "TruMenu 0.22.51 (sonar view + base PDA + X default + DLC start from a level +',
+     'const char *const kVersion = "TruMenu 0.22.51 (sonar view +'),
     ('check row changed', '{0x006e3bec, "8d4c2474 51"},', '{0x006e3bec, "8d4c2474 52"},'),
     ('check row dropped', '    {0x00551adb, "8b742414 8b5008 8b4c2410 03542418"},\n', ''),
     ('check order', '    S5Check();                                // 0.22.51', '    // S5Check();'),
@@ -64,12 +64,30 @@ CPP_CASES = [
      '        reinterpret_cast<MissionStartFn>(kUgdF27)(args, select, 0, 0);         // f27 UILoadLevel'),
     ('in-level any unit', '_stricmp(name, "dlc_level1_start") && _stricmp(name, "dlc_level2_start")', 'false'),
     ('in-level ui ungated', '&& !g_menuPaused && !g_radPaused;', ';'),
+    # (i) W9 reverb
+    ('W9 check row', '    {0x0058223b, "e89b702300"},\n', ''),
+    ('W9 check order', '    W9Check();                                // 0.22.51', '    // W9Check();'),
+    ('W9 tick missing', '    W9Tick();                                 // 0.22.51', '    // W9Tick();'),
+    ('W9 detach', '        W9Shutdown();                                 // 0.22.51', '        // 0.22.51'),
+    ('W9 R1 site', 'const DWORD kW9R1 = 0x00591591,', 'const DWORD kW9R1 = 0x00591596,'),
+    ('W9 R2 bytes', 'kW9R2Game[5] = {0xe8, 0x2f, 0x5e, 0x23, 0x00};', 'kW9R2Game[5] = {0xe8, 0x2f, 0x5e, 0x23, 0x01};'),
+    ('W9 stub offset', '        mov dword ptr [esp + 0x2c], 0\n', '        mov dword ptr [esp + 0x28], 0\n'),
+    ('W9 stub no voice', '        push esi\n        call W9VoiceMuted\n', '        call W9VoiceMuted\n'),
+    ('W9 mutes all', '!W8FmOf(handle, &ci, &fl, &rf, &mode) || !(fl & 8)) return 0;', '!W8FmOf(handle, &ci, &fl, &rf, &mode)) return 0;'),
+    ('W9 R2 unchecked', 'if (!SoWrite(kW9R2, want ? kW9R2Game : g_w9R2New, want ? g_w9R2New : kW9R2Game, 5)) {',
+     'if (!WriteBytes(kW9R2, want ? g_w9R2New : kW9R2Game, 5)) {'),
+    ('W9 audible rule', 'return dryOn || (send > 0.0f && W9RevOutNow() > 0.0f);', 'return dryOn;'),
+    ('W9 rev not kept', '            g_w9RevOld = level;\n', ''),
+    ('W9 box old', 'W8Box(dl, p, h, e.aud, c);', 'W8Box(dl, p, h, !e.fmMute, c);'),
+    ('W9 no rev row', '            W9RevRow(de, sends, mutedSends, smax, name, sizeof(name), state, sizeof(state));\n', ''),
 ]
 SW_CASES = [
     ('fade range', 'TruMenu | Sonar | FadeFar | int:-1..2000:50 |', 'TruMenu | Sonar | FadeFar | int:0..2000:50 |'),
     ('tint default', 'Tint other areas | live | 0 |', 'Tint other areas | live | 1 |'),
     ('pda restart', 'Replace the shadow PDA with the base PDA | live | 0 |', 'Replace the shadow PDA with the base PDA | restart | 0 |'),
     ('fade since', 'faded out at n m | TruMenu 0.22.51', 'faded out at n m | TruMenu 0.22.50'),
+    ('reverb default', 'Reverb follows mute | live | 1 |', 'Reverb follows mute | live | 0 |'),
+    ('reverb off restart', 'Reverb off | live | 0 |', 'Reverb off | restart | 0 |'),
 ]
 
 

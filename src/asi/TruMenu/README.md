@@ -2928,7 +2928,7 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
-## 0.22.51 - sonar: fade of the far map, one area, other areas tinted, why one is missing; base PDA in DLC 2; X = default; DLC start from a level (2026-11-14)
+## 0.22.51 - sonar: fade of the far map, one area, other areas tinted, why one is missing; base PDA in DLC 2; X = default; DLC start from a level; the game's reverb follows mute (2026-11-14)
 
 Built into `work\asi\menu0274`, not installed, no live test (owner wishes of 14.11. evening; report in the workspace
 `docs\Befund-TruMenu-02251-1411.md`). 22 byte checks `kS5Checks` (`work\menu51_1411\precheck_02251.txt`, 0 mismatches
@@ -2975,6 +2975,20 @@ on `data\pc\tru.exe`; start line `0.22.51 sonar view / base PDA: checks ok (22 r
   doppelganger - then stdscreenmgr f7 + f19; the case's UI-stack call only when the game's own pause menu is open).
   Refused only during a cutscene or while a level change waits. 4 more byte checks at the first use
   (`work\menu51_1411\evidence_dlcstart_level.txt`, 12 rows, 0 mismatches).
+- **The game's reverb (Eitr beam: "alles stumm", a tone still)** (workspace `docs\Befund-Ton-ausserhalb-FMOD-1411.md`,
+  live 20:50 - 21:10): the game feeds every pool voice also into its own FMOD DSP "SFX Reverb" (holder `[0xccde98]`, an
+  input of the master group's head). The send (voice +8) leaves the channel's DSP head (real +0x98) **before** the dry
+  connection, so FMOD's mute never reaches it; its level is the game volume, set again on every voice update (0x591591)
+  and at the attach (0x5841bf). 11 byte checks `kW9Checks` (`work\menu51_1411\precheck_02251_reverb.txt`).
+  - **"Hall folgt Stumm"** (`snd.reverbmute`, `[Sound] ReverbFollowsMute`, default 1): the two `call 0x7b9ff3` sites ->
+    W9SendStub: a voice whose channel FMOD has muted (bit 3 - every TruMenu mute: Alles stumm, category, solo, sonar
+    sound off) sends 0 into the reverb; then the game's setMix. Takes effect at the voice's next update.
+  - **"Hall aus"** (`snd.reverboff`, `[Sound] ReverbOff`): the reverb -> master connection to 0 (the level before kept,
+    set back on off) - the simple switch; audible sounds lose their reverb too.
+  - **Audible** in the box, the monitor and "Nur hörbare Zeilen" = not paused and (dry mix > 0 or (send > 0 and reverb
+    out > 0)); muted lines with a live send say `stumm, Hall 0.34` and keep a filled box; the monitor has a row
+    `-- Hall (Spiel-Reverb) -> Master 1.00 | Sends n (m stumm), max x`. Info row "Hall: Stand" (`snd.reverb`).
+  - Rows on Spiel-Einstellungen / Ton (after "Ambient aus") and in Paket B2 (B2.8 / B2.9).
 - Rows: Spiel-Einstellungen / PDA / Sonar and copies in Paket G (G.9 - G.14). Options `[Sonar] FadeFar`, `TintOthers`,
   `[PDA] ShadowPdaAsBasePda` (live, switch group `tmsonar`). Items `sonar.fade`, `sonar.tint`, `sonar.area`, `sonar.why`,
   `sonar.view`, `pda.basepda`, `pda.state`. Checks: `trumenu_ini_check` `check_02251` (+ `check_0213` X rule,
@@ -2998,6 +3012,11 @@ on `data\pc\tru.exe`; start line `0.22.51 sonar view / base PDA: checks ok (22 r
 | 11 | DLC 1 level, page Kapitel | "DLC 2 ..." right twice, then from DLC 2 "DLC 1 ..." right twice | DLC 2 as in 10; DLC 1: the outfit / weapon screen, Lara without doppelganger mode (`arena.mode`: doppelganger byte 0), DLC 1 objectives |
 | 12 | main menu, page Kapitel | "DLC 2 ..." / "DLC 1 ..." | as 0.22.50 (mission start), unchanged |
 | 13 | a level, during a cutscene | a DLC row | refused: "a cutscene plays ..." |
+| 14 | start | read `TruMenu.log` | `0.22.51 reverb: checks ok (11 rows); [Sound] ReverbFollowsMute 1, ReverbOff 0`; at the first pad poll `0.22.51 reverb (run time): R1 0x591591 / R2 0x5841bf -> W9SendStub ...` |
+| 15 | DLC 2 at the Eitr beam, Ton-Monitor | "Hall folgt Stumm" **off**, "Stumm: Welt / Umgebung" on | the beam lines: `stumm, Hall 0.xx`, filled box; monitor row `Hall (Spiel-Reverb) -> Master 1.00 \| Sends 15 (15 stumm) ...`; the tone is **still there** (as 0.22.50) |
+| 16 | same | "Hall folgt Stumm" **on** | within a second the tone is **gone**; lines `(stumm)` with empty boxes; `Hall: Stand`: sends set to 0 counts up (B2.8) |
+| 17 | same, nothing muted | "Hall aus" on / off | on: the beam sounds dry (no reverb), monitor row `-> Master 0.00 (Hall aus)`, log `Hall aus - reverb -> master ... -> 0`; off: back to 1.00 (B2.9) |
+| 18 | optional, outside | `work\ton_1411\Get-AudioSessions.ps1` with all muted | tru.exe session peak about 0 with "Hall folgt Stumm" on (was 0.28 .. 0.38) |
 
 ## 0.22.50 - the sound log readable, every FMOD channel, two source hooks, one Ambient aus, Kapitel from the main menu (2026-11-14)
 
@@ -6158,6 +6177,8 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Sonar] FloorMarkers` | 0 | 0.22.48 (`sonar.markers`): only with `FullMap=1`: 1 = every stair / floor-change marker of the loaded units (0x6e40c6), not only the ones a ping saw; 0 = the game's. Live |
 | `[Sonar] AllFloors` | 0 | 0.22.49 (`sonar.allfloors`, "Alle verbundenen Bereiche"): only with `FullMap=1`: 1 = the sonar frame 0x6e4130 also draws the map units of other floors that the sonar loaded itself (0x6e429b `74 1d` -> `90 90`: the floor test `[unit+0xb0] & [0xedf268]` skipped). Loaded are only the units the game's own open path asks for - the floor's units and their direct portal neighbours of any floor - so no load is added and streaming is not touched; display only. Live |
 | `[Sonar] TriangleCap` | 300000 | 0.22.49 ("Sonar komplett: Dreiecks-Grenze"): only with `FullMap=1`: the sonar's per-frame triangle budget - TruMenu writes `cap - 1` into the imm32 of `cmp dword [0xee03e8], 0x16d83` (0x6dfa6f); values up to 93572 = the game's bytes, at most 1000000. A budget only (the triangles are flushed in batches of 2000 into the render device's growing dynamic vertex pool, 84 bytes each: 300000 = about 25 MB of vertex buffers per sonar frame). Live |
+| `[Sound] ReverbFollowsMute` | 1 | 0.22.51 (`snd.reverbmute`, "Hall folgt Stumm"): the game sends every pool voice also into its own FMOD DSP "SFX Reverb" (holder `[0xccde98]`) - a send from the channel's DSP head that FMOD's mute (dry mix 0) never reaches; 1 = a voice whose channel FMOD has muted (ChannelI +0x74 bit 3: TruMenu's mute / solo / category / sonar-sound rules) sends 0 into it (two call redirects 0x591591 / 0x5841bf of the game's send `setMix`); 0 = the game's (muted sounds keep their reverb). Live |
+| `[Sound] ReverbOff` | 0 | 0.22.51 (`snd.reverboff`, "Hall aus"): 1 = the game's reverb -> master connection set to 0 through the game's `setMix` 0x7b9ff3 (the level before kept and set back on 0); every reverb of the game is gone, also of audible sounds. Live |
 | `[Sonar] FadeFar` | 0 | 0.22.51 (`sonar.fade`, "Sonar: Abblenden Ferne"): the fog of the sonar view. 0 = the game's call (its fog near = far = 65536, i.e. no linear fog); n = 1 .. 2000 metres: the map fades from n/2 to n m into the background colour (smaller = stronger); -1 = aus (fog 90 / 100 km). Two call redirects 0x6e4d94 / 0x6e4bf9 (`call 0x5bfe40` -> S5FogStub). Live |
 | `[Sonar] TintOthers` | 0 | 0.22.51 (`sonar.tint`, "Sonar: andere Bereiche einfärben"): 1 = every map unit except the sonar's open unit (Lara's, `[0xedf254]`) is drawn with an amber-tinted draw colour (`[0xee03bc]` 40 % towards 255 / 170 / 40 for that unit's call, call redirect 0x6e42ac). Live |
 | `[PDA] ShadowPdaAsBasePda` | 0 | 0.22.51 (`pda.basepda`, "Shadow-PDA durch Basis-PDA ersetzen"): 1 = DLC 2 shows the base PDA (Croft VX2 with the sonar map) instead of its journal PDA - in the resident g_pda script 3347 the DLC branch f1 (`level tag == "dlc2"`) returns 0 (word `04000001` -> `04000000`), written only in a level with the world running, the sonar and TruMenu's menu closed, back on 0 and at unload. Only with the DLC g_pda; the PC's own g_pda has no DLC branch ("keine DLC-PDA geladen", nothing written). Live |
