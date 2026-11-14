@@ -21,7 +21,9 @@ Then a per-session summary: units in first-visit order, portal hits per unit pai
 (first time each), how each DLC 2 unit was first reached (the 6 events before its first MOVE / PLACE / LOAD).
 
 Usage (from trudlcport):
-  ../bin/pyt -t 300 work/pk2_1411/pk2_trace_dlc2.py TRUTRACE TRUMENU OUT [--from HH:MM] [--to HH:MM] [--day YYYY-MM-DD]
+  ../bin/pyt -t 300 work/pk2_1411/pk2_trace_dlc2.py TRUTRACE TRUMENU OUT [--from HH:MM] [--to HH:MM] [--day YYYY-MM-DD] [--old]
+  --old: copy from before TruTrace 0.3 (lines without date, no session lines): trace events and TruMenu lines as two
+         lists in file order (the 'logs-bis-1211-vor-PaketR' copy holds the only ring walk, 07.-11.11.)
 Exit code 0 = done, 2 = usage / no session.
 """
 import sys, re, collections
@@ -30,7 +32,7 @@ DLC1 = ('dlc_level2_start', 'dlc_yggdrasil_hall01', 'dlc_yggdrasil_hall02', 'dlc
         'dlc2_hall_machine_ceremony', 'dlc2_machine_room', 'dlc2_hall_goo_machine', 'dlc2_goo_room',
         'dlc2_hall_ceremony_goo', 'dlc2_treasure_room_cine')
 CLOCK = r'([0-9]{2}[:][0-9]{2}[:][0-9]{2}\.[0-9]{3})'      # hh:mm:ss.mmm (classes keep the upload scan quiet)
-TS = r'^(\d{4}-\d\d-\d\d) ' + CLOCK + ' '
+TS = r'^(?:(\d{4}-\d\d-\d\d) )?' + CLOCK + ' '               # old copies (before TruTrace 0.3): no date, no session lines
 R_SESS = re.compile(r'^=== (\d{4}-\d\d-\d\d) ' + CLOCK + r' TruTrace (\S+) session start \(pid (\d+)\) ===')
 R_LOAD = re.compile(TS + r"\[[^\]]*\] level: STREAM_LevelLoadAndInit '([^']+)' from \S+ \(level load 0x5dded0\)")
 R_REQ = re.compile(TS + r"\[[^\]]*\] level: REQUEST level change(.*)")
@@ -46,7 +48,7 @@ R_MENU = re.compile(TS + r"(item (?:level\.load|cp\.jump|pos\.portal|unit\.go|le
 # DLC 2 story markers the unit scripts print (TruMenu 'script:' lines; texts from the unit scripts, PK1-8 scripts scan)
 R_STORY = re.compile(TS + r"script: (.*(?:[Vv]isit ?[123]|EndVisit|SetUpVisit|prep visit|Machine power|machine power|"
                      r"credits|CREDITS|warp|Warp|StartCinematic called|Cine_End event starting|natlapod|"
-                     r"Objectives Dispatcher|dlc obj count|ceremony|goo room|machine_room|treasure|"
+                     r"Objectives Dispatcher|dlc obj count|objectives count to|ceremony|goo room|machine_room|treasure|"
                      r"Loading DLC|MainMenu:  Inside Open).*)")
 
 
@@ -56,13 +58,17 @@ def opt(argv, name, default=None):
     return default
 
 
-def sessions(path):
+def sessions(path, old=False):
     out, cur = [], None
     for ln in open(path, encoding='utf-8', errors='replace'):
         m = R_SESS.match(ln)
         if m:
             cur = dict(day=m.group(1), start=m.group(2), ver=m.group(3), pid=m.group(4), ev=[])
             out.append(cur); continue
+        if cur is None and old and (m := re.match(TS, ln)):
+            # --old: a copy without session lines = one pseudo session in file order (days not known)
+            cur = dict(day='-', start=m.group(2), ver='(old, no session lines)', pid='?', ev=[])
+            out.append(cur)
         if cur is None: continue
         e = None
         m = R_LOAD.match(ln)
@@ -77,7 +83,7 @@ def sessions(path):
         if e is None and (m := R_SAVE0.match(ln)): e = ('SAVE', "no checkpoint intro (placement) in %s" % m.group(3))
         if e is None and (m := R_REST.match(ln)): e = ('REST', "%s cp %s" % (m.group(4), m.group(5)))
         if e is None and (m := R_TP.match(ln)): e = ('TP', "%s units in %s (%s)" % (m.group(4), m.group(3), m.group(5)[:60]))
-        if e: cur['ev'].append((m.group(1), m.group(2)) + e)
+        if e: cur['ev'].append((m.group(1) or '-', m.group(2)) + e)
     return out
 
 
@@ -85,18 +91,34 @@ def menu_events(path):
     ev = []
     for ln in open(path, encoding='utf-8', errors='replace'):
         m = R_MENU.match(ln)
-        if m: ev.append((m.group(1), m.group(2), 'MENU', m.group(3)[:170])); continue
+        if m: ev.append((m.group(1) or '-', m.group(2), 'MENU', m.group(3)[:170])); continue
         m = R_STORY.match(ln)
-        if m: ev.append((m.group(1), m.group(2), 'STORY', m.group(3)[:170]))
+        if m: ev.append((m.group(1) or '-', m.group(2), 'STORY', m.group(3)[:170]))
     return ev
 
 
 def main(argv):
     t_from, t_to, day = opt(argv, '--from', '00:00'), opt(argv, '--to', '99:99'), opt(argv, '--day')
+    old = '--old' in argv
+    if old: argv.remove('--old')
     if len(argv) < 4: print(__doc__); return 2
     trace, menu, out = argv[1:4]
-    S = sessions(trace)
+    S = sessions(trace, old)
     M = menu_events(menu)
+    if old:
+        # no dates: TruMenu lines cannot be merged by time; trace events stay in file order, the TruMenu lines follow
+        # as their own list (file order)
+        lines = ['=' * 100, 'OLD COPY: TruTrace events in file order (%d), then TruMenu lines in file order (%d)' % (
+            len(S[0]['ev']) if S else 0, len(M))]
+        for s in S:
+            for e in s['ev']:
+                if e[2] == 'TP': continue
+                lines.append('  %s %-5s %s' % (e[1][:12], e[2], e[3]))
+        lines.append('-' * 100)
+        for e in M: lines.append('  %s %-5s %s' % (e[1][:12], e[2], e[3]))
+        open(out, 'w', encoding='utf-8', newline='\n').write('\n'.join(lines) + '\n')
+        print('old copy: %d trace events, %d TruMenu lines -> %s' % (len(S[0]['ev']) if S else 0, len(M), out))
+        return 0 if S else 2
     lines, nsel = [], 0
     for i, s in enumerate(S):
         if day and s['day'] != day: continue
