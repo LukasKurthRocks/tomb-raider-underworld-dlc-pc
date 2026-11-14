@@ -2307,7 +2307,7 @@ def sw_rows(counts, groups):                   # QbSwRows: group row + the open 
     return sum(1 + (c if o else 0) for c, o in zip(counts, groups))
 
 
-QB_VIEW_MAX = 192                              # kQbViewMax (0.22.44; 0.22.18 .. 0.22.43: 128; 0.21.1 .. 0.22.15: 64)
+QB_VIEW_MAX = 256                              # kQbViewMax (0.22.44; 0.22.18 .. 0.22.43: 128; 0.21.1 .. 0.22.15: 64)
 
 
 def shipped_switch_counts():                   # 0.22.23: the shipped file's group sizes (was a fixed list of 9 groups)
@@ -2442,7 +2442,7 @@ def check_swcap():
     # page Fixes: the shipped file never cuts; a 130-row group cuts 12 rows with 10 groups and says so
     worst = max(sw_page(shipped, k)[1] for k in range(len(shipped)))
     cases.append(('page Fixes, shipped file: every group open in turn, rows not shown max %d' % worst, worst == 0))
-    # 0.22.44: the sizes follow QB_VIEW_MAX (128 -> 192): 130 / 118 rows = QB_VIEW_MAX + 2 / QB_VIEW_MAX - 10
+    # 0.22.44: the sizes follow QB_VIEW_MAX (128 -> 256): 130 / 118 rows = QB_VIEW_MAX + 2 / QB_VIEW_MAX - 10
     big = QB_VIEW_MAX + 2
     built, hidden = sw_page([5] * 9 + [big], 9)
     cases.append(('page Fixes, 10 groups, open group %d rows: %d rows built, %d named in the head' % (big, built, hidden),

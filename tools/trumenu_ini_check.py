@@ -1842,8 +1842,8 @@ SW_START_GATED = {
 }
 SW_START_GATED_HINT = ('live nur wenn 1 beim Start', 'live if 1 at start')
 SW_MAX, SW_GROUP_MAX = 512, 24              # 0.22.23: 512 rows (was 160 - the shipped file had 159)
-QB_VIEW_MAX = 192                            # kQbViewMax: rows of one bar page (page Fixes: group rows + the open group);
-                                             # 0.22.44 (W2): 192 (was 128) - page Tests with the guide packages + archive
+QB_VIEW_MAX = 256                            # kQbViewMax: rows of one bar page (page Fixes: group rows + the open group);
+                                             # 0.22.44 (W2): 256 (was 128) - page Tests 227 static rows
 RING_FROZEN = 172                            # 0.21.5: the ring is frozen - no new entries
 
 
@@ -2193,7 +2193,7 @@ def check_0216(ini_path):
     elif pages[specials.index('kQsCostume') - 1][1] != 'kQbLara':
         problems.append('TruMenu.cpp: page Kostueme must follow page Lara')
     if 'static_assert(kQbPageN <= %d' % QB_PAGES_MAX not in src or 'g_qbRow[%d]' % QB_PAGES_MAX not in src or \
-            'const int kQbViewMax = %d;' % QB_VIEW_MAX not in src:   # 0.22.16: 112; 0.22.18: 128; 0.22.44: 192
+            'const int kQbViewMax = %d;' % QB_VIEW_MAX not in src:   # 0.22.16: 112; 0.22.18: 128; 0.22.44: 256
         problems.append('TruMenu.cpp: the page / row limits (static_assert kQbPageN <= %d, g_qbRow[%d], kQbViewMax %d) '
                         'changed' % (QB_PAGES_MAX, QB_PAGES_MAX, QB_VIEW_MAX))
     sec = src[src.find('// ---- 0.21.6 costumes'):src.find('// ---- end of 0.21.6 costumes')]
@@ -5251,7 +5251,7 @@ def check_02244(switches_path):
     the block kQfTg, kQfTg nowhere else; switch rows sw.set of TruMenu.switches.txt; then ts_teleport / ts_arena1 /
     ts_cine on level 0, then the closed group ts_archive (the last level-0 group) holding tp_q90 (the TP block), ts_spots,
     light_diag, ts_diag, ts_hall02 as kQfSub groups - no old row lost (the arena / hall02 / light items still on the
-    page); QbTestsRows skips tg ids, TpCheckSet tags them 1411; kQbViewMax 192. Barrierefreiheit: no label with a
+    page); QbTestsRows skips tg ids, TpCheckSet tags them 1411; kQbViewMax 256 (page Tests static rows + 16 <= it). Barrierefreiheit: no label with a
     leading space, the planned rows only in the last group acc_planned (closed at the start), the arachnophobia rows in
     the sub-group acc_arachno; QbViewOf: planned rows without the "   " prefix. [Menu]: an INI without Load (before
     0.22.18) keeps the big window off (g_menuOldIni; Load stays as read), logged at the start and in ToggleMenu; row
@@ -5350,7 +5350,11 @@ def check_02244(switches_path):
     if '!strncmp(t.id, "tg", 2)' not in qt: problems.append('TruMenu.cpp: QbTestsRows must skip the tg<X>.<name> rows too')
     if '!_strnicmp(r.arg, "tg", 2) ? "1411" : "Q90"' not in fn_body(src, 'void TpCheckSet('):
         problems.append('TruMenu.cpp: TpCheckSet must tag the tg checks 1411 (the archived ones Q90)')
-    if 'const int kQbViewMax = 192;' not in src: problems.append('TruMenu.cpp: kQbViewMax must be 192')
+    if 'const int kQbViewMax = 256;' not in src: problems.append('TruMenu.cpp: kQbViewMax must be 256')
+    n_tests = len([r for r in qb_rows(src) if r[0] == 'kQbTests'])
+    if n_tests + 16 > QB_VIEW_MAX:   # every group open: the static rows + room for the Prepare / TO TEST rows
+        problems.append('TruMenu.cpp: page Tests has %d static rows - kQbViewMax %d leaves < 16 for Prepare / TO TEST' %
+                        (n_tests, QB_VIEW_MAX))
     # Barrierefreiheit
     acc = [r for r in qb_rows(src, True) if r[0] == 'kQbAccess']
     accb = src[src.find('const QbRow kQbAccess[] = {'):]
@@ -5406,7 +5410,7 @@ def check_02244(switches_path):
     n = {k: sum(1 for r in rows if r[4] == k) for k in ('kQbGroup', 'kQbCheck', 'kQbSwitch', 'kQbNote')}
     return problems, ('W2 order (page Tests: TG block %d rows - %d groups, %d checks, %d switch, %d notes, packages %s; '
                       'archive %s; Barrierefreiheit planned rows in acc_planned, acc_arachno; old INI keeps the big '
-                      'window off; DeviceGlyphs on Spiel-Einstellungen; kQbViewMax 192)' %
+                      'window off; DeviceGlyphs on Spiel-Einstellungen; kQbViewMax 256)' %
                       (len(rows), n['kQbGroup'], n['kQbCheck'], n['kQbSwitch'], n['kQbNote'],
                        ' '.join(p.upper() for p in order), ' '.join(W2_ARCHIVED)))
 

@@ -1,0 +1,4 @@
+kQbTests: 227 static rows (kQbAction 66, kQbBool 27, kQbCheck 65, kQbChoice 1, kQbGroup 26, kQbInfo 8, kQbNote 19, kQbSwitch 12, kQbValue 3)
+  row starts in the table text: 227
+kQbAccess: 33 static rows (kQbAction 1, kQbBool 10, kQbGroup 5, kQbInfo 2, kQbPlanned 10, kQbValue 5)
+  row starts in the table text: 33

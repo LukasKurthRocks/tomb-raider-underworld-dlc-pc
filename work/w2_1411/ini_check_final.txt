@@ -29,7 +29,7 @@ ok: 0.22.19 29 menu pages, 17 bar page names, power.infinite row / item / greyin
 ok: 0.22.20 menu.noattract: [Menu] NoAttract=0, item / row / help / greying, capture + hold, 13 byte checks
 ok: 0.22.21 menu.attracttimer: [Menu] AttractTimerShow=0 / AttractTimerPosition=tr, item / row / help / greying, read-only shadow + flash, front end only, 45 byte checks unchanged
 ok: 0.22.22 teaser timer line in the bar language, game clock / wall clock, pause bit marker (0.5 + bit), 4 byte checks read only, precheck_02222 = 45 + 4 rows
-ok: 0.22.23 switches limit 512 / 24 groups (file 205 rows in 14 groups, 307 free), lines over it logged, page Fixes at most 56 rows (group dlc2kampf open) <= 192, no new byte checks
+ok: 0.22.23 switches limit 512 / 24 groups (file 205 rows in 14 groups, 307 free), lines over it logged, page Fixes at most 56 rows (group dlc2kampf open) <= 256, no new byte checks
 ok: 0.22.24 fall watch (records 742/743/1068/1080, states 1008 / 1015, watchdog, safe ground, 40 lines / 10 s), [Rescue] FallNet default 0 live, net after 3 s / 3000 units through UnstuckPlace, 2 + 1 byte checks, switch row
 ok: 0.22.25 settings.reset: default text 48626 bytes (283 keys) built in a measured buffer, no fixed array; table texts fit: Log line 2048 (light.cut 1400), [Quick] Closed 605 of 1024, OpenPages 220 of 400, Cheats 69 of 256, NavDraw 120 of 256, settings.show 9198 of 16384
 ok: 0.22.26 test arena: 6 kAdmChecks rows (0x6e6646 patch left out), meter-full once in __try, CheatGate on fill / keep, AdmTick per frame, ai.remove spawned by address + stamp, page Tests 3 arena rows, no new INI key
@@ -45,7 +45,7 @@ ok: 0.22.40 attract display styles (Q126b): [Menu] AttractIcon = 7 live, the 8 s
 ok: 0.22.41 compact attract styles (Q126c): [Menu] AttractIcon 0 .. 16 = 7 live, 17 styles, 8 .. 16 without a box (small circle + counter / terse text), no time next to a circle, one or two digits
 ok: 0.22.42 W3 debug view (RoomOnly + own stream unit / RoomNear with a reason log; DistMetres 1; OcclNear + test point +1 m; one label per instance and frame, uber labels after the debug view, LabelStack / LabelCellMax; HideEmptyPots; teaser icon main menu only, 3 byte checks = precheck_02242; 6 keys, 3 items)
 ok: 0.22.43 W5 markup (object markup through the bone matrix, query skip rules, type + id labels within 15 m, RoomOnly / occlusion, bar rows first; 6 byte checks = precheck_02243)
-ok: 0.22.44 W2 order (page Tests: TG block 55 rows - 7 groups, 19 checks, 1 switch, 7 notes, packages A B C D E F; archive tp_q90 ts_spots light_diag ts_diag ts_hall02; Barrierefreiheit planned rows in acc_planned, acc_arachno; old INI keeps the big window off; DeviceGlyphs on Spiel-Einstellungen; kQbViewMax 192)
+ok: 0.22.44 W2 order (page Tests: TG block 55 rows - 7 groups, 19 checks, 1 switch, 7 notes, packages A B C D E F; archive tp_q90 ts_spots light_diag ts_diag ts_hall02; Barrierefreiheit planned rows in acc_planned, acc_arachno; old INI keeps the big window off; DeviceGlyphs on Spiel-Einstellungen; kQbViewMax 256)
 ok: 0.22.27 save probe: 4 items read only on the TruLink thread, kSvChecks 32 + kSvHookChecks 5 + 2 prologues = precheck_02227_sv, memcpy 0x8148a0 only in the 2 copy hooks, [Log] Save default 0 live, switch row
 ok: 0.22.28 TP block: 109 rows (11 groups, 46 checks, 11 switches, 11 notes), all kQfTp, packages 1 2 3 4 5 6 7 8 9 A, no INI key
 ok: 0.22.29 radial lock: Enabled=0 closes, 4 drawn-frame guards, 6 entry calls in RadialTick

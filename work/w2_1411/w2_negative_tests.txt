@@ -1,5 +1,5 @@
 positive (unchanged sources): 0 problem(s) ok
-  W2 order (page Tests: TG block 55 rows - 7 groups, 19 checks, 1 switch, 7 notes, packages A B C D E F; archive tp_q90 ts_spots light_diag ts_diag ts_hall02; Barrierefreiheit planned rows in acc_planned, acc_arachno; old INI keeps the big window off; DeviceGlyphs on Spiel-Einstellungen; kQbViewMax 192)
+  W2 order (page Tests: TG block 55 rows - 7 groups, 19 checks, 1 switch, 7 notes, packages A B C D E F; archive tp_q90 ts_spots light_diag ts_diag ts_hall02; Barrierefreiheit planned rows in acc_planned, acc_arachno; old INI keeps the big window off; DeviceGlyphs on Spiel-Einstellungen; kQbViewMax 256)
 case version             : 1 problem(s) ok - TruMenu.cpp: kVersion must start with "TruMenu 0.22.44 (W2 order"
 case no TG block         : 1 problem(s) ok - TruMenu.cpp: kQbTests lacks the block "TG 1411 begin" .. "TG 1411 end"
 case TG not first        : 1 problem(s) ok - TruMenu.cpp: the TG block must be the first rows of kQbTests
@@ -22,7 +22,8 @@ case archive not closed  : 1 problem(s) ok - TruMenu.cpp: ts_archive missing in 
 case old row lost        : 1 problem(s) ok - TruMenu.cpp: kQbTests lost the row fix.hall02 
 case QbTestsRows tg      : 1 problem(s) ok - TruMenu.cpp: QbTestsRows must skip the tg<X>.<name> rows too
 case tag 1411            : 1 problem(s) ok - TruMenu.cpp: TpCheckSet must tag the tg checks 1411 (the archived ones Q90)
-case kQbViewMax          : 1 problem(s) ok - TruMenu.cpp: kQbViewMax must be 192
+case kQbViewMax          : 1 problem(s) ok - TruMenu.cpp: kQbViewMax must be 256
+case page too long       : 1 problem(s) ok - TruMenu.cpp: page Tests has 247 static rows - kQbViewMax 256 leaves < 16 for Prepare / TO TEST
 case access space        : 1 problem(s) ok - TruMenu.cpp: kQbAccess label "  Spinnen-Modell aus" starts with a space
 case planned outside     : 1 problem(s) ok - TruMenu.cpp: kQbAccess has planned rows outside the group acc_planned
 case planned not closed  : 1 problem(s) ok - TruMenu.cpp: acc_planned missing in kQbStartClosed
@@ -37,4 +38,4 @@ case glyph row gone      : 1 problem(s) ok - TruMenu.cpp: page Spiel-Einstellung
 case README TO TEST      : 1 problem(s) ok - README.md: section "## 0.22.44 - ..." with "### TO TEST 0.22.44" missing
 case PS1 hash            : 1 problem(s) ok - Set-TruMenu.ps1: the 0.22.43 build hash (work/asi/menu0266) is missing
 case switches row        : 2 problem(s) ok - TruMenu.cpp: TG row "Tasten-Hinweise nach Geraet" (sw.set TruMenu:Input:DeviceGlyphs): a switch row is sw.set <Plugin>:<Section>:<Key> of TruMenu.switches.txt
-37 cases + 1 positive, 0 failed
+38 cases + 1 positive, 0 failed

@@ -44,7 +44,9 @@ CASES = [
     ('old row lost', '"fix.hall02", "", kQbAction', '"fix.hall03", "", kQbAction'),
     ('QbTestsRows tg', '(!strncmp(t.id, "tp", 2) || !strncmp(t.id, "tg", 2))', '(!strncmp(t.id, "tp", 2))'),
     ('tag 1411', '!_strnicmp(r.arg, "tg", 2) ? "1411" : "Q90"', '!_strnicmp(r.arg, "tp", 2) ? "1411" : "Q90"'),
-    ('kQbViewMax', 'const int kQbViewMax = 192;', 'const int kQbViewMax = 128;'),
+    ('kQbViewMax', 'const int kQbViewMax = 256;', 'const int kQbViewMax = 192;'),
+    ('page too long', '    // ---- TG 1411 end\n', '    // ---- TG 1411 end\n' +
+     '    {"Teleport", "Teleport", "-", "", kQbNote, -1, kQcNone, 0, kQbGrey, 0},\n' * 20),
     ('access space', '{"Spinnen-Modell aus", "Spider model off"', '{"  Spinnen-Modell aus", "  Spider model off"'),
     ('planned outside', '    {"Gott voll (Hilfe)", "Full god mode (assist)"',
      '    {"Reaktions-Momente", "Reaction moments", "-", "a|b", kQbPlanned, -1, kQcNone, 0, 0, 0},\n'

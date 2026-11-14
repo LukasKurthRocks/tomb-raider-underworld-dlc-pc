@@ -2953,8 +2953,8 @@ No new INI key, no new item, no hook, no byte check.
   Alt"** (`ts_archive`) with the rows of earlier rounds, moved unchanged as sub-groups: "Alte Testpakete 11.11. (Q90)"
   (`tp_q90` + packages A, 1 .. 9), Teststellen (`ts_spots`), Licht (Diagnose) (`light_diag`), Diagnose (`ts_diag`),
   hall02-Zähler (`ts_hall02`). Nothing deleted; the group keys are the same, so `[Quick] Closed` keeps applying.
-- **`kQbViewMax` 192** (was 128): with every group open the page has about 165 static rows - the Prepare / TO TEST rows
-  after them were cut before.
+- **`kQbViewMax` 256** (was 128): with every group open the page has 227 static rows (170 before) - the Prepare / TO
+  TEST rows after them were already cut at 128 (`work\w2_1411\w2_row_counts.py`).
 - **Barrierefreiheit.** The rows "verschoben": planned rows were drawn with a 3-space prefix after the (empty) square
   column (QbViewOf, since 0.18 - the column came in 0.22.18), the arachnophobia parts had two leading spaces in their
   labels. Now: no prefix, no leading spaces; the arachnophobia rows are a sub-group "Arachnophobie" of "Sonstige
