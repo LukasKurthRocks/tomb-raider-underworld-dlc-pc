@@ -2928,6 +2928,77 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.51 - sonar: fade of the far map, one area, other areas tinted, why one is missing; base PDA in DLC 2; X = default; DLC start from a level (2026-11-14)
+
+Built into `work\asi\menu0274`, not installed, no live test (owner wishes of 14.11. evening; report in the workspace
+`docs\Befund-TruMenu-02251-1411.md`). 22 byte checks `kS5Checks` (`work\menu51_1411\precheck_02251.txt`, 0 mismatches
+on `data\pc\tru.exe`; start line `0.22.51 sonar view / base PDA: checks ok (22 rows) ...`), three 5-byte call redirects
+(only while an option needs them) and one script word (only with the DLC g_pda).
+
+- **"Sonar: Abblenden Ferne"** (`sonar.fade`, `[Sonar] FadeFar`, value row: aus / Spiel / 800 / 400 / 200 / 100 / 50 /
+  20 m; page Fixes: -1 .. 2000). What the code shows: every map vertex gets the same colour (`[0xee03bc]`, no distance
+  term on the CPU); the sonar view sets the camera far plane = tuning +0x10 (live 100000) and a fog override
+  `0x5bfe40(r, g, b, 65536.0, 65536.0)` - fog near == far, so the engine's linear fog is degenerate (1 / (far - near) =
+  inf). The game's own fade is therefore not a linear fog; most likely the shading of the sonar materials (lit by the face
+  normal) - **not proven**. The row drives the engine's fog for the sonar: 0 = the game's call untouched, n m = fog from
+  n/2 to n m into the background colour, aus = fog 90 / 100 km. TO TEST 1 / 2 decide whether "aus" also removes the
+  game's own fade; if not, the next step is the material / shader of tuning +0x34.
+- **"Bereich anzeigen"** (`sonar.area`, value row: alle + every unit of the sonar's own list): only that unit is drawn
+  (the frame's draw call 0x6e42ac -> S5UnitStub skips the others). No load (only units the sonar loaded itself), the
+  camera is not moved (the view centre comes from the game's pan input - no safe way to set it was found; documented).
+  Kept for the session (not in the INI); X = alle.
+- **"Sonar: andere Bereiche einfärben"** (`sonar.tint`, `[Sonar] TintOthers`): Lara's unit (the sonar's open unit) in the
+  game's cyan, every other drawn unit with the draw colour 40 % towards amber (only for that unit's draw call; the game's
+  value back right after). Partly revealed edges (game mode without "Sonar komplett") stay cyan.
+- **Why a unit is missing** (helheim01 without helheim02): the view distance is 100000 (+4000) live - not the reason.
+  0x6dfa60 drops a triangle when `(v0 - view centre) . view axis < -4000` - everything more than 40 m in front of the view
+  centre (towards the camera) is cut, depending on where the camera looks. The sonar-open log line now has a second line
+  `0.22.51 sonar view (open): centre ..., axis ..., per unit plane / dist, origins behind the cut`; "Sonar: warum fehlt
+  ein Bereich? (Log)" (`sonar.why`) writes it at any moment (turn the camera, press it again).
+- **"Shadow-PDA durch Basis-PDA ersetzen"** (`pda.basepda`, `[PDA] ShadowPdaAsBasePda`): with the DLC g_pda, DLC 2 shows
+  the base PDA (Croft VX2, sonar map) instead of its journal PDA. TruMenu finds the resident script 3347 through the
+  ScriptSection hash map (FindResource 0x551560 read by hand: `[0x8a6ed0]` buckets, `[0x8a6ed8]` table, object vtable
+  0x84e4d4, +8 = the section bytes), recognises f1 `level tag == "dlc2"` by its 19 words + 'dlc2' (first at +0x2294, else
+  a scan of 64 KiB) and writes `04000000` over `04000001` - only in a level, world running, sonar and TruMenu menu
+  closed; back on off and at unload, only over its own word. The PC's own g_pda (installed today) has no DLC branch: the
+  row is greyed with "keine DLC-PDA geladen", nothing is written. Info row "Basis-PDA: Stand" (`pda.state`).
+- **X on a value row = its default** (owner wish): every `kQbValue` row (default = its INI default / neutral value;
+  volumes, mouse, graphics and the pass mask have none - the footer says so) and every int / choice switch of
+  `TruMenu.switches.txt` (page Fixes, pinned rows, kQbSwitch rows of page Tests; default = the file's default column).
+  The footer shows `X: Standard` on such rows.
+- **Command line (L3)**: `level.start ` suggests every usable unit (as `level.load`); `level.load ...` in the main menu
+  (where it is refused since 0.22.46) suggests `level.start <unit>` lines.
+- **Kapitel: DLC 1 / DLC 2 from inside a level** (owner wish, was refused since 0.22.50): the two DLC start rows run
+  `save.backup kapitel;level.start dlc1|dlc2` in a level too; `level.start` there = the game's own DLC start from the
+  pause menu (RegisterAcceptChanges case 8 as the title update / TruDlc2Player 0.6: `f27 UILoadLevel(unit, 1 for DLC 1 /
+  0 for DLC 2, 0, 1)` - the new-game block zeroes the chosen-costume words -> the unit's default outfit, DLC 2 = the
+  doppelganger - then stdscreenmgr f7 + f19; the case's UI-stack call only when the game's own pause menu is open).
+  Refused only during a cutscene or while a level change waits. 4 more byte checks at the first use
+  (`work\menu51_1411\evidence_dlcstart_level.txt`, 12 rows, 0 mismatches).
+- Rows: Spiel-Einstellungen / PDA / Sonar and copies in Paket G (G.9 - G.14). Options `[Sonar] FadeFar`, `TintOthers`,
+  `[PDA] ShadowPdaAsBasePda` (live, switch group `tmsonar`). Items `sonar.fade`, `sonar.tint`, `sonar.area`, `sonar.why`,
+  `sonar.view`, `pda.basepda`, `pda.state`. Checks: `trumenu_ini_check` `check_02251` (+ `check_0213` X rule,
+  `check_02240` enum, `check_02244` key count, `check_02250` version part adapted); negative cases
+  `work\menu51_1411\m51_negative_tests.py`; compiled stubs `work\menu51_1411\s5_stub_bytes.py`.
+
+### TO TEST 0.22.51
+
+| # | Where | Do | Expected |
+|---|---|---|---|
+| 1 | start | read `TruMenu.log` | `0.22.51 sonar view / base PDA: checks ok (22 rows); [Sonar] FadeFar 0, TintOthers 0, [PDA] ShadowPdaAsBasePda 0` |
+| 2 | DLC 1 water wheel, PDA -> Sonar (FullMap on) | "Sonar: Abblenden Ferne" -> aus, then 50 m, then X | log `0.22.51 sonar view (sonar.fade): ... F1 0x6e4d94 / F2 0x6e4bf9 -> S5FogStub`; 50 m: the far map fades into black; **aus: does the game's own dimming of far meshes go away?** (screenshot - decides the cause); X: `Spiel`, `the game's calls` |
+| 3 | same | "Bereich anzeigen" right / left | only `dlc_pillory` (etc.) drawn, the others gone; `alle` = everything again; X = alle; no load in the log |
+| 4 | same | "Sonar: andere Bereiche einfärben" on | water wheel cyan, pillory / caverns amber-tinted; off = all cyan |
+| 5 | helheim01 (Arena 1a area), Sonar | look for helheim02, then "Sonar: warum fehlt ein Bereich? (Log)", turn the camera, again | line `0.22.51 sonar view (open)` / `(sonar.why)`: helheim02 `plane` < -40 m = behind the cut (then it appears when the camera turns) - or `UNPLACED` / `(other floor)` |
+| 6 | any page | X on "Zeitlupe", "Teaser-Anzeige", "Sonar komplett: Dreiecks-Grenze", "Höchstens so weit weg (m)" | each goes back to its default (1.00 / 12 / 300000 / 0), footer `X: Standard`; a volume row: "kein TruMenu-Standard" |
+| 7 | PDA / Sonar | "Shadow-PDA durch Basis-PDA ersetzen" (PC g_pda, today) | greyed, "keine DLC-PDA geladen"; "Basis-PDA: Stand" says so; nothing in the log but `no DLC branch` |
+| 8 | after the DLC g_pda is installed, DLC 2 | switch on, then open the PDA | log `base PDA: ... f1 word ... 0x04000001 -> 0x04000000`; Croft VX2 PDA with SONARKARTE; off = the journal PDA again at the next open |
+| 9 | main menu, L3 command line | type `level.start ` / `level.load l7` | unit suggestions; `level.load` turns into `level.start <unit>` lines |
+| 10 | base game level (e.g. Arena 1a), page Kapitel | "DLC 2 Laras Schatten" right twice | `level.start dlc_level2_start in a level ... f27('dlc_level2_start', 0, 0, 1)`; DLC 2 loads with the doppelganger (`DoppelgangerInit`), shadow meter, no gold bikini; objectives DLC 2 |
+| 11 | DLC 1 level, page Kapitel | "DLC 2 ..." right twice, then from DLC 2 "DLC 1 ..." right twice | DLC 2 as in 10; DLC 1: the outfit / weapon screen, Lara without doppelganger mode (`arena.mode`: doppelganger byte 0), DLC 1 objectives |
+| 12 | main menu, page Kapitel | "DLC 2 ..." / "DLC 1 ..." | as 0.22.50 (mission start), unchanged |
+| 13 | a level, during a cutscene | a DLC row | refused: "a cutscene plays ..." |
+
 ## 0.22.50 - the sound log readable, every FMOD channel, two source hooks, one Ambient aus, Kapitel from the main menu (2026-11-14)
 
 Built into `work\asi\menu0273`, not installed, no live test (owner live wishes of 14.11.; report in the workspace
@@ -6087,6 +6158,9 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Sonar] FloorMarkers` | 0 | 0.22.48 (`sonar.markers`): only with `FullMap=1`: 1 = every stair / floor-change marker of the loaded units (0x6e40c6), not only the ones a ping saw; 0 = the game's. Live |
 | `[Sonar] AllFloors` | 0 | 0.22.49 (`sonar.allfloors`, "Alle verbundenen Bereiche"): only with `FullMap=1`: 1 = the sonar frame 0x6e4130 also draws the map units of other floors that the sonar loaded itself (0x6e429b `74 1d` -> `90 90`: the floor test `[unit+0xb0] & [0xedf268]` skipped). Loaded are only the units the game's own open path asks for - the floor's units and their direct portal neighbours of any floor - so no load is added and streaming is not touched; display only. Live |
 | `[Sonar] TriangleCap` | 300000 | 0.22.49 ("Sonar komplett: Dreiecks-Grenze"): only with `FullMap=1`: the sonar's per-frame triangle budget - TruMenu writes `cap - 1` into the imm32 of `cmp dword [0xee03e8], 0x16d83` (0x6dfa6f); values up to 93572 = the game's bytes, at most 1000000. A budget only (the triangles are flushed in batches of 2000 into the render device's growing dynamic vertex pool, 84 bytes each: 300000 = about 25 MB of vertex buffers per sonar frame). Live |
+| `[Sonar] FadeFar` | 0 | 0.22.51 (`sonar.fade`, "Sonar: Abblenden Ferne"): the fog of the sonar view. 0 = the game's call (its fog near = far = 65536, i.e. no linear fog); n = 1 .. 2000 metres: the map fades from n/2 to n m into the background colour (smaller = stronger); -1 = aus (fog 90 / 100 km). Two call redirects 0x6e4d94 / 0x6e4bf9 (`call 0x5bfe40` -> S5FogStub). Live |
+| `[Sonar] TintOthers` | 0 | 0.22.51 (`sonar.tint`, "Sonar: andere Bereiche einfärben"): 1 = every map unit except the sonar's open unit (Lara's, `[0xedf254]`) is drawn with an amber-tinted draw colour (`[0xee03bc]` 40 % towards 255 / 170 / 40 for that unit's call, call redirect 0x6e42ac). Live |
+| `[PDA] ShadowPdaAsBasePda` | 0 | 0.22.51 (`pda.basepda`, "Shadow-PDA durch Basis-PDA ersetzen"): 1 = DLC 2 shows the base PDA (Croft VX2 with the sonar map) instead of its journal PDA - in the resident g_pda script 3347 the DLC branch f1 (`level tag == "dlc2"`) returns 0 (word `04000001` -> `04000000`), written only in a level with the world running, the sonar and TruMenu's menu closed, back on 0 and at unload. Only with the DLC g_pda; the PC's own g_pda has no DLC branch ("keine DLC-PDA geladen", nothing written). Live |
 | `[Sound] SourceHooks` | 1 | 0.22.50: 1 = the two small code redirects that name a sound's source exactly - V1 0x591351 (the wave node's `call VoicePool::Play` -> a stub: voice -> the node's emitter +0x10) and E1 0x5b99fc (the 6 bytes after the anim sound event's untouched `call 0x5935d0` -> a stub: emitter -> the event's instance `[ebp+0xc]`); written on the game thread only over the game's bytes, put back at unload; 0 = the owner list of `[inst+0x248]` only. Read at the start |
 | `[Sound] LogLara` | 1 | 0.22.50 (`snd.logcat lara`): the sound box shows Lara's body / gear / weapons sounds. Live |
 | `[Sound] LogEnemies` | 1 | 0.22.50 (`snd.logcat enemies`): enemies and creatures. Live |

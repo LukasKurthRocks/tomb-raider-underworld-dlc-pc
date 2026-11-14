@@ -268,7 +268,8 @@ QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'chea
                   'gfx.r.mode', 'gfx.r.fullscreen', 'gfx.r.present2',
                   # 0.22.18 subtitle alignment, voice language, frame-step rate
                   'sub.valign', 'sub.halign', 'sub.margin', 'voice.lang', 'cine.steprate',
-                  'menu.attracticon')                                            # 0.22.40 (Q126b) styles 0 .. 7
+                  'menu.attracticon',                                            # 0.22.40 (Q126b) styles 0 .. 7
+                  'sonar.fade', 'sonar.area')                                    # 0.22.51 S5
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
@@ -1622,8 +1623,9 @@ def check_0213(ini_path):
     mv = re.search(r'case kQbValue:(.*?)return;', ex, re.S)
     if not ex: problems.append('TruMenu.cpp: QbExecRow missing')
     else:
-        if not mv or 'QbActRow' in mv.group(1) or 'QbRun' in mv.group(1):
-            problems.append('TruMenu.cpp: QbExecRow: X on a value row must do nothing (no QbActRow / QbRun)')
+        # 0.22.51 (e, owner 2026-11-14): X on a value row = its default, through QbActRow with kQbDefDir (was: nothing)
+        if not mv or 'QbActRow(page, r, kQbDefDir);' not in mv.group(1) or 'QbRun' in mv.group(1):
+            problems.append('TruMenu.cpp: QbExecRow: X on a value row = QbActRow(page, r, kQbDefDir) (0.22.51: the default)')
         mb = re.search(r'case kQbBool:(.*?)return;', ex, re.S)
         if not mb or 'QbRowOn(r)' not in mb.group(1) or '? -1 : 1' not in mb.group(1):
             problems.append('TruMenu.cpp: QbExecRow: X on a bool row must toggle from QbRowOn (on -> -1, off -> +1)')
@@ -1853,6 +1855,10 @@ SW_LIVE = {
     ('TruMenu', 'Sound', 'LogOnlyAudible'): 'void W8ReadSwitch(',
     ('TruMenu', 'Sound', 'LogCollapse'): 'void W8ReadSwitch(',
     ('TruMenu', 'Sound', 'LogMaxDist'): 'void W8ReadSwitch(',
+    # TruMenu 0.22.51 (sonar fade / tint, base PDA; about once a second from S5Tick)
+    ('TruMenu', 'Sonar', 'FadeFar'): 'void S5ReadSwitch(',
+    ('TruMenu', 'Sonar', 'TintOthers'): 'void S5ReadSwitch(',
+    ('TruMenu', 'PDA', 'ShadowPdaAsBasePda'): 'void S5ReadSwitch(',
 }
 # TruMenu 0.22.50: the bar's bool rows with a category argument (RadialOn -> W8RowOn) and the categories (kW8CatKey)
 W8_CAT_ITEMS = ('snd.logcat', 'snd.catmute', 'snd.catsolo')
@@ -4880,8 +4886,10 @@ def check_02240(ini_path, switches_path):
     if not (0 <= a < r < t):
         problems.append('TruMenu.cpp: bar row "Teaser-Anzeige" (kQbValue kQvAtStyle) must follow menu.attracttimer in set_main')
     if '"menu.attracticon", "", kQbBool' in src: problems.append('TruMenu.cpp: the bool bar row menu.attracticon must be gone')
-    if 'kQvAtStyle };' not in src: problems.append('TruMenu.cpp: kQvAtStyle must close the QbVal enum')
-    if ': val == kQvAtStyle ? kAtStyleN : 0;' not in fn_body(src, 'int QbValueCount('):
+    # 0.22.51: kQvSoFade / kQvSoArea follow kQvAtStyle (was: kQvAtStyle closed the enum)
+    if not re.search(r'kQvAtStyle,[^\n]*\n\s*kQvSoFade, kQvSoArea \};', src):
+        problems.append('TruMenu.cpp: kQvAtStyle must be in the QbVal enum (0.22.51: before kQvSoFade, kQvSoArea)')
+    if ': val == kQvAtStyle ? kAtStyleN ' not in fn_body(src, 'int QbValueCount('):
         problems.append('TruMenu.cpp: QbValueCount must give kAtStyleN for kQvAtStyle')
     if 'case kQvAtStyle: Out(o, n, "%d", i); break;' not in fn_body(src, 'void QbValueArg('):
         problems.append('TruMenu.cpp: QbValueArg kQvAtStyle missing')
@@ -5441,12 +5449,14 @@ def check_02244(switches_path):
     if 'TruMenu:Input:DeviceGlyphs' not in sw_keys: problems.append('switches: TruMenu | Input | DeviceGlyphs missing')
     header, opt_rows = table(src)
     # 0.22.44 added none, 0.22.45 the three [Sound] wave log keys, 0.22.47 the seven sound monitor / sonar keys, 0.22.48
-    # the three [Sonar] keys, 0.22.49 [Sonar] AllFloors + TriangleCap, 0.22.50 the 11 [Sound] keys of W8_KEYS_02250
-    if len(opt_rows) != 283 + len(W6_KEYS_02245) + len(W7_KEYS_02247) + len(SO_KEYS_02248) + 2 + len(W8_KEYS_02250):
+    # the three [Sonar] keys, 0.22.49 [Sonar] AllFloors + TriangleCap, 0.22.50 the 11 [Sound] keys of W8_KEYS_02250,
+    # 0.22.51 the three keys of S5_KEYS_02251
+    if len(opt_rows) != 283 + len(W6_KEYS_02245) + len(W7_KEYS_02247) + len(SO_KEYS_02248) + 2 + len(W8_KEYS_02250) + \
+            len(S5_KEYS_02251):
         problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.44 adds no INI key (283), 0.22.45 adds %d, 0.22.47 adds %d, '
-                        '0.22.48 adds %d, 0.22.49 adds 2, 0.22.50 adds %d' % (len(opt_rows), len(W6_KEYS_02245),
-                                                                              len(W7_KEYS_02247), len(SO_KEYS_02248),
-                                                                              len(W8_KEYS_02250)))
+                        '0.22.48 adds %d, 0.22.49 adds 2, 0.22.50 adds %d, 0.22.51 adds %d' % (
+                            len(opt_rows), len(W6_KEYS_02245), len(W7_KEYS_02247), len(SO_KEYS_02248), len(W8_KEYS_02250),
+                            len(S5_KEYS_02251)))
     readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
     if '\n## 0.22.44 - ' not in readme or '\n### TO TEST 0.22.44' not in readme:
         problems.append('README.md: section "## 0.22.44 - ..." with "### TO TEST 0.22.44" missing')
@@ -6274,8 +6284,8 @@ def check_02250(switches_path):
     src = read_cpp()
     code = re.sub(r'//[^\n]*', '', src)
     ver = src[:src.find('\n', src.find('kVersion = '))]
-    if '"TruMenu 0.22.50 (sound log readable + FMOD channels + source hooks' not in ver:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.50 (sound log readable + FMOD channels + '
+    if '0.22.50 (sound log readable + FMOD channels + source hooks' not in ver:   # 0.22.51: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.50 part "0.22.50 (sound log readable + FMOD channels + '
                         'source hooks"')
     # ---- (1) checks, order
     offline = []
@@ -6482,6 +6492,223 @@ def check_02250(switches_path):
                       'FMOD read without a call; monitor + box; owner walk throttled; category rules; one Ambient aus / '
                       'Musik aus; Kapitel from the main menu; %d items, %d keys, ton_log %d rows)' %
                       (len(rows), len(W8_ITEMS_02250), len(W8_KEYS_02250), len(se)))
+
+
+# TruMenu 0.22.51 (S5 sonar view + base PDA, X default, cmd suggestions, DLC start from a level)
+S5_CHECKS_02251 = os.path.join(ROOT, 'work', 'menu51_1411', 'precheck_02251.txt')
+S5_KEYS_02251 = (('Sonar', 'FadeFar', '0'), ('Sonar', 'TintOthers', '0'), ('PDA', 'ShadowPdaAsBasePda', '0'))
+# item, type, game thread (queued)
+S5_ITEMS_02251 = (('sonar.fade', 'action', 'true'), ('sonar.tint', 'bool', 'true'), ('sonar.area', 'action', 'true'),
+                  ('sonar.why', 'action', 'true'), ('sonar.view', 'info', 'false'), ('pda.basepda', 'bool', 'true'),
+                  ('pda.state', 'info', 'false'))
+S5_FOG_STUB = ('mov eax, dword ptr [g_s5FogFar]', 'test eax, eax', 'je s5f_go', 'mov dword ptr [esp + 0x14], eax',
+               'mov eax, dword ptr [g_s5FogNear]', 'mov dword ptr [esp + 0x10], eax', 'lock inc dword ptr [g_s5FogCalls]',
+               's5f_go:', 'jmp dword ptr [g_s5FogFn]')
+S5_UNIT_STUB = ('mov eax, dword ptr [esp + 4]', 'mov ecx, dword ptr [g_s5ShowUnit]', 'test ecx, ecx', 'je s5u_draw',
+                'cmp eax, ecx', 'je s5u_draw', 'lock inc dword ptr [g_s5AreaSkips]', 'ret', 's5u_draw:',
+                'cmp dword ptr [g_s5Tint], 0', 'je s5u_plain', 'mov ecx, dword ptr [g_s5AnchorAt]', 'cmp eax, dword ptr [ecx]',
+                'je s5u_plain', 'mov ecx, dword ptr [g_s5ColourAt]', 'push dword ptr [ecx]',
+                'mov edx, dword ptr [g_s5TintColour]', 'mov dword ptr [ecx], edx', 'push dword ptr [esp + 0xc]', 'push eax',
+                'call dword ptr [g_s5DrawFn]', 'add esp, 8', 'mov ecx, dword ptr [g_s5ColourAt]', 'pop edx',
+                'mov dword ptr [ecx], edx', 'lock inc dword ptr [g_s5Tinted]', 'ret', 's5u_plain:',
+                'jmp dword ptr [g_s5DrawFn]')
+S5_HASH_02250 = 'b1262935dc898fd7f55201d943c9ddd6dd2a686093292f0084797e6c93154ced'
+
+
+def check_02251(switches_path):
+    """0.22.51 (owner wishes 2026-11-14 evening; workspace docs/Befund-TruMenu-02251-1411.md): (1) kS5Checks = the 22 rows of
+    work/menu51_1411/precheck_02251.txt in order, S5Check right after W8Check, S5ReadOptions after W8ReadOptions, S5Tick
+    after SoTick in PadHook, S5Shutdown after W8Shutdown; (2) the three call redirects D1 0x6e42ac / F1 0x6e4d94 / F2
+    0x6e4bf9 only through SoWrite (the game's call bytes in, read back), the stubs exactly the source sequences, the
+    section writes no game code otherwise and its only WriteBytes are the PDA word (S5PdaTick, S5Shutdown); (3) fade =
+    fog n/2 .. n m, -1 = 90 / 100 km, 0 = the game's call; tint 40 % amber, alpha kept; (4) PDA: script 3347 by the hash
+    map, f1 found by its words, written only through S5PdaSafe, back only over our own word; (5) items, help, kOpts keys,
+    INI, switch rows, bar rows (set_sonar + Paket G), value rows kQvSoFade / kQvSoArea; (6) X = default (kQbDefDir, the
+    switch file's default, footer); (7) command line suggestions; (8) the DLC rows in a level = the pause menu's DLC start
+    (LevelStartInGame); (9) README 0.22.51 + TO TEST, Set-TruMenu knows the 0.22.50 hash"""
+    problems = []
+    src = read_cpp()
+    code = re.sub(r'//[^\n]*', '', src)
+    ver = src[:src.find('\n', src.find('kVersion = '))]
+    if '"TruMenu 0.22.51 (sonar view + base PDA + X default + DLC start from a level' not in ver:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.51 (sonar view + base PDA + X default + DLC '
+                        'start from a level"')
+    # ---- (1) checks, order
+    offline = []
+    if os.path.exists(S5_CHECKS_02251):
+        for line in open(S5_CHECKS_02251, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/menu51_1411/precheck_02251.txt (the offline byte list) is missing')
+    rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kS5Checks')]
+    if rows != offline or len(rows) != 22:
+        problems.append('TruMenu.cpp: kS5Checks (%d rows) must be the 22 rows of precheck_02251.txt in order' % len(rows))
+    if 'g_s5Ok = DvChecks(kS5Checks,' not in fn_body(src, 'void S5Check('):
+        problems.append('TruMenu.cpp: S5Check must set g_s5Ok = DvChecks(kS5Checks, ...)')
+    for pat, what in ((r'\n    W8Check\(\);[^\n]*\n    S5Check\(\);', 'the load must call S5Check right after W8Check'),
+                      (r'\n    W8ReadOptions\(ini\);[^\n]*\n    S5ReadOptions\(ini\);',
+                       'ReadOptions must call S5ReadOptions(ini) right after W8ReadOptions(ini)'),
+                      (r'\n    SoTick\(\);[^\n]*\n    S5Tick\(\);', 'PadHook must call S5Tick() right after SoTick()'),
+                      (r'\n        W8Shutdown\(\);[^\n]*\n        S5Shutdown\(\);',
+                       'DLL_PROCESS_DETACH must call S5Shutdown right after W8Shutdown')):
+        if not re.search(pat, src): problems.append('TruMenu.cpp: %s' % what)
+    # ---- (2) redirects, stubs, writes
+    for want in ('const DWORD kS5D1 = 0x006e42ac, kS5F1 = 0x006e4d94, kS5F2 = 0x006e4bf9;',
+                 'const BYTE kS5D1Game[5] = {0xe8, 0x4f, 0xf7, 0xff, 0xff};',
+                 'const BYTE kS5F1Game[5] = {0xe8, 0xa7, 0xb0, 0xed, 0xff};',
+                 'const BYTE kS5F2Game[5] = {0xe8, 0x42, 0xb2, 0xed, 0xff};',
+                 'DWORD g_s5DrawFn = 0x006e3a00, g_s5FogFn = 0x005bfe40, g_s5AnchorAt = 0x00edf254, g_s5ColourAt = 0x00ee03bc;'):
+        if want not in src: problems.append('TruMenu.cpp: %s missing' % want)
+    ck = fn_body(src, 'void S5Check(')
+    for want in ('S5CallBytes(g_s5D1New, kS5D1, &S5UnitStub);', 'S5CallBytes(g_s5F1New, kS5F1, &S5FogStub);',
+                 'S5CallBytes(g_s5F2New, kS5F2, &S5FogStub);'):
+        if want not in ck: problems.append('TruMenu.cpp: S5Check lacks %s' % want)
+    ap = fn_body(src, 'void S5Apply(')
+    for want in ('SoWrite(kS5D1, wantD ? kS5D1Game : g_s5D1New, wantD ? g_s5D1New : kS5D1Game, 5)',
+                 'SoWrite(kS5F1, wantF ? kS5F1Game : g_s5F1New, wantF ? g_s5F1New : kS5F1Game, 5)',
+                 'SoWrite(kS5F2, wantF ? kS5F2Game : g_s5F2New, wantF ? g_s5F2New : kS5F2Game, 5)',
+                 'const bool wantD = g_s5ShowUnit != 0 || g_s5Tint != 0, wantF = g_s5Fade != 0;'):
+        if want not in ap: problems.append('TruMenu.cpp: S5Apply lacks %s' % want)
+    for name, seq in (('S5FogStub', S5_FOG_STUB), ('S5UnitStub', S5_UNIT_STUB)):
+        body = re.sub(r'//[^\n]*', '', fn_body(src, '__declspec(naked) void %s(' % name))
+        lines = [l.strip() for l in body.split('\n') if l.strip() and l.strip() not in ('__asm {', '}', '{')]
+        lines = [l for l in lines if not l.startswith('__declspec')]
+        if lines != list(seq): problems.append('TruMenu.cpp: %s must be exactly %s (got %s)' % (name, ' / '.join(seq), lines))
+    sec = src[src.find('// ---- 0.22.51 S5: sonar view + base PDA'):src.find('// ---- end of 0.22.51 S5 ----')]
+    if not sec: problems.append('TruMenu.cpp: the section "0.22.51 S5" is missing')
+    sc = re.sub(r'//[^\n]*', '', sec)
+    for bad in ('WriteDword(', 'WriteByte(', 'VirtualProtect('):
+        if bad in sc: problems.append('TruMenu.cpp: the S5 section must not call %s' % bad)
+    pt, sd = fn_body(src, 'void S5PdaTick('), fn_body(src, 'void S5Shutdown(')
+    if sc.count('WriteBytes(') != 2 or 'WriteBytes(g_s5PdaAt, &to, 4)' not in pt or \
+            'WriteBytes(g_s5PdaOursAt, &game, 4)' not in sd:
+        problems.append('TruMenu.cpp: in the S5 section only the PDA word is written with WriteBytes (S5PdaTick, S5Shutdown)')
+    # ---- (3) fade / tint values
+    fv = fn_body(src, 'void S5FogValues(')
+    for want in ('if (f < 0) { nearV = 9.0e6f; farV = 1.0e7f; }',
+                 'else if (f > 0) { farV = static_cast<float>(f) * 100.0f; nearV = farV * 0.5f; }'):
+        if want not in fv: problems.append('TruMenu.cpp: S5FogValues lacks %s' % want)
+    if 'const DWORD tint[3] = {255, 170, 40};' not in fn_body(src, 'void S5TintValue(') or \
+            'mixed = (ch * 6 + tint[k] * 4) / 10' not in fn_body(src, 'void S5TintValue('):
+        problems.append('TruMenu.cpp: S5TintValue: 40 % towards amber (255, 170, 40), alpha kept')
+    if 'LONG S5FadeClamp(LONG v) { return v < -1 ? -1 : v > 2000 ? 2000 : v; }' not in src:
+        problems.append('TruMenu.cpp: S5FadeClamp must keep FadeFar in -1 .. 2000')
+    lv = fn_body(src, 'void S5LogView(')
+    for want in ('ReadFloats(0x00ee04e0, c, 4);', 'ReadFloats(0x00ee0440, ax, 4);', 'ReadFloats(mesh + 0x20, o, 3)',
+                 'if (plane < -40.0f) ++behind;'):
+        if want not in lv: problems.append('TruMenu.cpp: S5LogView lacks %s' % want)
+    if 'S5LogView("open");' not in re.sub(r'//[^\n]*', '', fn_body(src, 'void SoMapTick(')):
+        problems.append('TruMenu.cpp: SoMapTick must log S5LogView("open") with the open line')
+    # ---- (4) base PDA
+    for want in ('const DWORD kS5ScrBuckets = 0x008a6ed0, kS5ScrTable = 0x008a6ed8, kS5ScrObjVt = 0x0084e4d4, '
+                 'kS5PdaScript = 3347;', 'const DWORD kS5PdaGame = 0x04000001, kS5PdaOurs = 0x04000000;',
+                 '{0x4c, 0x32636c64}', 'const DWORD kS5F1Word = 0x20;'):
+        if want not in src: problems.append('TruMenu.cpp: %s missing' % want)
+    if not 0 <= pt.find('if (!S5PdaSafe(why, sizeof(why)))') < pt.find('WriteBytes(g_s5PdaAt, &to, 4)'):
+        problems.append('TruMenu.cpp: S5PdaTick must pass S5PdaSafe before it writes')
+    if 'if (word != from || (!want && g_s5PdaOursAt != g_s5PdaAt))' not in pt:
+        problems.append('TruMenu.cpp: S5PdaTick must write only over the expected word and put back only its own')
+    sf = fn_body(src, 'bool S5PdaSafe(')
+    for want in ('InLevel()', '(flags & 0x1000)', 'ReadDword(kSoMode, &mode) && mode', 'g_menuOpen'):
+        if want not in sf: problems.append('TruMenu.cpp: S5PdaSafe lacks %s' % want)
+    if 'if (!_stricmp(id, "pda.basepda")) return S5PdaWhy();' not in fn_body(src, 'const char *RadialWhy('):
+        problems.append('TruMenu.cpp: RadialWhy must grey pda.basepda while no DLC g_pda is loaded (S5PdaWhy)')
+    # ---- (5) items, help, keys, switches, bar
+    for item, typ, gt in S5_ITEMS_02251:
+        if not re.search(r'\{"%s", "%s", "0\.22\.51[^}]*?,\s+%s,\s+[A-Za-z0-9_<>]+,\s+[A-Za-z0-9_<>]+\},' %
+                         (re.escape(item), typ, gt), src, re.S):
+            problems.append('TruMenu.cpp: item %s (%s, game thread %s) missing in kItems' % (item, typ, gt))
+        hm = re.search(r'\{"%s", "\*?", "((?:[^"\\]|\\.)*)"\}' % re.escape(item), src)
+        if not hm: problems.append('TruMenu.cpp: kQbHelp row %s missing' % item)
+        else:
+            de, en = unescape(hm.group(1)).split('|')
+            if len(de) > 60 or len(en) > 60: problems.append('TruMenu.cpp: help of %s over 60 characters' % item)
+    header, opt_rows = table(src)
+    keys = {(s, k): d for s, k, d, _ in opt_rows}
+    sw_rows = {}
+    for line in open(switches_path, encoding='utf-8').read().splitlines():
+        f = [x.strip() for x in line.split('|')]
+        if line.startswith('#') or len(f) < 9 or f[0] == 'group': continue
+        sw_rows['%s:%s:%s' % (f[0], f[1], f[2])] = f
+    for sec_, key, default in S5_KEYS_02251:
+        if keys.get((sec_, key)) != default: problems.append('TruMenu.cpp: kOpts [%s] %s=%s missing' % (sec_, key, default))
+        f = sw_rows.get('TruMenu:%s:%s' % (sec_, key))
+        if not f or f[6] != 'live' or f[7] != default or len(f) < 10 or f[9] != 'TruMenu 0.22.51':
+            problems.append('switches: row TruMenu | %s | %s | ... | live | %s | ... | TruMenu 0.22.51 missing' %
+                            (sec_, key, default))
+    if sw_rows.get('TruMenu:Sonar:FadeFar', [''] * 4)[3] != 'int:-1..2000:50':
+        problems.append('switches: FadeFar must be int:-1..2000:50')
+    for tbl, grp_want, flag in (('kQbSettings', 'set_sonar', None), ('kQbTests', 'tg_g', 'kQfTg')):
+        have, grp = set(), None
+        for r in qb_rows(src, True):
+            if r[0] != tbl: continue
+            if r[4] == 'kQbGroup': grp = r[3]; continue
+            if grp == grp_want: have.add((r[2], r[4]))
+        for it in (('sonar.fade', 'kQbValue'), ('sonar.area', 'kQbValue'), ('sonar.tint', 'kQbBool'),
+                   ('sonar.why', 'kQbAction'), ('sonar.view', 'kQbInfo'), ('pda.basepda', 'kQbBool'), ('pda.state', 'kQbInfo')):
+            if it not in have: problems.append('TruMenu.cpp: %s group %s lacks %s (%s)' % (tbl, grp_want, it[0], it[1]))
+    for want in ('"sonar.fade", "", kQbValue, -1, kQcNone, kQvSoFade,', '"sonar.area", "", kQbValue, -1, kQcNone, kQvSoArea,'):
+        if src.count(want) != 2: problems.append('TruMenu.cpp: two bar rows (settings + Paket G) with %s' % want)
+    if 'const LONG kS5FadeSteps[8] = {-1, 0, 800, 400, 200, 100, 50, 20};' not in src or \
+            'const int kS5FadeStepN = 8, kS5FadeStepDefault = 1;' not in src:
+        problems.append('TruMenu.cpp: the fade row steps (aus, Spiel, 800 .. 20 m; default Spiel) missing')
+    for fn_head, want in (('int QbValueCount(', 'val == kQvSoFade ? kS5FadeStepN : val == kQvSoArea ? S5AreaCount() : 0'),
+                          ('void QbValueArg(', 'case kQvSoArea: S5AreaArg(i, o, n); break;'),
+                          ('int QbValueNow(', 'case kQvSoArea: v = S5AreaNow(); break;'),
+                          ('bool ItemValueShort(', 'else if (!_stricmp(id, "sonar.area")) S5AreaShort(de, o, n);')):
+        if want not in fn_body(src, fn_head): problems.append('TruMenu.cpp: %s lacks %s' % (fn_head.strip('('), want))
+    # ---- (6) X = default
+    if 'const int kQbDefDir = 3;' not in src: problems.append('TruMenu.cpp: kQbDefDir = 3 missing')
+    if 'case kQbValue: QbActRow(page, r, kQbDefDir); return;' not in fn_body(src, 'void QbExecRow('):
+        problems.append('TruMenu.cpp: QbExecRow: X on a value row = QbActRow(page, r, kQbDefDir)')
+    qa = fn_body(src, 'void QbActRow(')
+    if 'else if (r.kind == kQbValue && dir == kQbDefDir) {' not in qa or 'if (!QbValueDefault(r.val, arg, sizeof(arg))) {' not in qa:
+        problems.append('TruMenu.cpp: QbActRow: a value row with kQbDefDir takes QbValueDefault')
+    dv = fn_body(src, 'bool QbValueDefault(')
+    for want in ('case kQvTime:', 'case kQvSoFade: i = kS5FadeStepDefault; break;', 'case kQvSoArea: i = 0; break;',
+                 'default: return false;', 'case kQvAtStyle: i = atoi(OptDefault("Menu", "AttractIcon")); break;'):
+        if want not in dv: problems.append('TruMenu.cpp: QbValueDefault lacks %s' % want)
+    sw = fn_body(src, 'void QbSwAct(')
+    if 'if (dir == kQbXDir && r.type != kSwBool) {' not in sw or 'Out(arg, sizeof(arg), "%s %s", r.target + 4, r.def);' not in sw:
+        problems.append('TruMenu.cpp: QbSwAct: X on an int / choice switch = the file\'s default column')
+    dq = fn_body(src, 'void DrawQuick(')
+    if 'const bool xDef = QbSelIsValue(g_qbPage, sel);' not in dq or '"X: Standard  Y: Favorit"' not in dq:
+        problems.append('TruMenu.cpp: DrawQuick: the footer says "X: Standard" on a value row (QbSelIsValue)')
+    # ---- (7) command line
+    av = fn_body(src, 'template <typename F> void CmdArgValues(')
+    if 'if (!UnitUnused(i) && !UnitNameNoArchive(kUnits[i].unit) && !UnitNoDrm(i))' not in av:
+        problems.append('TruMenu.cpp: CmdArgValues: level.start must list the usable units')
+    if 'const bool menuStart = !_stricmp(word, "level.load") && !InLevel();' not in fn_body(src, 'void CmdBuildSuggestions('):
+        problems.append('TruMenu.cpp: CmdBuildSuggestions: level.load in the main menu suggests level.start')
+    # ---- (8) DLC start from a level
+    cs = fn_body(src, 'bool ChapSteps(')
+    if not re.search(r'if \(dlcStart && InLevel\(\)\) \{[^}]*?LevelStartInGameOk\(\)', cs, re.S) or \
+            cs.count('Out(steps, n, "save.backup kapitel;level.start %s", dlc);') != 2:
+        problems.append('TruMenu.cpp: ChapSteps: the DLC rows in a level = "level.start dlc1|dlc2" (LevelStartInGameOk)')
+    if 'if (state == 1 && InLevel()) return LevelStartInGame(name, given, o, n);' not in fn_body(src, 'bool RunLevelStart('):
+        problems.append('TruMenu.cpp: RunLevelStart must hand a level (main state 1) to LevelStartInGame')
+    lg = fn_body(src, 'bool LevelStartInGame(')
+    for want in ('reinterpret_cast<MissionStartFn>(kUgdF27)(args, select, 0, 1);', 'reinterpret_cast<VoidFn>(kScrF7)();',
+                 'reinterpret_cast<VoidFn>(kScrF19)();', '&& !g_menuPaused && !g_radPaused;',
+                 '_stricmp(name, "dlc_level1_start") && _stricmp(name, "dlc_level2_start")', 'if (CinematicNow())'):
+        if want not in lg: problems.append('TruMenu.cpp: LevelStartInGame lacks %s' % want)
+    if 'kUgdF22' in lg: problems.append('TruMenu.cpp: LevelStartInGame must not call uigamedata f22 (case 8 does not)')
+    if not 0 <= lg.find('(kUgdF27)') < lg.find('(kScrF7)') < lg.find('(kScrF19)'):
+        problems.append('TruMenu.cpp: LevelStartInGame: f27, then f7, then f19 (the case-8 order)')
+    # ---- (9) README, Set-TruMenu
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.51 - ' not in readme or '\n### TO TEST 0.22.51' not in readme:
+        problems.append('README.md: section "## 0.22.51 - ..." with "### TO TEST 0.22.51" missing')
+    for sec_, key, _ in S5_KEYS_02251:
+        if '`[%s] %s`' % (sec_, key) not in readme: problems.append('README.md: options row `[%s] %s` missing' % (sec_, key))
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if S5_HASH_02250 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.50 build hash (work/asi/menu0273) is missing')
+    return problems, ('sonar view + base PDA (%d byte checks = precheck_02251; D1 / F1 / F2 through SoWrite, stubs exact; '
+                      'PDA word only through S5PdaSafe; X default; cmd suggestions; DLC start from a level; %d items, %d keys)'
+                      % (len(rows), len(S5_ITEMS_02251), len(S5_KEYS_02251)))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -7123,6 +7350,10 @@ def main(argv):
     for p in cproblems50: print('Q02250 %s' % p)
     if not cproblems50: print('ok: 0.22.50 %s' % csummary50)
     problems += cproblems50
+    cproblems51, csummary51 = check_02251(opt.get('--switches', SWITCHES))   # 0.22.51 (sonar view, base PDA, X default)
+    for p in cproblems51: print('Q02251 %s' % p)
+    if not cproblems51: print('ok: 0.22.51 %s' % csummary51)
+    problems += cproblems51
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

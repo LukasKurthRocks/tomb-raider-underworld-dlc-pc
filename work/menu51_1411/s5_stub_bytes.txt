@@ -1,0 +1,7 @@
+S5FogStub: 1 match(es)
+  file offset 0xb0600: a1 9c 95 91 10 85 c0 74 14 89 44 24 14 a1 98 95 91 10 89 44 24 10 f0 ff 05 a8 95 91 10 ff 25 ac 17 21 10
+  je go -> 0xb061d (want the jmp at 0xb061d)
+S5UnitStub: 1 match(es)
+  file offset 0xb15a0: 98 bytes
+  je draw -> 0xb15ba / 0xb15ba (want 0xb15ba), je plain -> 0xb15fc / 0xb15fc (want 0xb15fc)
+stubs ok

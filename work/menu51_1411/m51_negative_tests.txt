@@ -1,0 +1,45 @@
+positive (unchanged sources): 0 problem(s) ok
+case version                 : 1 problem(s) ok - TruMenu.cpp: kVersion must start with "TruMenu 0.22.51 (sonar view + base PDA + X default + DLC start from a level"
+case check row changed       : 1 problem(s) ok - TruMenu.cpp: kS5Checks (22 rows) must be the 22 rows of precheck_02251.txt in order
+case check row dropped       : 1 problem(s) ok - TruMenu.cpp: kS5Checks (21 rows) must be the 22 rows of precheck_02251.txt in order
+case check order             : 1 problem(s) ok - TruMenu.cpp: the load must call S5Check right after W8Check
+case tick missing            : 1 problem(s) ok - TruMenu.cpp: PadHook must call S5Tick() right after SoTick()
+case options missing         : 1 problem(s) ok - TruMenu.cpp: ReadOptions must call S5ReadOptions(ini) right after W8ReadOptions(ini)
+case detach without S5       : 1 problem(s) ok - TruMenu.cpp: DLL_PROCESS_DETACH must call S5Shutdown right after W8Shutdown
+case D1 other site           : 1 problem(s) ok - TruMenu.cpp: const DWORD kS5D1 = 0x006e42ac, kS5F1 = 0x006e4d94, kS5F2 = 0x006e4bf9; missing
+case F1 game bytes           : 1 problem(s) ok - TruMenu.cpp: const BYTE kS5F1Game[5] = {0xe8, 0xa7, 0xb0, 0xed, 0xff}; missing
+case F2 not written          : 2 problem(s) ok - TruMenu.cpp: S5Apply lacks SoWrite(kS5F2, wantF ? kS5F2Game : g_s5F2New, wantF ? g_s5F2New : kS5F2Game, 5)
+case stub F2 missing         : 1 problem(s) ok - TruMenu.cpp: S5Check lacks S5CallBytes(g_s5F2New, kS5F2, &S5FogStub);
+case fog stub arg            : 1 problem(s) ok - TruMenu.cpp: S5FogStub must be exactly mov eax, dword ptr [g_s5FogFar] / test eax, eax / je s5f_go / mov dword ptr [esp + 0x14], eax / mov eax, dword ptr [g_s5FogNear] / mov dword ptr [esp + 0x10], eax / lock inc dword ptr [g_s5FogCalls] / s5f_go: / jmp dword ptr [g_s5FogFn] (got ['mov eax, dword ptr [g_s5FogFar]', 'test eax, eax', 'je s5f_go', 'mov dword ptr [esp + 0x18], eax', 'mov eax, dword ptr [g_s5FogNear]', 'mov dword ptr [esp + 0x10], eax', 'lock inc dword ptr [g_s5FogCalls]', 's5f_go:', 'jmp dword ptr [g_s5FogFn]'])
+case fog stub no test        : 1 problem(s) ok - TruMenu.cpp: S5FogStub must be exactly mov eax, dword ptr [g_s5FogFar] / test eax, eax / je s5f_go / mov dword ptr [esp + 0x14], eax / mov eax, dword ptr [g_s5FogNear] / mov dword ptr [esp + 0x10], eax / lock inc dword ptr [g_s5FogCalls] / s5f_go: / jmp dword ptr [g_s5FogFn] (got ['mov eax, dword ptr [g_s5FogFar]', 'mov dword ptr [esp + 0x14], eax', 'mov eax, dword ptr [g_s5FogNear]', 'mov dword ptr [esp + 0x10], eax', 'lock inc dword ptr [g_s5FogCalls]', 's5f_go:', 'jmp dword ptr [g_s5FogFn]'])
+case unit stub arg2          : 1 problem(s) ok - TruMenu.cpp: S5UnitStub must be exactly mov eax, dword ptr [esp + 4] / mov ecx, dword ptr [g_s5ShowUnit] / test ecx, ecx / je s5u_draw / cmp eax, ecx / je s5u_draw / lock inc dword ptr [g_s5AreaSkips] / ret / s5u_draw: / cmp dword ptr [g_s5Tint], 0 / je s5u_plain / mov ecx, dword ptr [g_s5AnchorAt] / cmp eax, dword ptr [ecx] / je s5u_plain / mov ecx, dword ptr [g_s5ColourAt] / push dword ptr [ecx] / mov edx, dword ptr [g_s5TintColour] / mov dword ptr [ecx], edx / push dword ptr [esp + 0xc] / push eax / call dword ptr [g_s5DrawFn] / add esp, 8 / mov ecx, dword ptr [g_s5ColourAt] / pop edx / mov dword ptr [ecx], edx / lock inc dword ptr [g_s5Tinted] / ret / s5u_plain: / jmp dword ptr [g_s5DrawFn] (got ['mov eax, dword ptr [esp + 4]', 'mov ecx, dword ptr [g_s5ShowUnit]', 'test ecx, ecx', 'je s5u_draw', 'cmp eax, ecx', 'je s5u_draw', 'lock inc dword ptr [g_s5AreaSkips]', 'ret', 's5u_draw:', 'cmp dword ptr [g_s5Tint], 0', 'je s5u_plain', 'mov ecx, dword ptr [g_s5AnchorAt]', 'cmp eax, dword ptr [ecx]', 'je s5u_plain', 'mov ecx, dword ptr [g_s5ColourAt]', 'push dword ptr [ecx]', 'mov edx, dword ptr [g_s5TintColour]', 'mov dword ptr [ecx], edx', 'push dword ptr [esp + 0x8]', 'push eax', 'call dword ptr [g_s5DrawFn]', 'add esp, 8', 'mov ecx, dword ptr [g_s5ColourAt]', 'pop edx', 'mov dword ptr [ecx], edx', 'lock inc dword ptr [g_s5Tinted]', 'ret', 's5u_plain:', 'jmp dword ptr [g_s5DrawFn]'])
+case unit stub no restore    : 1 problem(s) ok - TruMenu.cpp: S5UnitStub must be exactly mov eax, dword ptr [esp + 4] / mov ecx, dword ptr [g_s5ShowUnit] / test ecx, ecx / je s5u_draw / cmp eax, ecx / je s5u_draw / lock inc dword ptr [g_s5AreaSkips] / ret / s5u_draw: / cmp dword ptr [g_s5Tint], 0 / je s5u_plain / mov ecx, dword ptr [g_s5AnchorAt] / cmp eax, dword ptr [ecx] / je s5u_plain / mov ecx, dword ptr [g_s5ColourAt] / push dword ptr [ecx] / mov edx, dword ptr [g_s5TintColour] / mov dword ptr [ecx], edx / push dword ptr [esp + 0xc] / push eax / call dword ptr [g_s5DrawFn] / add esp, 8 / mov ecx, dword ptr [g_s5ColourAt] / pop edx / mov dword ptr [ecx], edx / lock inc dword ptr [g_s5Tinted] / ret / s5u_plain: / jmp dword ptr [g_s5DrawFn] (got ['mov eax, dword ptr [esp + 4]', 'mov ecx, dword ptr [g_s5ShowUnit]', 'test ecx, ecx', 'je s5u_draw', 'cmp eax, ecx', 'je s5u_draw', 'lock inc dword ptr [g_s5AreaSkips]', 'ret', 's5u_draw:', 'cmp dword ptr [g_s5Tint], 0', 'je s5u_plain', 'mov ecx, dword ptr [g_s5AnchorAt]', 'cmp eax, dword ptr [ecx]', 'je s5u_plain', 'mov ecx, dword ptr [g_s5ColourAt]', 'push dword ptr [ecx]', 'mov edx, dword ptr [g_s5TintColour]', 'mov dword ptr [ecx], edx', 'push dword ptr [esp + 0xc]', 'push eax', 'call dword ptr [g_s5DrawFn]', 'add esp, 8', 'mov ecx, dword ptr [g_s5ColourAt]', 'pop edx', 'lock inc dword ptr [g_s5Tinted]', 'ret', 's5u_plain:', 'jmp dword ptr [g_s5DrawFn]'])
+case S5 writes a dword       : 1 problem(s) ok - TruMenu.cpp: the S5 section must not call WriteDword(
+case fade far scale          : 1 problem(s) ok - TruMenu.cpp: S5FogValues lacks else if (f > 0) { farV = static_cast<float>(f) * 100.0f; nearV = farV * 0.5f; }
+case fade clamp              : 1 problem(s) ok - TruMenu.cpp: S5FadeClamp must keep FadeFar in -1 .. 2000
+case tint mix                : 1 problem(s) ok - TruMenu.cpp: S5TintValue: 40 % towards amber (255, 170, 40), alpha kept
+case log not at open         : 1 problem(s) ok - TruMenu.cpp: SoMapTick must log S5LogView("open") with the open line
+case pda word                : 1 problem(s) ok - TruMenu.cpp: const DWORD kS5PdaGame = 0x04000001, kS5PdaOurs = 0x04000000; missing
+case pda no safety           : 1 problem(s) ok - TruMenu.cpp: S5PdaTick must pass S5PdaSafe before it writes
+case pda restores foreign    : 1 problem(s) ok - TruMenu.cpp: S5PdaTick must write only over the expected word and put back only its own
+case pda while paused        : 1 problem(s) ok - TruMenu.cpp: S5PdaSafe lacks (flags & 0x1000)
+case pda not greyed          : 1 problem(s) ok - TruMenu.cpp: RadialWhy must grey pda.basepda while no DLC g_pda is loaded (S5PdaWhy)
+case item thread             : 1 problem(s) ok - TruMenu.cpp: item sonar.tint (bool, game thread true) missing in kItems
+case help missing            : 1 problem(s) ok - TruMenu.cpp: kQbHelp row sonar.why missing
+case fade steps              : 1 problem(s) ok - TruMenu.cpp: the fade row steps (aus, Spiel, 800 .. 20 m; default Spiel) missing
+case X runs nothing          : 1 problem(s) ok - TruMenu.cpp: QbExecRow: X on a value row = QbActRow(page, r, kQbDefDir)
+case X no default            : 1 problem(s) ok - TruMenu.cpp: QbValueDefault lacks case kQvSoArea: i = 0; break;
+case switch X steps          : 1 problem(s) ok - TruMenu.cpp: QbSwAct: X on an int / choice switch = the file's default column
+case footer                  : 1 problem(s) ok - TruMenu.cpp: DrawQuick: the footer says "X: Standard" on a value row (QbSelIsValue)
+case cmd no units            : 1 problem(s) ok - TruMenu.cpp: CmdArgValues: level.start must list the usable units
+case cmd menu map            : 1 problem(s) ok - TruMenu.cpp: CmdBuildSuggestions: level.load in the main menu suggests level.start
+case level refused           : 1 problem(s) ok - TruMenu.cpp: RunLevelStart must hand a level (main state 1) to LevelStartInGame
+case in-level f22            : 1 problem(s) ok - TruMenu.cpp: LevelStartInGame must not call uigamedata f22 (case 8 does not)
+case in-level arg4           : 1 problem(s) ok - TruMenu.cpp: LevelStartInGame lacks reinterpret_cast<MissionStartFn>(kUgdF27)(args, select, 0, 1);
+case in-level any unit       : 1 problem(s) ok - TruMenu.cpp: LevelStartInGame lacks _stricmp(name, "dlc_level1_start") && _stricmp(name, "dlc_level2_start")
+case in-level ui ungated     : 1 problem(s) ok - TruMenu.cpp: LevelStartInGame lacks && !g_menuPaused && !g_radPaused;
+case fade range              : 1 problem(s) ok - switches: FadeFar must be int:-1..2000:50
+case tint default            : 1 problem(s) ok - switches: row TruMenu | Sonar | TintOthers | ... | live | 0 | ... | TruMenu 0.22.51 missing
+case pda restart             : 1 problem(s) ok - switches: row TruMenu | PDA | ShadowPdaAsBasePda | ... | live | 0 | ... | TruMenu 0.22.51 missing
+case fade since              : 1 problem(s) ok - switches: row TruMenu | Sonar | FadeFar | ... | live | 0 | ... | TruMenu 0.22.51 missing
+43 cases + 1 positive, 0 failed

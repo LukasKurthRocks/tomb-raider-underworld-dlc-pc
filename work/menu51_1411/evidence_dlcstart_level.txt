@@ -1,0 +1,25 @@
+# TruMenu 0.22.51 (h): a DLC start from inside a level = the game's own DLC start from the pause menu.
+# Run: ../bin/pyt -t 120 tools/pe_bytes_check.py ../data/pc/tru.exe --file work/menu51_1411/evidence_dlcstart_level.txt
+# Listing: work/menu51_1411/dis_77e790.txt (RegisterAcceptChanges 0x77e790), work/menu50_1411/dis_77e170.txt (f27).
+# The first four rows are TruMenu's kLsGameHex (checked at the first use in a level).
+# case 8 (pause ring -> DLC -> mission screen -> yes): ebp = the level name; TruDlc2Player 0.6 patches 0x77e8c0..0x77e8e3
+0077e8a9 3beb 0f8499000000 8b542410 a16892c500 891514e9fa00
+# .. the tail: 0x5a48d0() = the UI stack's top screen, its vf+0x148, stdscreenmgr f7 0x4be580 (f19 0x4be5e0 at 0x77e8f9)
+0077e8e3 e8e85fe2ff 8b10 8bc8 8b8248010000 ffd0 e887fcd3ff
+# .. jump table 0x77e97c entry 7 (action 8) = 0x77e8a9
+0077e998 a9e87700
+# .. 0x5a48d0: [[0xcdc9fc] + 4] (no null test of the top - the game calls it only from the pause menu)
+005a48d0 a1fcc9cd00 85c0 7501 c3 8b4004 c3
+# the PC's own case 8 (without TruDlc2Player): the inlined f27 tail with argument 4 = 0 - selection byte 1, the two
+# +0x90 words 0, 0x5dfb20(name, 0) - i.e. NO new-game block (the chosen costume stays: live 10.11. 21:12)
+0077e8c0 c605d9e8fa0001 899890000000 8b0d6492c500 53 55 899990000000 e84012e6ff 83c408
+# f27 0x77e170 with argument 4 = 1 runs the new-game block (0x556940(0): costume words 0) and ends in the same tail
+0077e189 807d1400
+0077e199 0f8472020000
+0077e283 e8b886ddff
+0077e411 8b0d6892c500 33c0 898190000000 8b156492c500 8b4c2448 898290000000 8b4510 50 51 e8e716e6ff
+# the main menu's mission start TruMenu used so far: uigamedata f22 0x4a0f10 ([0xa039b8] = 1), f7 / f19 = two screen
+# managers' vf+0x10
+004a0f10 c605b839a00001 c3
+004be580 8b0d583fa100 8b01 8b5010 ffe2
+004be5e0 8b0d503fa100 8b01 8b5010 ffe2

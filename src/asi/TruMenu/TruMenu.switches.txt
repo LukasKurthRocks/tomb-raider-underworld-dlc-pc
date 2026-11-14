@@ -303,6 +303,11 @@ TruMenu | Sonar | FloorMarkers | bool | Sonar komplett: alle Stockwerk-Marker | 
 # 2026-11-14: TruMenu 0.22.49 - AllFloors draws the other floors' map units the sonar loaded itself (no extra load)
 TruMenu | Sonar | AllFloors | bool | Alle verbundenen Bereiche | All connected areas | live | 0 | Geladene Nachbar-Stockwerke auch (mit FullMap) // Loaded neighbour floors too (with FullMap) | TruMenu 0.22.49
 TruMenu | Sonar | TriangleCap | int:0..1000000:50000 | Sonar komplett: Dreiecks-Grenze | Full map: triangle cap | live | 300000 | Dreiecke je Bild (Spiel 93572, bis dahin = Spiel) // Triangles per frame (game 93572, up to it = game) | TruMenu 0.22.49
+# 2026-11-14: TruMenu 0.22.51 - the sonar view's fog (FadeFar: 0 = the game's, -1 = aus, n metres), the other areas
+# tinted, the DLC 2 base PDA (only with the DLC g_pda, written while the PDA is closed); re-read about once a second
+TruMenu | Sonar | FadeFar | int:-1..2000:50 | Sonar: Abblenden Ferne (m) | Sonar: distance fade (m) | live | 0 | 0 = Spiel, -1 = aus, n = bis n m ausblenden // 0 = game, -1 = off, n = faded out at n m | TruMenu 0.22.51
+TruMenu | Sonar | TintOthers | bool | Sonar: andere Bereiche einfärben | Tint other areas | live | 0 | Laras Bereich cyan, andere bernsteinfarben // Lara's area cyan, the others amber | TruMenu 0.22.51
+TruMenu | PDA | ShadowPdaAsBasePda | bool | Shadow-PDA durch Basis-PDA ersetzen | Replace the shadow PDA with the base PDA | live | 0 | Nur mit DLC-g_pda; bei geschlossenem PDA // Only with the DLC g_pda; while the PDA is closed | TruMenu 0.22.51
 
 # 2026-11-14: TruMenu 0.22.50 - the sound log box: [Sound] Log* re-read about once a second (W8ReadSwitch) = live;
 # SourceHooks (the two code redirects V1 / E1) is read at the start (bar page Spiel-Einstellungen, group Ton-Log)

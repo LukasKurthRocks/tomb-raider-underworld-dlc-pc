@@ -1,0 +1,41 @@
+# TruMenu 0.22.51 (S5: sonar view area / tint / fade + base PDA) - kS5Checks, in this order.
+# Run: ../bin/pyt -t 120 tools/pe_bytes_check.py ../data/pc/tru.exe --file work/menu51_1411/precheck_02251.txt
+# Listings (local, not in the repo): work/menu51_1411/dis_6dfa60.txt, dis_5bfd10.txt, dis_5cafb0.txt, dis_513be0.txt,
+# dis_6e2680.txt, dis_scriptres.txt, dis_resolver.txt; work/sonar_1411/dis_draw.txt (0x6e3a00), dis_more.txt (0x6e4130 /
+# 0x6e4b60), dis_units.txt (0x6e2b10).
+#
+# --- D1: the frame 0x6e4130 calls the face draw 0x6e3a00(unit, 0) once per unit (cdecl, add esp,8 after the list reload)
+006e42a6 3bc7 7410 57 50 e84ff7ffff 8b0d3cff8a00 83c408
+# --- the face draw's vertex colours 2 / 3: [0xee03bc] for state 1, else [0xee03b8] (colour 1 at 0x6e3b1b: kSoChecks)
+006e3b6f 8b0dbc03ee00 7506 8b0db803ee00
+006e3bb3 8b0dbc03ee00 7506 8b0db803ee00
+# .. the 3 colours are argument 3 (lea ecx,[esp+74h]; push ecx) of 0x6dfa60, copied into the batch vertex +0xc (+0x28 / +0x44)
+006e3bec 8d4c2474 51
+006dfc02 8b10 8954310c
+# .. their only writer: the init 0x6e2b10 (ARGB of the constant 0xfad714.. x 255)
+006e2c52 890dbc03ee00
+# --- F1: the sonar view's fog 0x5bfe40(r, g, b, 65536.0, 65536.0): both distances from [0x84c4e8], colour tuning +0x60..
+006e4d4f a1e003ee00 d905e8c48400 0fb64862 d9542408 0fb65061 d95c2404
+006e4d94 e8a7b0edff 56 6888f0e700 e88cf3ffff 83c41c
+# --- F2: the same call in mode 1 (waiting for the loads)
+006e4bb4 a1e003ee00 d905e8c48400 0fb64862 d9542408
+006e4bf9 e842b2edff 83c414
+# --- 0x5bfe40: argument 4 -> fog near [0xdb6a54], 5 -> fog far [0xdb73e0], colour [0xdbc690], override [0xdb6a58] = 1
+005bfe40 55 8bec 83e4f0 83ec10 f30f10051c118400 d94514 f30f1144240c d91d546adb00 f30f104510 d94518
+005bfe6e d91de073db00
+0084c4e8 00008047
+# --- the far plane = tuning +0x10 (0x5bfd10 -> [0x8aa764]); the frame's axis [0xee0440] and cull radius (+0x10 + 4000)^2
+006e4cfa a1e003ee00 d94010 83c404 d91c24 e803b0edff
+006e422c 8b15e003ee00 0f29054004ee00 d94210 dc0500d98500
+# --- 0x6dfa60's plane: (v0 - centre + 4000 * axis) . axis < 0 -> the triangle is dropped (je 0x6dfe89); 4000.0
+006dfb23 0f28154004ee00 d9ee f30f10057c1c8500 0fc6c000 0f59c2 0f58c1 0f59c2
+006dfb5c d85c2440 dfe0 f6c441 0f841e030000
+00851c7c 00007a45
+# --- scripts by id (ScriptSection): FindResource 0x551560 = hash map {buckets count [0x8a6ed0], table [0x8a6ed8]}
+00551560 8b4c2404 33d2 8bc1 f735d06e8a00 a1d86e8a00 8b1490 85d2 743f
+# .. node +4 = id, +0 = next, +8 = handle; handle +0 = the object (0 = collected)
+00551580 394a04 7409 8b12 85d2 75f5 33c0 c3 85d2 7427 8b4a08 85c9 7420 8b01 85c0 751c
+# .. the object's ctor 0x5784e0: vtable 0x84e4d4, +8 = new(size) (0x574940) = the section bytes
+005784f0 c706d4e48400 894610 894614 884618 884619 8b442408 50 e834c4ffff 894608
+# .. the loader's copy 0x551ad0: memcpy([object+8] + offset, source, size)
+00551adb 8b742414 8b5008 8b4c2410 03542418
