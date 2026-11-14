@@ -1,0 +1,261 @@
+﻿# Tomb Raider: Underworld - game knowledge base
+
+What the project learned about the game itself (PC 1.1, Xbox 360 retail and title update, DLC 1 *Beneath the Ashes*, DLC 2 *Lara's Shadow*) from its data and code, written at game level: what happens, under which conditions, with which numbers.
+Status: ✅ proven from data / code or seen live · 🔶 inferred · ⬜ open. Where a later finding corrected an earlier one only the corrected fact is listed, marked "(corrected)".
+Technical detail (addresses, structs, tools) is in [ENGINE.md](ENGINE.md); the Source column names its section and row, a repo doc, or a `Befund-*` finding report (kept outside this repo, named only).
+
+## 1. Structure
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Units | The world is cut into stream units (one `.drm` each). The PC unit list has 119 units: base levels l1-l7 with 23 / 16 / 9 / 11 / 6 / 6 / 13, DLC 1 12, DLC 2 11 | ✅ | ENGINE §4.1 "Unit list" |
+| Units without data | `dlc_level1_left` / `_right` and `dlc_level3_start` .. `dlc_level6_start` are listed but exist in no archive on any platform (four never-built DLC slots) | ✅ | ENGINE §4.1 "Units without a DRM" |
+| Streaming | Up to 32 units are resident. Stream portals link units; crossing one makes the target the main unit and loads its neighbours (portals with the auto-load flag) | ✅ | ENGINE §4.1, §4.2 |
+| Level change | A level change (story end, mission start, death reload) runs on the main thread behind the loading screen; PC loads took 23-38 s (median 32 s). A death reload waits at least 3 s | ✅ live | ENGINE §3 "Level load loop", §4.2 "Reload after death" |
+| Look-through portals | A few portals (DLC 1, base `l2_cliffhall_b` <-> `l2_hubhall`) name a unit two rooms away; Lara never walks through them - read as preload / look-through portals | 🔶 | ENGINE §8.2 "DLC 1 level chain (PK.1)" |
+| Cells and stream groups | Inside a unit the scene is split into cells; when Lara enters another cell the game loads the stream groups (material / texture sets) that the cell's list names, also from neighbour units | ✅ | ENGINE §16 "Cell stream lists" |
+| Sonar maps | Each unit has a separate `<unit>_map.drm` collision mesh used only by the PDA sonar | ✅ | ENGINE §14 "PDA sonar map (ping map) build" |
+| Navigation | Enemy paths use the unit's NavPower mesh. Hand-made "custom" areas exist only in DLC 1 (209 areas, mostly facing down or steep = walls / ceilings for spiders 🔶). Units with bats or sharks also carry a 3D graph | ✅ | ENGINE §15 "Data statistics", "3D image (Level+0x68)" |
+| Objects | Units place objects as intros; an object loads its children (weapons, dismemberment pieces, companions) after itself | ✅ | ENGINE §5.1 "Object request / load end" |
+| Shared ids | For data ids (DTPs, animations, materials) the first loaded copy wins; a later file with the same id uses that copy | ✅ | ENGINE §5.1 "Id tables: first loaded copy wins" |
+| Scripts | Object scripts run per instance; their variables are lost on reload unless they are "stickies" (persistent int / bool / float) | ✅ | ENGINE §6.1 "What is saved and what is not" |
+| Puzzle objects | Movable puzzle parts are uber objects: a state graph whose transitions fire on time, commands, damage, impacts or joint angles (degrees) / slider positions (units). Multi-part puzzles test the node of linked parts | ✅ | ENGINE §9 "Event / command delivery (Q74)", "Object check cond 9" |
+| Triggers | Trigger volumes (box or sphere) send enter / leave / inside events; trigger planes and stream portals are crossing tests. The test point is 200 units above Lara's feet | ✅ | ENGINE §11 "Volume = two points, no sweep (Q73)" |
+| Trigger scripts | A trigger volume's "first in" runs once per save (sticky); "in" / "out" run on every crossing | ✅ | ENGINE §11 "Trigger volume base script 3484 (Q73)" |
+| Cinematics | A cinematic object plays once (sticky "played"); trigger volumes can preload it before the playing trigger is reached | ✅ | ENGINE §11 "Cinematic base script 3523 (Q73)" |
+| Game time | Logic runs in ticks of 1/30 s; one frame is capped at 2 ticks, so below 15 fps the game slows down instead of stepping further | ✅ | ENGINE §11 "Frame time clamp (Q73)" |
+| Physics | 405 bodies / 1200 geoms / 300 joints; variable time step, 5 solver iterations; below ~26 fps each frame runs as two half steps | ✅ | ENGINE §13.6 "Physics frame step (Q69)", "MultibodySystem::Step" |
+| Scale | About 290 units per metre (280-310; Lara's bind mesh is 511 units tall) (corrected: not 100 per metre) | 🔶 | ENGINE §4.3 |
+
+## 2. Level order
+
+### 2.1 Base game
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Chain | Levels end in cinematics that start the next level: prologue `l3_main_hall` -> `l1_seatop` (Mediterranean) -> ship sinking -> `l2_cliffclimb` (Thailand) -> `l3_caverns_start` (Croft Manor) -> `L4_trailstart` (Mexico) -> `L5_startsnow` (Jan Mayen) -> `L6_ship_exterior` -> `L7_thin_ice` (Arctic) | ✅ data | ENGINE §8.2 "Base-game level chain (Q113)" |
+| Inside a level | Only stream portals; the cinematic numbers never fall along the chain (101 visits over 81 units). Two portals between one unit pair are parallel doors with their own checkpoints | ✅ data | ENGINE §8.2 "Base-game level chain (Q113)" |
+| Revisits | The prologue units are revisited after level 3 starts; Mediterranean returns from the kraken room to the boat; Mexico returns from the pool to the ballcourt | 🔶 | ENGINE §8.2 "Base-game level chain (Q113)" |
+| Chapters | Chapters per level: 1 = 5, 2 = 4, 3 = 1, 4 = 4, 5 = 2, 6 = 1, 7 = 3, plus the prologue | ✅ data | ENGINE §8.2 "Chapter title card" |
+| End | The game ends in `l7_monastery` (its script ends the game). `l7_himalaya_end` holds a 59 s extended ending `343_hel_engame` that the shipped scripts never reach | ✅ data / ⬜ live | ENGINE §8.2 "Extended ending" |
+| Mediterranean start | Lara starts on the yacht, a fixed object that never moves; she surfaces wherever she crosses the wide seafloor portal (~65 m below the surface) and swims back to it | ✅ data + log | ENGINE §11 "Mediterranean boat (W4)" |
+
+### 2.2 DLC 1 *Beneath the Ashes*
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Entry | New game loads `dlc_level1_start`, plays the intro `010_intro`; its end warps Lara straight to a `dlc_caverns` checkpoint (no portal) | ✅ live | ENGINE §8.2 "DLC 1 level chain (PK.1)" |
+| Walked order | level1_start -> caverns -> caverns_hall -> water_wheel -> watertunnel -> dungeon -> dungeonhalla -> pillory (corrected: not the portal-graph order) | ✅ live | ENGINE §8.2 "DLC 1 level chain (PK.1)" |
+| Second visits | Scripts stage a second pass of water_wheel ("bats pass 2"), pillory ("visit 2") and dungeon, and route through `dlc_dungeonhallb` | 🔶 | ENGINE §8.2 "DLC 1 level chain (PK.1)" |
+| End | After the four goo-pit gates are closed a dungeon portal leads to `dlc_treasureroom`; its trigger plays `030_finale`, after 2.8 s the movie `credits_DLC1` runs, then the main menu | ✅ live | ENGINE §8.2 "DLC 1 level chain (PK.1)" |
+| Placement | In every DLC 1 unit the player start lies 5-11 m from the portal Lara first enters through | ✅ data | ENGINE §8.2 "DLC 1 level chain (PK.1)" |
+| Golden shotgun | The DLC 1 reward weapon is picked up in `dlc_dungeon` and shown on the PDA weapon pages | 🔶 | ENGINE §8.2 "Golden shotgun (884)" |
+| Default outfit | DLC 1 units default to `dlc_costume_f` | ✅ data | ENGINE §19 |
+
+### 2.3 DLC 2 *Lara's Shadow*
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Player | The player is the Doppelganger (`doppelganger_casual`); DLC 2 units default to the `lara_doppelganger` costume | ✅ data | ENGINE §19 |
+| Entry | The mission screen loads `dlc_level2_start` by name; the intro `000_fight` ends with Lara in the same unit (unlike DLC 1) | ✅ live | ENGINE §8.2 "DLC 2 level chain (PK1-8)" |
+| Front part | level2_start -> `dlc_yggdrasil_hall01` -> `hall02` (tutorial fight) -> `dlc_yggdrasil_end`; the three Yggdrasil rooms are the base-game rooms reused, the start unit is a rebuilt `l7_yggdrasil` | ✅ live / data | ENGINE §8.2; Befund-Sonar-DLC2-1411 |
+| Into the ring | A trigger in `dlc_yggdrasil_end` plays `020_ghoul` (32 s), which loads `dlc2_ceremony_room` by name; front (4 units) and ring (7 units) share no portal | ✅ live log | ENGINE §8.2 "DLC 2 cinematics" |
+| Ring | ceremony -> hall_ceremony_goo -> goo_room -> hall_goo_machine -> machine_room -> hall_machine_ceremony -> ceremony, walked twice | 🔶 | ENGINE §8.2 "DLC 2 level chain (PK1-8)" |
+| Objective counter | Scripts broadcast an objective count that orders the mission: 2 at the start, 3 hall02, 4 end room, 5 at `030_pod`, ... 31 at the last ceremony trigger | ✅ data, live 2-6 | ENGINE §8.2 "DLC 2 level chain (PK1-8)" |
+| End | Count 31 plays `040_podon`, then `045_finale` in `dlc2_treasure_room_cine`; the capsule switches start `050_crush` and the movie `credits_DLC2` | ✅ data | ENGINE §8.2 "DLC 2 level chain (PK1-8)" |
+| hall02 tutorial | The wall opens when the tutorial reached stage 2 and no thrall is alive; stage 2 comes from the combat hints (first kick) or, as fallback, three thrall deaths. Generator limit 7 thralls | ✅ live | ENGINE §8.1 |
+
+## 3. Lara: moves and combat
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Lock-on | LT holds a hard lock (lock time 8 from the player data), RT aims / fires; without a living target only a soft lock is possible | ✅ | ENGINE §13.7 "Lock-on path (aiming, record 718)" |
+| Target switch | While hard-locked, a right-stick push past 0.2 (after 3 / 12 tick timers) searches a new target in that direction and plays a sound | ✅ | ENGINE §13.7 "Lock-on target switch (Q68)" |
+| Adrenaline meter | Max 500. It fills with the health Lara takes off enemies and drains 20 per second (225 per second in adrenaline mode) | ✅ | ENGINE §13.7 "Adrenaline fill (Q77, group F)", "Adrenaline meter (Q65)" |
+| Adrenaline mode | R3 (press) with meter > 0, a hard lock on a target, no weapon in slot 3 and no strike running; Lara's time ramps to 0.5. Without a target R3 only plays a fail sound (corrected: a full meter is not needed) | ✅ | ENGINE §13.7 "Adrenaline mode, vault-off strike, headshot circle (Q108)" |
+| Vault-off strike | X held while hard-locked with a **full** meter on a valid enemy: the strike prompt shows, Lara vaults off the enemy (enemy -> Vaulted), the meter empties. Without a full meter: feedback sound, no move | ✅ | ENGINE §13.7 "Vault-off strike entry (group L)" |
+| Headshot circle | During the strike a circle appears; the pointer starts at a random point and moves with the right stick (and mouse). Pointer inside the circle + RT = headshot | ✅ / radius ⬜ | ENGINE §13.7 "Adrenaline mode ...", "Strike circle radius source" |
+| Headshot damage | A headshot hit uses the enemy's head-hit data, multiplies the damage by an enemy-specific percentage and resets its regeneration | ✅ / values ⬜ | ENGINE §13.7 "Headshot damage (group L)" |
+| Damage types | 0 Light, 1 Medium, 2 Heavy, 4 Explosion, 6 RigidBody, 8 Falling, 10 Fire, 11 Stamina; DLC 2 adds 17 (shadow step), 18-25 (combo), 26 / 27 (shadow moves) | ✅ | ENGINE §13.3 "Type names" |
+| DLC 2 combo | Punches on X (four in a chain), kicks via Y. Measured TU hit values: punches 20 / 40 / 60, kicks 130 / 100 / 70 | ✅ live (Xenia) | ENGINE §1 "Lara's punch combo (K-8)" |
+| Finisher | On a lying thrall Y starts a finisher leap; its distance is the animation's root motion (~600 units) | ✅ live | ENGINE §12 "Finisher Y move: state 1008" |
+| Falling | Gravity about -5151 units/s², speed cap ~411 000 u/s; there is no kill plane below hall02 (a 125 s fall was logged) | ✅ live | ENGINE §12 "Player fall state" |
+| Wall run (DLC 2) | Runs along walls only while the shadow power is on; stick direction picks the run and jump-off branches; without power Lara drops | ✅ | ENGINE §14 "Wall run chart (DLC 2)" |
+| Rock veins (DLC 2) | With LB/RB + A Lara jumps to and climbs rock veins; the meter drains while she hangs and she falls when it is empty | ✅ (Xenia) | DLC2.md "Doppelgänger / shadow power" |
+| Breath | Air (capacity value 4000) refills only when the diving gear item sits in its slot; the tank item is only a model | ✅ | ENGINE §20.6 "Breath", "Player data block" |
+| Gear | 13 gear kinds: binoculars (field camera), healthpack, grapple, sticky bomb, personal light, gauntlets, belt, diving gear, lighter, PDA, diving tanks, right gauntlet | ✅ | ENGINE §20.6 "Gear families" |
+| Default gear | Each unit gives a default weapon / gear list; Mediterranean: handgun, speargun, binoculars, grapple, grenades, PDA, light, diving gear, lighter - no tanks (a start scene gives them) | ✅ data | ENGINE §20.6 "Default gear per unit" |
+| Grapple | A grappled object goes back to its placed position when the area is saved / unloaded and its home unit is loaded | ✅ | ENGINE §6.4 "Live updates during play" |
+| Scripted adrenaline moments | The base game slows world / player time itself in scripted adrenaline scenes (one script in 28 base DRMs) (corrected: no DLC script does this) | ✅ data | ENGINE §20.2 |
+
+## 4. Shadow power (DLC 2)
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Activation | Hold LB or RB; the power runs while one is held | ✅ live | ENGINE §21 "Shadow power keys on PC (W7)" |
+| Numbers | Meter max 1000, drains 200 / s (5 s), refills 200 / s, restarts only from 150 after running empty; world speed 0.3, player speed 1.2 | ✅ data | ENGINE §20.1 "858 tuning" |
+| Look | Screen blur and brightening while active; HUD silhouette (shadow meter) next to the weapon widget | ✅ (Xenia) | DLC2.md "Xbox reference" |
+| Needed for | The first rock vein after the start and five puzzles (grinders, vents, eitr serpent heads, floating blocks, deadly rain) need the slow motion | 🔶 | DLC2.md |
+| Meter at start | The title-update code shows the meter full when DLC 2 starts | ✅ static / Xbox not seen ⬜ | ENGINE §20.2 "Meter init HUD store (W7)" |
+| Vaulted enemies | An enemy knocked into Vaulted runs at normal speed for 5 s while the world is slowed | ✅ static | ENGINE §13.7 "Vaulted clock" |
+
+## 5. Enemies and AI
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Enemy kinds | 26 objects with enemy data: base 21 (sharks, mercenaries, poachers, bats, tiger, panthers, nagas, spiders, tarantulas, Mayan / viking / yeti thralls), DLC 1 knight thrall, DLC 2 four viking / yeti thrall kinds | ✅ data | ENGINE §13.1 "Enemy kinds and what they load (Q83)" |
+| Behaviour types | Creature, CreatureVolumetric (bats, sharks - need the 3D graph), Thrall, Soldier | ✅ | ENGINE §13.1 "Behaviour tree byte" |
+| Health | Enemy health comes from its tuning record scaled by the "EnemyHP" difficulty step; a viking thrall has 350 | ✅ live | ENGINE §13.1 "LP at birth (Q86)" |
+| Regeneration | A lethal hit on a thrall lays it down to regenerate (yeti 300 ticks = 10 s, tutorial viking 210 = 7 s) instead of killing it; hits while lying push attached pieces | ✅ | ENGINE §13.4 |
+| Finisher hint | The first lethal hit on a regenerating enemy shows the finisher hint once | ✅ live | ENGINE §7.3 "Notification ids" |
+| Dismemberment | Dead thralls can break into pieces (chunkdoll); pieces vanish after 20 s (base) / 7.5 s (DLC 2), a flagged last piece stays for good and is saved | ✅ | ENGINE §13.6 "Data D", "Permanent piece (Q99)" |
+| Hit reactions | A hit is light (hit animation) or heavy (knockback); DLC 2 thrall knockback forces per hit type 3 / 9 / 12 / 18 | ✅ static | ENGINE §13.7 "Hit struct selector", "Knockback force (K-1)" |
+| Generators | Spawners keep max-alive and total limits, spawn in groups with pauses, never while Lara is within ~632 units of the spawner or a body lies at the spawn point; every retail generator starts switched off | ✅ | ENGINE §8.1 "Generator 10028 spawn", §10 "Intro data" |
+| Drowning | Land enemies in deep water die a drown death | ✅ static | ENGINE §11 "Water volume intro data and water level (PW.1)" |
+| Cinematics | Enemies switch to a "Puppet" state when a cinematic starts and return to idle afterwards | ✅ live | ENGINE §13.9 "State Puppet" |
+| Melee chains | Enemy melee attacks can chain into linked follow-up attacks; an attack coordinator grants attack slots | ✅ / slot count ⬜ | ENGINE §13.4 "Attack coordinator", §13.5 |
+| Debug cheats | One-hit-kill sets any damaged enemy to 0 health; an enemy-health text cheat exists | ✅ | ENGINE §13.3 "Health component", §23 "Cheats" |
+
+## 6. PDA, sonar, hints, objectives
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Sonar | The ping map casts rays (500 per frame) from Lara's eye (+200 units) to map vertices inside the ping radius; only geometry in range and in line of sight is drawn, plus pingable objects and portals in sight | ✅ static | Befund-Sonar-DLC2-1411; ENGINE §14 |
+| Sonar maps DLC 2 | Real maps only in `dlc_yggdrasil_hall01` / `hall02` / `end` (copies of the base Yggdrasil maps); the start unit and all `dlc2_*` rooms carry a developer placeholder mesh spelling "MAP", so the sonar shows almost nothing there | ✅ data / Xbox 🔶 | Befund-Sonar-DLC2-1411 |
+| Sonar maps DLC 1 / base | DLC 1 maps are real except `dlc_level1_start` and `dlc_treasureroom` (placeholder); the base game uses the same placeholder in five cinematic / corridor units | ✅ data | Befund-Sonar-DLC2-1411 |
+| Help on demand | Lara's hint / answer lines (499 streams) are picked per level ("l0".."l7"). DLC 1 asks for "dlc_l1", which the PDA does not know, so DLC 1 has no help | ✅ chain / Xbox 🔶 | ENGINE §8.2 "DLC 1 help-on-demand" |
+| DLC 2 PDA | DLC 2 changes the PDA main / journal page, the weapon pages (golden shotgun) and adds a DLC journal menu with DLC room names | ✅ data | Befund-DLC2-PDA-1111 |
+| Objective banner (DLC 2) | "Objective / hint revealed" banner: dark bar scales in within 1 s, text fades in by 2 s, holds to 6.5 s, gone at 7.5 s | ✅ data | ENGINE §8.2 "DLC 2 objective / hint notifier" |
+| DLC 2 hints | Tutorial hint boxes close on move notifications (e.g. the first kick closes the punch hint); which move sends which id is only partly known | 🔶 | ENGINE §8.1 "Hints", §7.3 |
+
+## 7. Puzzles and world mechanics
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| DLC 1 water | Only the sluice gate in `dlc_water_wheel` (second visit) sets the sticky `WaterFlowing`; the same action turns the wheel and starts the falls | ✅ static + log | ENGINE §11 "DLC 1 dungeon water flag WaterFlowing (W4)" |
+| DLC 1 water level | With the flag the dungeon raises its water when it streams in or when Lara enters the lower basin: basin -1285 -> -120, sewer 252 -> 1520 (floor height); without it the water is lowered. New game resets it | ✅ static + log | ENGINE §11 (W4); Befund-W4-Wasser-Boot-1411 |
+| Water levels | Water surfaces are moved by script to placed marker heights; an unknown marker leaves the level unchanged | ✅ static | ENGINE §11 "Water volume intro data and water level (PW.1)" |
+| DLC 1 caverns gates | The caverns_hall gates stay open 25 s after the switch, then close; reset 2 s later; the switch has its own 30 s wait | ✅ live | ENGINE §9 "Gates in dlc_caverns_hall" |
+| DLC 2 goo drips | End-room drip sources start after 4 s and drop one blob per 0.7 s (easy) or two per 0.9 s (hard, endless); a blob hit plus throw explains the deaths in the drip corridor | ✅ data / deaths 🔶 | ENGINE §9 "Goo drips", "Corridor drips" |
+| Puzzle persistence | A puzzle's node, timer and running transition are saved; events that arrive during a transition are dropped, not queued | ✅ static | ENGINE §9 "Uber save / restore (Q74)", "Event / command delivery" |
+| Breakables | Weight plates break into a "Broken" end node; solved ping-map markers are removed (eye puzzle: 17 s after solving) | ✅ live | ENGINE §9 "End record, removal (P1)" |
+| Mediterranean boat end | The return cutscene at the yacht plays only if Baldr's tomb was solved; else the volume does nothing | ✅ data | ENGINE §11 "Dead-end trigger sites (Q73)" |
+| Thin triggers | A trigger volume thinner than one frame's step can be passed without an event (no sweep); a volume Lara is already inside when it activates sends no "enter" | ✅ static | ENGINE §11 "Volume = two points, no sweep (Q73)" |
+
+## 8. Loading screens, movies, cards, subtitles
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Loading backgrounds | Eight base images (mansion, medsea, thailand, dungeon, mexico, snow, ship, arcticsea; 640x360) plus DLC 1 / DLC 2 images; chosen by level number from the unit name, default mansion; 4:3 / 16:9 / 16:10 variants | ✅ data | Befund-Ladebild-Hauptspiel-1411 |
+| DLC loading screen | Title in a ring, the description types itself in | ✅ (Xenia) | DLC2.md "Xbox reference" |
+| Title card | The "Eidos presents" card of the first level runs on its own text animation without a background image | ✅ code | Befund-Ladebild-Hauptspiel-1411 |
+| Chapter cards | Shown only by base-game cinematic objects; the DLC units never call them, so DLCs have no chapter cards | ✅ data | ENGINE §8.2 "Chapter title card" |
+| Movies | `intro`, `medsea_loop` (main menu background), `credits`, `credits_DLC1`, `explode`, `prevontr`; 4:3 screens use `_nw` variants; no cinema bars exist | ✅ static | ENGINE §23 "Code-played movies", "Front-end state" |
+| Skipping | One-shot movies (credits) end on a click / key; the looping main-menu movie cannot be skipped | ✅ static | ENGINE §23 "Video player skip input (W3)" |
+| Front end | Legal screens (script-drawn), intro movie, press start, main menu; after 40 s without input the attract teaser plays (`intro`) | ✅ | ENGINE §23 "Front-end state", "Attract timer" |
+| Cutscene timing | A cutscene follows its sound stream's clock; without sound it runs on game time | ✅ static | ENGINE §3 "Cinematic stream clock" |
+| Subtitles | Up to two lines; each new line shows at least 3 s (90 ticks) before scrolling up. One record holds all languages, each with its own cue times; no line names its speaker | ✅ static | ENGINE §16 "Subtitle line clock", "Subtitle record format" |
+| DLC 1 conversations | The Zip / Lara conversations of DLC 1 have no subtitles | ✅ data | ENGINE §18.5 "Speaker per line" |
+
+## 9. Sound
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Groups | Sounds play in a tree of channel groups: 77 on PC 1.1, 80 with the title update (77 / 78 DLC 2 player, 79 shadow-power loop) | ✅ | ENGINE §18.3 |
+| Sliders | Music slider = group 1 (menu theme, level music, stingers); Effects slider = group 4, 70 of 80 groups incl. Lara's voice and hint lines; Speech slider = group 7, only cutscene speech (25) and a few DLC 2 lines | ✅ | Befund-Ton-Gruppen-0611 |
+| Ambience | Group 15 with 16-24: loops 19, animals 20, fire 21, wind / storm 22, water 23, underwater 24. DLC 2 ambience beds run in the music group | ✅ | Befund-Ton-Gruppen-0611; Befund-W6-Toene-1411 |
+| HUD sounds | Group 53: binoculars 54, Lara special 55 (heartbeat, adrenaline time bend, rewards, targeting), menu 56, PDA 57; Lara's hint lines 70 sit under the PDA group | ✅ | Befund-Ton-Gruppen-0611 |
+| Pause / death | The pause menu pauses groups 6, 25, 3, 9 (+79 on TU); Lara's death silences groups 70 and 76 | ✅ | ENGINE §18.3 |
+| Effects | Groups 58 / 59 carry a ParamEQ. TU group 77 = echo (500 ms; DLC 2 player's voice in bad water / drowning), 78 = chorus (75 ms; her body foley) | ✅ data | ENGINE §18.3 "Game DSP kinds" |
+| 3D falloff | A 3D sound is full inside 158 units, silent beyond 3161 units, squared falloff between (defaults) | ✅ static | ENGINE §18.3 "Why the group 78 voices sit at volume 0" |
+| Streams | Cutscene, voice, event and music streams (`.mul`) use the game's own IMA ADPCM decoder; DLC 1 / 2 have 25 music tracks | ✅ | ENGINE §18.4 |
+| Speech languages | Speech exists in EN / FR / DE / IT / ES; Dutch has text only (English speech). Mercenary barks (490 lines) exist only in the ship units | ✅ data | ENGINE §18.5 "Language census", §18.5 |
+| Checkpoint chime | Base checkpoints chime in group 55 (pauses with the pause menu), DLC 1 units in group 5 (does not) | ✅ data / effect 🔶 | ENGINE §1 "Checkpoint chime DTP 906 / PC 3512" |
+
+## 10. Options and controls
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Option list | SFX / Music / Voice volume (0-128), brightness, subtitle language, camera X / Y and aim X / Y invert, vibration, combat mode, aspect (3 choices), fullscreen effects, shadows, anti-aliasing, depth of field, reflection, water FX, resolution / rate, language, mouse sensitivity (default 10), volumetric FX, triple buffer, VSync, texture detail, best texture filter | ✅ static | ENGINE §16 "Option table" |
+| Registry | Settings live under `HKCU\Software\Crystal Dynamics\Tomb Raider: Underworld` (root values, `Graphics` and `Input` keys); a missing value reads as 0 (e.g. depth of field off) | ✅ static | ENGINE §16 "Graphics settings" |
+| Saving settings | Settings are written only on a clean exit; a crash or killed process keeps the old values | ✅ static | ENGINE §16 "Settings save" |
+| Subtitle language | Stored per profile; -1 = same as the game language; a change applies to the next line | ✅ live | ENGINE §16 "Subtitle language at run time" |
+| Languages | Text tables EN / FR / DE / IT / ES / NL in PC 1.1; one bitmap font (205 glyphs incl. pad icons) for all; line wrap only at spaces | ✅ | ENGINE §16 "Bitmap font" |
+| Pad codes | A 3, B 2, X 1, Y 0, LB 6, RB 7, LT 4, RT 5, D-pad 12-15, Start 10, Back 11, L3 8, R3 9 | ✅ | ENGINE §21 "Pad codes" |
+| Keyboard | Keys are bound to pad codes, not actions: registry `Input` value name = pad code, data = source codes (keyboard 0x80 + scan code, mouse 0x60-0x62) | ✅ | ENGINE §21 "Keyboard = pad code (Q108)" |
+| Key actions | R3 = adrenaline mode, X (held) = vault-off strike, LT = lock, RT = fire, L3 = centre camera, LB / RB = shadow power (DLC 2) | ✅ | ENGINE §21, §22 "Centre-camera button" |
+| Button prompts | On PC prompts show the bound button's name instead of the pad icon (Back shows the word BACK); stick icons stay icons (only DLC texts still use them; the PC rewrote its base hints) | ✅ static | ENGINE §16 "Button glyphs in text (Q9)", "Stick glyphs in DLC hints (W7)" |
+| Auto-recenter | The camera recentres 5 s after the last look input, over a 2 s ramp; any mouse pause restarts the delay | ✅ static | ENGINE §22 "Auto-recenter" |
+| Graphics switch | Fullscreen effects and depth of field switch without a device reset | ✅ static | ENGINE §16 "Graphics apply" |
+
+## 11. Saves, stickies, rewards, achievements
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Slots | 10 save slots (`savegame00..09.sav`, 1.25 MB each) plus `profile.pro`; a save overwrites its slot in place, no temporary file | ✅ static | ENGINE §6.2 "Save file I/O (Q69)", §23 "Photo system gate" |
+| Checkpoints | A checkpoint is an in-memory snapshot of the live save area; death restores it | ✅ | ENGINE §6.4 "Checkpoint = copy" |
+| Saved content | Units, instances, the game block (unit, checkpoint, play time in s, chapter, costume, options), stickies, dead bits; not saved: plain script variables | ✅ | ENGINE §6.1, §6.2 |
+| Save names | "<LEVEL> - <chapter>"; the game block's chapter field was 0 in all 14 saves read | ✅ data | ENGINE §8.2 "Chapter title card" |
+| Stickies | Persistent script values: 512 int, 4096 bool, 128 float; keys grow in creation order | ✅ | ENGINE §6.3 |
+| Restore rules | A saved object waits until its object and its linked parent exist; one that never restores stays gone and keeps its placed copy suppressed; a missing inventory item stays missing | ✅ static | ENGINE §6.4 "Restore order", "Birth suppression", "Inventory restore" |
+| Rewards | 179 treasures + 6 relics = 185, each placed once: Med 26, Thailand 30, Manor 13, Mexico 50, Jan Mayen 30, Arctic 30 treasures, one relic in each; each pickup sets its bit once | ✅ data + log | ENGINE §6.4 "Reward collected bits + table (P1)" |
+| Health pickups | `*_rw_shard` rewards are health pickups and are not counted | ✅ data | ENGINE §6.4 "Reward collected bits + table (P1)" |
+| Achievements on PC | PC 1.1 has no achievements: the script natives are empty and the scripts check an "is Xbox" flag that is false | ✅ | ENGINE §7.2 "achievement (script 66)", "corebase f15 / f16" |
+| Exe achievements (Xbox) | Treasures 10 / 50 / 100 / all, relics 1 / 3 / 6, two / three kills with one grenade, vehicle kills 1 / 5, adrenaline headshots 1 / 10, chapter ends, chimney-jump counts | ✅ static | ENGINE §7.2 "Exe-awarded achievements (I-4)" |
+| Timed achievements | Ballcourt < 45 s, Valgrind < 50 s, Valaskjalf entry < 40 s - all three in one adventure gives one more; three swan-dive spots count 1 / 2 / 3 🔶 | ✅ static | ENGINE §7.2 "GameGlobals (script 5) achievement checks (I-3)" |
+| DLC achievements | DLC achievements 47 / 54-57 come from script natives; DLC 2 has speed-run clocks ("Refinery Speed Demon", "Right of Passage") | ✅ data | ENGINE §7.2, §23 "Script clock time step" |
+
+## 12. Menus, DLC offer, costumes, difficulty
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Ring menu | One script for main and pause menu: 7 ring slots (new game, options, load, save, audio / visual, extras, slot 7) + centre (play / resume) | ✅ static | ENGINE §8.2 "Ring menu slot 7" |
+| Slot 7 | Slot 7 is Quit Game or Downloadable Content (sub-ring: play mission, community info, download content); PC 1.1 shows Quit in both menus. Bottom position 14 is the Xbox storage-device entry, unused on PC | ✅ static | ENGINE §8.2 "Ring menu slot 7", "Ring geometry: 14 positions" |
+| Mission screen | Lists only installed DLC; the slots for missions 3-6 have placeholder texts / images but can never appear. Title light blue over the description | ✅ | ENGINE §4.1 "Units without a DRM"; DLC_MENU.md |
+| Outfits | Offered only when the costume file exists (no unlock flag); the outfit selection appears on a mission / level start, not on story transitions | ✅ | ENGINE §19; DLC2.md "Xbox reference" |
+| Costume packs | Wetsuit pack: Wetsuit, Blue Wetsuit; Classic pack: Classic Lara, Legend Lara; Designer pack: Fashion Winner, People's Choice | ✅ data | COSTUMES.md |
+| Difficulty | Player tailoring = EnemyHP, AmmoAdj, PlayerHP, SavingGrabAdj and a fifth value; each 0-2, 1 = Medium (default) | ✅ static | Befund-DLC-Schwierigkeit-1111 |
+| TU mission start | Starting a DLC mission on the TU resets tailoring to Medium and the chosen costume; DLC 2+ starts skip the outfit selection. PC 1.1 keeps both and always offers outfits | ✅ static / PC live | ENGINE §4.2 "Dialog accept case 8"; Befund-Hauptmenue-Schwierigkeit-1111 |
+
+## 13. Xbox vs PC and the title update (game level)
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| TU = DLC base | The DLCs were built for title update 0.0.2.3; its exe code (504 new, 824 changed functions) holds the shadow power, rock veins, DLC 2 damage types and thrall companions. PC 1.1 is retail-based | ✅ | ENGINE §1 "TU coverage list" |
+| Base-game data | The TU changes no base level, enemy or player data - only append-only lists (camera ids, 6 input bindings, sound groups) and some menu texts / UI sounds | ✅ data | ENGINE §1 "Base-game DATA in the TU (Q60)" |
+| TU fixes | TU code blocks match the published fix list: jump targeting, ledge corners, edge probe by stick direction, faster trigger tests; the Legend cheat poll was removed | 🔶 | ENGINE §1 "Main-game bug fixes in the TU" |
+| DLC 2 hits | PC 1.1 knows damage types 0-16 only, so DLC 2 hits do nothing and thralls never die | ✅ live | ENGINE §13.3 |
+| Combo | On the TU every combo punch can hit the same thrall again; on PC 1.1 only the first punch of a chain hits | ✅ static + log | ENGINE §1 "Lara's punch combo (K-8)" |
+| Punch impulse | The TU skips the push impulse after Lara's punch on thralls, so they stay in their hit reaction; PC 1.1 throws them into a fall on every punch | ✅ live | ENGINE §1 "Impulse 0x91 after Lara's contact hit (K-1b)" |
+| Finisher | TU steers the finisher Y onto the target every frame and kills it at the end; PC 1.1 leaps by root motion and does not kill | ✅ static / PC live | ENGINE §12 "Finisher Y move", "State 1015" |
+| Dismemberment | TU builds the pieces in the death state (limit 8); PC 1.1 builds them inside the physics step (limit 4), which can end in a fatal "failed to create geom" | ✅ live | ENGINE §13.6 "Crash root cause" |
+| Collision pairs | TU sizes the markup collision pool at 3000 boxes / 1000 pair links, PC 1.1 at 1000 / 400 | ✅ | ENGINE §1 "SweepAndPrune pool" |
+| Slow-motion camera | Under the shadow power the TU camera, camera shake, braid and some player steps run at normal speed; on PC they would run at world speed 0.3 | ✅ static | ENGINE §20.4, §20.5, §22 "Camera time step (TU)" |
+| DLC 2 camera | TU uses own camera settings for the Doppelganger (recenter after 0.25 s, 5 s ramp; new climb modes) | ✅ (Xenia) | ENGINE §22 "Doppelganger camera settings (TU)" |
+| Rendering | The Xbox has per-object and camera motion blur, absent on PC; depth of field is complete in the PC exe but off unless the registry value is set | ✅ static | ENGINE §1 "Motion blur", "Depth of field" |
+| Back icon | The Xbox draws the Back pad icon in prompts; the PC shows a word | ✅ | ENGINE §16 "Button glyphs in text (Q9)" |
+
+## 14. Original game bugs known on PC
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| > 31 CPU threads | The CPU count loop never ends when bit 31 of the affinity mask is set and overruns a stack array; with 25+ worker threads the first load hangs. Up to 24 workers run | ✅ static + live | ENGINE §3 "CPU count / > 31-thread start-up crash", "Worker pool" |
+| Release walk crash | When a big unload (e.g. the death reload in the pillory area, five units at once) frees resources and a destructor adds one more past the list capacity, the release walk reads freed memory and crashes | ✅ (dump) | ENGINE §16 "Deferred release list (W1 / PT.1)" |
+| Stale pause after menu exit | Leaving to the main menu from the pause screen keeps the pause bit; all menu clocks then run at half speed (attract teaser after ~80 s). Same code on the Xbox | ✅ static + live | ENGINE §23 "Script clock time step / stale pause bit" |
+| Mouse switches targets | While hard-locked any mouse movement counts as a right-stick push and switches the lock-on target | ✅ static | ENGINE §13.7 "Lock-on target switch (Q68)" |
+| Finisher off the edge | The retail finisher leap can carry Lara past a target at an arena edge and out of the world (seen in hall02); the TU's target steering avoids it | ✅ live / TU 🔶 | Befund-Sturz-durch-Welt-1111 |
+| Save abort | A failed save write deletes the slot file (no temporary copy) | ✅ static | ENGINE §6.2 "Save file I/O (Q69)" |
+| Frame-rate pushes | One-frame physics pushes given as forces get weaker at high frame rates | 🔶 | ENGINE §13.6 "Frame-rate sensitivity (Q69)" |
+
+## 15. Cut and leftover content
+
+| Topic | Fact | Status | Source |
+|---|---|---|---|
+| Photo feature | A full screenshot system (100 photo slots, JPEG quality 85, PDA photo inbox, upload), seven Lara photo poses and an unpublished Xbox achievement "Photo Archaeologist" exist; a gate byte that nothing sets keeps it off, the field camera only zooms | ✅ static | ENGINE §23 "Screenshot / photo system", "Photo system gate (Q78)" |
+| Key items | Ten cut key items keep names and descriptions in the text tables (gem, jewel, stone headdress, four house keys, Xibalba key, jaguar head, Helheim power stone); the puzzle objects exist, no inventory page shows them | ✅ data / 🔶 meaning | Befund-Unbenutzte-Inhalte-Q66-1111 |
+| Test players | Four test player types (`lara_untextured`, `lara_metrics_test` / `2`, `lara_placeholder`) exist only as names in the exe | ✅ | ENGINE §19 "Test player types (Q66)" |
+| Legend leftovers | Kick physics skips three Legend props, an object-name cache lists 16 Legend objects, enemy health-pack drop code is still in the exe - none can trigger | ✅ / drops ⬜ | ENGINE §23 "Legend kick props", §5.1 "Resident object-name cache", §13.7 "Enemy adrenaline / health-pack components" |
+| DLC 2 plans | Breakable-ledge and goo objects are listed in the DLC object list without any data | ✅ | Befund-Unbenutzte-Inhalte-Q66-1111 |
+| Developer menu | 101 developer-menu rows in 15 pages are still in the data (fog, frame rate lock 30 / 20 / 60, reload unit, "perfect game now"); chapter jumps and debug text are compiled out | ✅ | ENGINE §23 "Developer menu data", "Rows that act" |
+| Cheats | The Legend cheat-code poll is still active on PC (removed by the TU); a `co_rock` cheat object in `l1_seafloor` waits for an input sequence; "infinite adrenaline" is empty on PC | ✅ / sequence 🔶 | ENGINE §23 "Legend cheat poll", "co_rock cheat object" |
+| Unlockables | Script natives for unlockable music and costumes exist but no script calls them | ✅ | ENGINE §23 "Unreferenced native types (Q81)" |

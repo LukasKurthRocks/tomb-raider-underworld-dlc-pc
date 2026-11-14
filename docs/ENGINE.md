@@ -4,6 +4,10 @@ One place for everything the project learned about **how the game engine works**
 state flows, where it lives in the PC executable, how the Xbox title update (TU) differs, and what our plugins and tools
 do about it. The aim is that with this file everything only has to be *rebuilt*, never *re-discovered*.
 
+**ENGINE vs KNOWLEDGE:** this file says *how* the engine does it (addresses, data layouts, code paths). What the game does
+at game level - level order, conditions, numbers, original-game bugs, without addresses - is in
+[TRU-Knowledge.md](TRU-Knowledge.md), whose rows point back here. A new finding updates both in the same commit.
+
 This file is the **index and summary**. Details, disassembly and test logs stay in the sources it names. Conversion
 pipeline: [ARCHITECTURE.md](ARCHITECTURE.md), [PIPELINE.md](PIPELINE.md). The older short-facts file
 [FINDINGS.md](FINDINGS.md) is only a pointer here since 08.11. (its content is merged in, marked "from FINDINGS.md"). DLC 2 notes: [DLC2.md](DLC2.md). Costumes: [COSTUMES.md](COSTUMES.md). Open work list:
