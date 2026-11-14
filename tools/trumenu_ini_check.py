@@ -4749,11 +4749,13 @@ def check_02240(ini_path, switches_path):
     strike / text place); DrawAt draws by the style (text only returns before the circle, the strike only for strike
     styles, text inside / below / left); item menu.attracticon "value" 0..7 (one digit or off, else usage; the old key
     removed before the write); bar row kQbValue kQvAtStyle after menu.attracttimer with the style name (ItemValueShort);
-    kVersion 0.22.40; README 0.22.40 with TO TEST; Set-TruMenu knows the 0.22.39 hash"""
+    kVersion 0.22.40; README 0.22.40 with TO TEST; Set-TruMenu knows the 0.22.39 hash.
+    0.22.41 (Q126c): the range (0 .. 16, kAtStyleN 17), the switches row type / version, the two-digit parse in RunAt and
+    the item text moved to check_02241; the first 8 table rows and everything else stay checked here"""
     problems = []
     src = read_cpp()
-    if '"TruMenu 0.22.40 (Q126b attract display styles' not in src[:src.find('\n', src.find('kVersion = '))]:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.40 (Q126b attract display styles"')
+    if '0.22.40 (Q126b attract display styles' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.41: later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.40 part "0.22.40 (Q126b attract display styles"')
     # keys: one key, default 7; AttractIconText only in AtStyleRead / RunAt (the 0.22.39 mapping) and comments / texts
     if not re.search(r'\{"Menu", "AttractIcon", "7",', src): problems.append('TruMenu.cpp: kOpts [Menu] AttractIcon must be "7"')
     if re.search(r'\{"Menu", "AttractIconText",', src): problems.append('TruMenu.cpp: kOpts [Menu] AttractIconText must be gone')
@@ -4771,23 +4773,23 @@ def check_02240(ini_path, switches_path):
     if re.search(r'^AttractIconText=', ini, re.M): problems.append('%s: AttractIconText must be gone' % os.path.basename(ini_path))
     sw = [l.rstrip('\r\n').split(' | ') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Menu | ')]
     f = [x for x in sw if len(x) >= 10 and x[2] == 'AttractIcon']
-    if not f or f[0][3] != 'int:0..7' or f[0][6] != 'live' or f[0][7] != '7' or f[0][9] != 'TruMenu 0.22.40':
-        problems.append('%s: row TruMenu | Menu | AttractIcon | int:0..7 | ... | live | 7 | ... | TruMenu 0.22.40 missing'
+    if not f or not f[0][3].startswith('int:0..') or f[0][6] != 'live' or f[0][7] != '7':   # 0.22.41: range in check_02241
+        problems.append('%s: row TruMenu | Menu | AttractIcon | int:0..<n> | ... | live | 7 | ... missing'
                         % os.path.basename(switches_path))
     if [x for x in sw if len(x) >= 3 and x[2] == 'AttractIconText']:
         problems.append('%s: row AttractIconText must be gone' % os.path.basename(switches_path))
     # the style table
     m = re.search(r'const AtStyleDef kAtStyles\[\] = \{(.*?)\};', src, re.S)
     rows = re.findall(r'\{(\d), (\d), (kAtText[A-Za-z]+), "((?:[^"\\]|\\.)*)", "((?:[^"\\]|\\.)*)"\}', m.group(1)) if m else []
-    if len(rows) != 8: problems.append('TruMenu.cpp: kAtStyles must hold 8 rows (got %d)' % len(rows))
-    else:
+    if len(rows) < 8: problems.append('TruMenu.cpp: kAtStyles must hold the 8 rows of 0.22.40 first (got %d)' % len(rows))
+    else:                                    # 0.22.41: rows 8 .. 16 in check_02241
         for i, (row, shape, names) in enumerate(zip(rows, AT_SHAPES_02240, AT_STYLES_02240)):
             if row[:3] != shape: problems.append('TruMenu.cpp: kAtStyles[%d] must be %s (got %s)' % (i, shape, row[:3]))
             if (unescape(row[3]), row[4]) != names:
                 problems.append('TruMenu.cpp: kAtStyles[%d] names must be %s / %s' % (i, names[0], names[1]))
             if len(names[0]) > 40 or len(names[1]) > 40: problems.append('kAtStyles[%d]: name over 40 characters' % i)
-    if 'const int kAtStyleN = 8, kAtStyleDefault = 7;' not in src:
-        problems.append('TruMenu.cpp: kAtStyleN 8 / kAtStyleDefault 7 missing')
+    if not re.search(r'const int kAtStyleN = \d+, kAtStyleDefault = 7;', src):   # 0.22.41: N in check_02241
+        problems.append('TruMenu.cpp: kAtStyleN / kAtStyleDefault 7 missing')
     if 'return kAtStyles[s >= 0 && s < kAtStyleN ? s : kAtStyleDefault];' not in fn_body(src, 'const AtStyleDef &AtStyleOf('):
         problems.append('TruMenu.cpp: AtStyleOf must clamp to the default')
     # reading: the INI value, the 0.22.39 mapping, the range; migrate only from AtReadSwitch
@@ -4824,11 +4826,11 @@ def check_02240(ini_path, switches_path):
         if any(w in body for w in ('reinterpret_cast<', 'WriteByte(', 'WriteBytes(', 'WriteDword(', 'LcPatch(', 'Fn>(')):
             problems.append('TruMenu.cpp: %s must not touch game memory' % fn.strip('('))
     # item, bar row, help, value helpers
-    if not re.search(r'\{"menu\.attracticon", "value", "0\.22\.40 0\.\.7 .*?,\s+false, ValAt, RunAt\}', src, re.S):
-        problems.append('TruMenu.cpp: item menu.attracticon ("value", "0.22.40 0..7 ...", ValAt / RunAt) missing')
+    # 0.22.41: the item text "0.22.41 0..16" and the two-digit parse are checked in check_02241
+    if not re.search(r'\{"menu\.attracticon", "value", "0\.22\.4\d 0\.\.\d+ .*?,\s+false, ValAt, RunAt\}', src, re.S):
+        problems.append('TruMenu.cpp: item menu.attracticon ("value", "0.22.4x 0..n ...", ValAt / RunAt) missing')
     run = fn_body(src, 'bool RunAt(')
     for want in ('if (!arg || !arg[0]) { ValAt(o, n); return true; }',
-                 "if (arg[0] >= '0' && arg[0] <= '9' && !arg[1]) v = arg[0] - '0';",
                  'else if (!_stricmp(arg, "off")) v = 0;', 'if (v < 0 || v >= kAtStyleN) {', 'usage: menu.attracticon 0..%d',
                  'IniKeepInt("Menu", "AttractIcon", v);'):
         if want not in run: problems.append('TruMenu.cpp: RunAt must hold %s' % want)
@@ -4860,8 +4862,128 @@ def check_02240(ini_path, switches_path):
     ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
     if '11bce73110d4c61c3b85cf8375e5bb019442c6154060468027b589372a10f6d5' not in ps:
         problems.append('Set-TruMenu.ps1: the 0.22.39 build hash (work/asi/menu0262) is missing')
-    return problems, ('attract display styles (Q126b): [Menu] AttractIcon 0 .. 7 = 7 live, 8 styles, 0.22.39 INI mapped '
-                      'once, item value 0..7, bar row with the style name')
+    return problems, ('attract display styles (Q126b): [Menu] AttractIcon = 7 live, the 8 styles 0 .. 7, 0.22.39 INI '
+                      'mapped once, item value, bar row with the style name (0.22.41 range: check_02241)')
+
+
+# 0.22.41 (Q126c, owner 14.11. after trying 0.22.40): the styles 8 .. 16 appended to the same cycle switch
+AT_STYLES_02241 = (('Klein, ohne Kasten', 'small, no box'), ('Klein + Strich, ohne Kasten', 'small + strike, no box'),
+                   ('Klein, Zahl daneben', 'small, count beside'), ('Klein, Zahl darunter', 'small, count below'),
+                   ('Klein, Zahl am Rand', 'small, count badge'), ('Knapp: Zeit + Zahl', 'terse: time + count'),
+                   ('Knapp: Zeit/Limit + Zahl', 'terse: time/limit + count'), ('Nur Zahl (Wort)', 'count only (word)'),
+                   ('Nur Zahl (Pfeil)', 'count only (arrow)'))
+AT_SHAPES_02241 = (('1', '0', 'kAtTextBare'), ('1', '1', 'kAtTextBare'), ('1', '0', 'kAtTextCountLeft'),
+                   ('1', '0', 'kAtTextCountBelow'), ('1', '0', 'kAtTextBadge'), ('0', '0', 'kAtTextTerse'),
+                   ('0', '0', 'kAtTextTerseOf'), ('0', '0', 'kAtTextWord'), ('0', '0', 'kAtTextArrow'))
+AT_HASH_02240 = '71374f9d167be140a6b124b71b55f6c24c603dfd3a0effbcf4e0cb8fc2b80f4b'   # work/asi/menu0263
+
+
+def check_02241(ini_path, switches_path):
+    """0.22.41 (Q126c, owner 14.11. after trying 0.22.40; workspace docs/Befund-AttractIcon-Kompakt-1411.md): [Menu]
+    AttractIcon 0 .. 16 - styles 8 .. 16 appended (0 .. 7 unchanged, default 7): all drawn by DrawAtBare without the box
+    (ImGuiWindowFlags_NoBackground, no box colour / alpha), the small circle (3 font sizes) without any time next to it,
+    only the counter (skipped while NoAttract holds, else the game's teasers) beside / below / as a badge, the strike only
+    in style 9, terse text 13 / 14 (the only places the seconds are drawn), the counter alone 15 / 16; the blink (lit)
+    for all; texts in de / en pairs and only Latin-1 glyphs (the ImGui default font); RunAt takes one or two digits;
+    switches row int:0..16; item text; help; kVersion 0.22.41; README 0.22.41 with TO TEST; Set-TruMenu knows the 0.22.40
+    hash"""
+    problems = []
+    src = read_cpp()
+    raw = open(CPP, 'r', encoding='utf-8').read()
+    if '"TruMenu 0.22.41 (Q126c compact attract styles' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.41 (Q126c compact attract styles"')
+    if 'const int kAtStyleN = 17, kAtStyleDefault = 7;' not in src:
+        problems.append('TruMenu.cpp: kAtStyleN 17 / kAtStyleDefault 7 missing')
+    em = re.search(r'enum AtTextAt \{(.*?)\};', src, re.S)
+    names = re.findall(r'kAtText[A-Za-z]+', re.sub(r'//[^\n]*', '', em.group(1))) if em else []
+    want_enum = ['kAtTextNone', 'kAtTextOnly', 'kAtTextInside', 'kAtTextBelow', 'kAtTextLeft', 'kAtTextBare',
+                 'kAtTextCountLeft', 'kAtTextCountBelow', 'kAtTextBadge', 'kAtTextTerse', 'kAtTextTerseOf', 'kAtTextWord',
+                 'kAtTextArrow']
+    if names != want_enum: problems.append('TruMenu.cpp: enum AtTextAt must be %s' % ', '.join(want_enum))
+    m = re.search(r'const AtStyleDef kAtStyles\[\] = \{(.*?)\};', src, re.S)
+    rows = re.findall(r'\{(\d), (\d), (kAtText[A-Za-z]+), "((?:[^"\\]|\\.)*)", "((?:[^"\\]|\\.)*)"\}', m.group(1)) if m else []
+    if len(rows) != 17: problems.append('TruMenu.cpp: kAtStyles must hold 17 rows (got %d)' % len(rows))
+    else:
+        for i, (row, shape, nm) in enumerate(zip(rows[8:], AT_SHAPES_02241, AT_STYLES_02241), 8):
+            if row[:3] != shape: problems.append('TruMenu.cpp: kAtStyles[%d] must be %s (got %s)' % (i, shape, row[:3]))
+            if (unescape(row[3]), row[4]) != nm:
+                problems.append('TruMenu.cpp: kAtStyles[%d] names must be %s / %s' % (i, nm[0], nm[1]))
+            if len(nm[0]) > 40 or len(nm[1]) > 40: problems.append('kAtStyles[%d]: name over 40 characters' % i)
+        for col, lang in ((3, 'DE'), (4, 'EN')):
+            if len(set(r[col] for r in rows)) != len(rows): problems.append('TruMenu.cpp: kAtStyles %s names not unique' % lang)
+    # DrawAt hands 8 .. 16 to DrawAtBare before its own text and box
+    draw = fn_body(src, 'void DrawAt(')
+    disp = 'if (st.text >= kAtTextBare) return DrawAtBare(st, ntDrawn, lit, held, why, frac, shown);'
+    i_frac, i_disp, i_l1, i_begin = (draw.find('const float frac = why[0] ? -1.0f : AtFraction(held, &shown);'),
+                                     draw.find(disp), draw.find('char l1[64]'), draw.find('ImGui::Begin('))
+    if not (0 <= i_frac < i_disp < i_l1 < i_begin):
+        problems.append('TruMenu.cpp: DrawAt must hand styles 8 .. 16 to DrawAtBare after the fraction, before its text / box')
+    bare = fn_body(src, 'void DrawAtBare(')
+    bare_raw = fn_body(raw, 'void DrawAtBare(')
+    if not bare: problems.append('TruMenu.cpp: DrawAtBare missing')
+    else:
+        if not bare.split('\n')[2:3] == ['    const bool de = g_qbLang == 0;']:
+            problems.append('TruMenu.cpp: DrawAtBare must start with const bool de = g_qbLang == 0; (the bar language)')
+        for want in ('ImGuiWindowFlags_NoBackground', 'ImGui::Begin("##TruAttractIcon", nullptr, flags)',
+                     'g_ntPos == 2 && g_ntBoxH > 0.0f', 'const LONG count = held ? g_atSkipped : g_atStarted;',
+                     'const bool strike = held && st.strike;', 'const ImU32 text = lit ?', 'const ImU32 base = lit ?',
+                     'case kAtTextCountLeft:', 'case kAtTextBadge:', 'case kAtTextTerse:', 'case kAtTextWord:',
+                     'case kAtTextArrow:', 'if (st.text == kAtTextCountLeft) {', 'if (st.text == kAtTextCountBelow) {',
+                     'if (st.text == kAtTextBadge) {', 'AtSkipArrow(dl, p, lh, text, 0.0f);'):
+            if want not in bare: problems.append('TruMenu.cpp: DrawAtBare must hold %s' % want)
+        for bad in ('PushStyleColor', 'SetNextWindowBgAlpha', 'ImGuiCol_WindowBg'):
+            if bad in bare: problems.append('TruMenu.cpp: DrawAtBare must not draw a box (%s)' % bad)
+        if bare.count('ImGui::Begin(') != 1 or bare.count('ImGui::End();') != 1 or \
+                not bare.rstrip().endswith('ImGui::End();\n}') and not bare.rstrip().endswith('ImGui::End();\r\n}'):
+            problems.append('TruMenu.cpp: DrawAtBare must Begin once and End once at its end (also when Begin is false)')
+        # no time next to a circle: the seconds / the limit only in the terse case
+        i_t, i_w = bare.find('case kAtTextTerse:'), bare.find('case kAtTextWord:')
+        for word in ('shown', 'g_naAlarm'):
+            uses = [x.start() for x in re.finditer(r'\b%s\b' % word, bare)]
+            outside = [u for u in uses if not (i_t <= u < i_w) and not bare[:u].endswith('float ')]
+            if outside: problems.append('TruMenu.cpp: DrawAtBare uses %s outside the terse styles 13 / 14' % word)
+        rest = re.sub(r'de\s*\?\s*' + NT_LITSEQ + r'\s*:\s*' + NT_LITSEQ, '', bare)
+        left = [unescape(x) for x in re.findall(r'"((?:[^"\\]|\\.)*)"', rest)]
+        single = [t for t in left if re.search(r'[A-Za-z]{2}', re.sub(r'%[-.0-9]*[a-z]+', '', t)) and t != '##TruAttractIcon']
+        if single: problems.append('TruMenu.cpp: DrawAtBare texts without a de / en pair: %s' % ', '.join(single))
+        for esc in re.findall(r'\\([0-7]{3})', bare_raw):   # UTF-8 lead bytes: only \302 / \303 (U+0080 .. U+00FF)
+            if 0xc0 <= int(esc, 8) and int(esc, 8) not in (0xc2, 0xc3):
+                problems.append('TruMenu.cpp: DrawAtBare draws a glyph outside Latin-1 (\\%s) - not in the ImGui font' % esc)
+    sc = fn_body(src, 'void AtSmallCircle(')
+    for want in ('if (strike)', 'lit ? IM_COL32(242, 115, 26, 235)', 'AtSector(dl, c, r, a,'):
+        if want not in sc: problems.append('TruMenu.cpp: AtSmallCircle must hold %s' % want)
+    if 'AddLine(' in sc and sc.find('if (strike)') > sc.find('AddLine('):
+        problems.append('TruMenu.cpp: AtSmallCircle must strike only when strike')
+    for fn in ('void DrawAtBare(', 'void AtSmallCircle(', 'void AtSkipArrow(', 'void AtShadowText(', 'bool RunAt('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('(')); continue
+        if any(w in body for w in ('reinterpret_cast<', 'WriteByte(', 'WriteBytes(', 'WriteDword(', 'LcPatch(', 'Fn>(')):
+            problems.append('TruMenu.cpp: %s must not touch game memory' % fn.strip('('))
+    run = fn_body(src, 'bool RunAt(')
+    for want in ("if (arg[0] >= '0' && arg[0] <= '9' && (!arg[1] || (arg[1] >= '0' && arg[1] <= '9' && !arg[2])))",
+                 "v = arg[1] ? (arg[0] - '0') * 10 + (arg[1] - '0') : arg[0] - '0';", 'if (v < 0 || v >= kAtStyleN) {',
+                 '8 .. %d compact without a "'):
+        if want not in run: problems.append('TruMenu.cpp: RunAt must hold %s' % want)
+    if not re.search(r'\{"menu\.attracticon", "value", "0\.22\.41 0\.\.16 \(', src):
+        problems.append('TruMenu.cpp: item menu.attracticon text must start with "0.22.41 0..16 ("')
+    hm = re.search(r'\{"menu\.attracticon", "", "((?:[^"\\]|\\.)*)"\s*"((?:[^"\\]|\\.)*)"\}', src)
+    if not hm or '8-16' not in hm.group(1) + hm.group(2): problems.append('TruMenu.cpp: menu.attracticon help must name 8-16')
+    sw = [l.rstrip('\r\n').split(' | ') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Menu | ')]
+    f = [x for x in sw if len(x) >= 10 and x[2] == 'AttractIcon']
+    if not f or f[0][3] != 'int:0..16' or f[0][6] != 'live' or f[0][7] != '7' or f[0][9] != 'TruMenu 0.22.41' \
+            or '(0-16)' not in f[0][4] or '(0-16)' not in f[0][5]:
+        problems.append('%s: row TruMenu | Menu | AttractIcon | int:0..16 | ...(0-16) | live | 7 | ... | TruMenu 0.22.41 '
+                        'missing' % os.path.basename(switches_path))
+    ini = open(ini_path, encoding='utf-8').read().replace('\r\n', '\n')
+    if '\n; 0.22.40 / 0.22.41 (menu.attracticon)' not in ini or '; 7 the 0.22.39 look; no box: 8 / 9 small circle' not in ini:
+        problems.append('%s: the [Menu] AttractIcon comment must name 0.22.41 and the styles 8 ..' % os.path.basename(ini_path))
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.41 - ' not in readme or '\n### TO TEST 0.22.41' not in readme:
+        problems.append('README.md: section "## 0.22.41 - ..." with "### TO TEST 0.22.41" missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if AT_HASH_02240 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.40 build hash (work/asi/menu0263) is missing')
+    return problems, ('compact attract styles (Q126c): [Menu] AttractIcon 0 .. 16 = 7 live, 17 styles, 8 .. 16 without '
+                      'a box (small circle + counter / terse text), no time next to a circle, one or two digits')
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -5459,6 +5581,10 @@ def main(argv):
     for p in cproblems40: print('Q02240 %s' % p)
     if not cproblems40: print('ok: 0.22.40 %s' % csummary40)
     problems += cproblems40
+    cproblems41, csummary41 = check_02241(ini_path, opt.get('--switches', SWITCHES))   # 0.22.41 (Q126c compact)
+    for p in cproblems41: print('Q02241 %s' % p)
+    if not cproblems41: print('ok: 0.22.41 %s' % csummary41)
+    problems += cproblems41
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

@@ -2928,6 +2928,70 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.41 - Q126c: compact attract styles without a box (2026-11-14)
+
+Built into `work\asi\menu0264`, not installed, no live test (finding in the workspace
+`docs\Befund-AttractIcon-Kompakt-1411.md`). Feedback of the project owner after trying 0.22.40: no time next to a
+filling circle (the circle already shows it), the **small** circle rather than the large one (styles 4 / 6), **no box**
+around it, shorter texts (only time + counter). Styles **8 .. 16** are appended to the same cycle switch; 0 .. 7 stay
+exactly as in 0.22.40 and the **default stays 7** until a style is picked. Values, slot, counters and the log line are
+those of 0.22.39; read only, no new byte checks.
+
+All new styles are drawn by `DrawAtBare` without the box (`ImGuiWindowFlags_NoBackground`); circle and text get a dark
+ground / shadow instead so they stay readable over the menu picture. The counter is the skipped teasers while NoAttract
+holds (light blue), else the game's teasers (amber). **Blink** at each limit for all: three orange flashes - the circle
+ground turns orange, texts turn orange (the box that flashed in 0 .. 7 is gone here).
+
+| Value | Name (DE / EN) | Drawn |
+|---|---|---|
+| 8 | Klein, ohne Kasten / small, no box | small circle (3 font sizes, as style 2) + play icon, no strike, no text |
+| 9 | Klein + Strich, ohne Kasten / small + strike, no box | as 8 with the red strike while NoAttract holds |
+| 10 | Klein, Zahl daneben / small, count beside | small circle, left of it only the counter `×3` |
+| 11 | Klein, Zahl darunter / small, count below | small circle, the counter `×3` centred below it |
+| 12 | Klein, Zahl am Rand / small, count badge | small circle, the counter as a small rounded badge on its lower right edge (`3`) |
+| 13 | Knapp: Zeit + Zahl / terse: time + count | one line `12s · 3` |
+| 14 | Knapp: Zeit/Limit + Zahl / terse: time/limit + count | one line `12/40 · ×3` |
+| 15 | Nur Zahl (Wort) / count only (word) | one line `übersprungen 3` / `skipped 3` (NoAttract off: `Teaser 1` / `teaser 1`) |
+| 16 | Nur Zahl (Pfeil) / count only (arrow) | a drawn skip arrow (clockwise arc, head down) + `3`; NoAttract off a small play icon + `1` |
+
+- Only the styles 13 / 14 show seconds; the circle styles 8 .. 12 never do. Without a clock yet 13 / 14 show `keine Uhr`
+  / `no clock`; 15 / 16 show the counter anyway. A reason of NaWhy (checks differ / patch refused) greys the circle and
+  stands in place of the counter in 10 / 11 / 13 .. 16 (8 / 9 / 12: grey circle only). The counter shows 0 as well.
+- Glyphs: only Latin-1 (`×`, `·`, `ü`) - the ImGui default font has no arrows, so the skip arrow of 16 is drawn.
+- `menu.attracticon 0..16`: one or two digits or `off`; anything else (`17`, `123`, `1a`, `-1`, `on`) = usage, nothing
+  changed; no argument = report. Bar row "Teaser-Anzeige" steps 0 .. 16 (at the ends "Ende"), e.g.
+  `< 12 Klein, Zahl am Rand >`; help "Aus, Text oder Kreis bis zum Teaser (2-7, knapp 8-16)". Page Fixes row
+  `AttractIcon` `int:0..16`, live. A value outside 0 .. 16 in the INI = 7 + one log line.
+- INI keys 278 (0, the comment of `AttractIcon` +3 lines), switches rows 0 (changed), items 0, bar rows 0. Check:
+  `trumenu_ini_check` `check_02241` (`check_02240` keeps the parts of 0.22.40 that did not change). Build: 0 warnings in
+  TruMenu.cpp.
+
+### TO TEST 0.22.41
+
+Main menu, NoAttract on (`menu.noattract 1`) unless noted; one input in the menu first so the clock runs. Switch with the
+bar row "Teaser-Anzeige" (left / right) or `menu.attracticon n`.
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | style 8 | `menu.attracticon 8` | small circle top right, light blue fill, play icon, **no** box, no strike, no text |
+| 2 | style 9 | right -> 9 | as 8 with the red strike |
+| 3 | style 10 | right -> 10 | small circle, `×0` (later `×1` ...) left of it, no box, no seconds |
+| 4 | style 11 | right -> 11 | small circle, `×n` centred below it |
+| 5 | style 12 | right -> 12 | small circle, a small light blue badge with the number on the lower right edge |
+| 6 | style 13 | right -> 13 | one line `12s · n`, no box, readable over the menu picture (dark shadow) |
+| 7 | style 14 | right -> 14 | one line `12/40 · ×n` |
+| 8 | style 15 | right -> 15 | one line `übersprungen n` (EN `skipped n`) |
+| 9 | style 16 | right -> 16 | a drawn arrow (arc over the top, head down on the right) + `n` |
+| 10 | blink | in each style 8 .. 16 wait for a limit (40 s) | 3 orange flashes (circle ground / text orange), counter + 1 |
+| 11 | NoAttract off | `menu.noattract 0`, styles 9 / 12 / 15 / 16 | 9 without strike, amber; at the limit the teaser starts; 15 `Teaser 1`, 16 play icon + `1` |
+| 12 | language | bar language EN, styles 13 .. 16 and the row | `skipped n` / `teaser n`, `no clock`; row `< 16 count only (arrow) >` |
+| 13 | Fixes row | page Fixes, "Hauptmenü (TruMenu)", AttractIcon 7 -> 12 -> 16 | within about a second the style changes (live) |
+| 14 | timer box | `menu.attracttimer 1` (tr), style 11 | the display sits below the timer box |
+| 15 | old styles | `menu.attracticon 7`, then 2, 4 | exactly the 0.22.40 looks (box, text left / inside) |
+| 16 | negative: values | `menu.attracticon 17`, `123`, `1a`, `-1`, `on`; then without argument | usage line each, style unchanged; no argument = report only |
+| 17 | negative: bad INI | `AttractIcon=17` in the INI (game closed), start | style 7 and one log line `[Menu] AttractIcon=17 is not 0 .. 16 - 7 used` |
+| 18 | negative: level | style 12, start a level | no display in the level (front end only) |
+
 ## 0.22.40 - Q126b: attract display styles, one cycle switch (2026-11-13)
 
 Built into `work\asi\menu0263`, not installed, no live test (finding in the workspace

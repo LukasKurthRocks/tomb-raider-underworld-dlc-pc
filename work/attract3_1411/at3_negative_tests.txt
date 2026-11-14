@@ -1,0 +1,42 @@
+ok   0 unchanged sources                           problems   0 
+ok   1 kVersion not 0.22.41                        problems   1 - TruMenu.cpp: kVersion must start with "TruMenu 0.22.41 (Q126c compact attract styles"
+ok   2 kAtStyleN 16                                problems   1 - TruMenu.cpp: kAtStyleN 17 / kAtStyleDefault 7 missing
+ok   3 default 8                                   problems   2 - TruMenu.cpp: kAtStyleN 17 / kAtStyleDefault 7 missing
+ok   4 style 8 with strike                         problems   1 - TruMenu.cpp: kAtStyles[8] must be ('1', '0', 'kAtTextBare') (got ('1', '1', 'kAtTextBare'))
+ok   5 style 9 without strike                      problems   1 - TruMenu.cpp: kAtStyles[9] must be ('1', '1', 'kAtTextBare') (got ('1', '0', 'kAtTextBare'))
+ok   6 table with 16 rows                          problems   1 - TruMenu.cpp: kAtStyles must hold 17 rows (got 16)
+ok   7 DE name twice                               problems   2 - TruMenu.cpp: kAtStyles[11] names must be Klein, Zahl darunter / small, count below
+ok   8 style 16 name English only                  problems   1 - TruMenu.cpp: kAtStyles[16] names must be Nur Zahl (Pfeil) / count only (arrow)
+ok   9 enum order changed                          problems   1 - TruMenu.cpp: enum AtTextAt must be kAtTextNone, kAtTextOnly, kAtTextInside, kAtTextBelow, kAtTextLeft, kAtText
+ok   10 no dispatch to DrawAtBare                  problems   1 - TruMenu.cpp: DrawAt must hand styles 8 .. 16 to DrawAtBare after the fraction, before its text / box
+ok   11 box back (no NoBackground)                 problems   1 - TruMenu.cpp: DrawAtBare must hold ImGuiWindowFlags_NoBackground
+ok   12 box colour pushed                          problems   2 - TruMenu.cpp: DrawAtBare must not draw a box (PushStyleColor)
+ok   13 time next to the circle (10)               problems   1 - TruMenu.cpp: DrawAtBare uses shown outside the terse styles 13 / 14
+ok   14 limit next to the circle (badge)           problems   1 - TruMenu.cpp: DrawAtBare uses g_naAlarm outside the terse styles 13 / 14
+ok   15 strike in every small style                problems   1 - TruMenu.cpp: DrawAtBare must hold const bool strike = held && st.strike;
+ok   16 AtSmallCircle strikes always               problems   1 - TruMenu.cpp: AtSmallCircle must hold if (strike)
+ok   17 no blink for the bare text                 problems   1 - TruMenu.cpp: DrawAtBare must hold const ImU32 text = lit ?
+ok   18 no blink ground in the small circle        problems   1 - TruMenu.cpp: AtSmallCircle must hold lit ? IM_COL32(242, 115, 26, 235)
+ok   19 word text English only                     problems   1 - TruMenu.cpp: DrawAtBare texts without a de / en pair: teaser %ld
+ok   20 arrow as a glyph (not in the font)         problems   1 - TruMenu.cpp: DrawAtBare draws a glyph outside Latin-1 (\342) - not in the ImGui font
+ok   21 DrawAtBare without End                     problems   1 - TruMenu.cpp: DrawAtBare must Begin once and End once at its end (also when Begin is false)
+ok   22 DrawAtBare writes the clock                problems   1 - TruMenu.cpp: void DrawAtBare must not touch game memory
+ok   23 badge branch gone                          problems   1 - TruMenu.cpp: DrawAtBare must hold if (st.text == kAtTextBadge) {
+ok   24 RunAt one digit only (0.22.40)             problems   2 - TruMenu.cpp: RunAt must hold if (arg[0] >= '0' && arg[0] <= '9' && (!arg[1] || (arg[1] >= '0' && arg[1] <= '9'
+ok   25 RunAt takes three digits                   problems   1 - TruMenu.cpp: RunAt must hold if (arg[0] >= '0' && arg[0] <= '9' && (!arg[1] || (arg[1] >= '0' && arg[1] <= '9'
+ok   26 RunAt without the upper bound              problems   2 - TruMenu.cpp: RunAt must hold if (v < 0 || v >= kAtStyleN) {
+ok   27 usage without 8 ..                         problems   1 - TruMenu.cpp: RunAt must hold 8 .. %d compact without a "
+ok   28 item text 0.22.40 0..7                     problems   1 - TruMenu.cpp: item menu.attracticon text must start with "0.22.41 0..16 ("
+ok   29 help without 8-16                          problems   1 - TruMenu.cpp: menu.attracticon help must name 8-16
+ok   30 QbValueCount 8 steps                       problems   1 - TruMenu.cpp: QbValueCount must give kAtStyleN for kQvAtStyle
+ok   31 0.22.40 style 4 changed                    problems   1 - TruMenu.cpp: kAtStyles[4] must be ('1', '0', 'kAtTextInside') (got ('1', '0', 'kAtTextBare'))
+ok   32 INI with AttractIcon=8                     problems   1 - TruMenu_neg.ini: [Menu] AttractIcon=7 missing
+ok   33 INI comment of 0.22.40                     problems   1 - TruMenu_neg.ini: the [Menu] AttractIcon comment must name 0.22.41 and the styles 8 ..
+ok   34 switches row int:0..7                      problems   1 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIcon | int:0..16 | ...(0-16) | live | 7 | ... | TruMenu 
+ok   35 switches row default 8                     problems   3 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIcon | int:0..16 | ...(0-16) | live | 7 | ... | TruMenu 
+ok   36 switches row restart                       problems   3 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIcon | int:0..16 | ...(0-16) | live | 7 | ... | TruMenu 
+ok   37 switches row since 0.22.40                 problems   1 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIcon | int:0..16 | ...(0-16) | live | 7 | ... | TruMenu 
+ok   38 switches row names (0-7)                   problems   1 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIcon | int:0..16 | ...(0-16) | live | 7 | ... | TruMenu 
+ok   39 README without TO TEST 0.22.41             problems   1 - README.md: section "## 0.22.41 - ..." with "### TO TEST 0.22.41" missing
+ok   40 Set-TruMenu without the 0.22.40 hash       problems   1 - Set-TruMenu.ps1: the 0.22.40 build hash (work/asi/menu0263) is missing
+41 cases, 41 as expected, 0 not

@@ -263,5 +263,6 @@ TruMenu | Input | DeviceGlyphs | bool | Tasten-Hinweise nach Gerät (Pad / Tasta
 
 # 2026-11-13 (Q126, owner idea): TruMenu 0.22.39 - [Menu] AttractIcon (AtReadSwitch, about once a second = live)
 # 0.22.40 (Q126b): one cycle switch 0 .. 7 instead of AttractIcon 0 / 1 + AttractIconText (the bar row names the style)
+# 0.22.41 (Q126c): 8 .. 16 appended (small circle / terse text, no box); 0 .. 7 unchanged, default 7
 group | tmhauptmenue | Hauptmenü (TruMenu) | Main menu (TruMenu)
-TruMenu | Menu | AttractIcon | int:0..7 | Teaser-Anzeige im Hauptmenü (0-7) | Teaser display in the main menu (0-7) | live | 7 | 0 aus, 1 Text, 2-7 Kreis (3/6 Strich, 4/6 innen, 5 unten) // 0 off, 1 text, 2-7 circle (3/6 strike, 4/6 inside, 5 below) | TruMenu 0.22.40
+TruMenu | Menu | AttractIcon | int:0..16 | Teaser-Anzeige im Hauptmenü (0-16) | Teaser display in the main menu (0-16) | live | 7 | 0 aus, 1 Text, 2-7 Kreis, 8-12 klein o. Kasten, 13-16 knapp // 0 off, 1 text, 2-7 circle, 8-12 small no box, 13-16 terse | TruMenu 0.22.41
