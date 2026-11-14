@@ -1,0 +1,46 @@
+ok   0 unchanged sources                           problems   0 
+ok   1 kOpts AttractIcon default 1                 problems   1 - TruMenu.cpp: kOpts [Menu] AttractIcon must be "7"
+ok   2 kOpts AttractIconText back                  problems   2 - TruMenu.cpp: kOpts [Menu] AttractIconText must be gone
+ok   3 g_atText back                               problems   1 - TruMenu.cpp: g_atText must be gone (the style replaces it)
+ok   4 old INI 1 + 1 mapped to 3                   problems   1 - TruMenu.cpp: AtStyleRead must hold const int mapped = v == 0 ? 0 : v == 1 ? (text ? 7 : 3) : v;
+ok   5 no range clamp                              problems   1 - TruMenu.cpp: AtStyleRead must hold if (v < 0 || v >= kAtStyleN) { *bad = true; v = def; }
+ok   6 AtStyleRead writes without migrate          problems   1 - TruMenu.cpp: AtStyleRead may write only with migrate
+ok   7 AtStyleRead keeps AttractIconText           problems   2 - TruMenu.cpp: "AttractIconText" only in AtStyleRead (read + remove) and RunAt (remove)
+ok   8 AtReadSwitch does not migrate               problems   1 - TruMenu.cpp: AtReadSwitch must hold AtStyleRead(g_iniPath, true, &bad, &raw);
+ok   9 ReadOptions migrates (log not open)         problems   1 - TruMenu.cpp: ReadOptions must hold AtStyleRead(ini, false, &bad, &raw);
+ok   10 AtReadSwitch leaves g_atWant               problems   1 - TruMenu.cpp: AtReadSwitch must hold InterlockedExchange(&g_atWant, style ? 1 : 0);
+ok   11 style 2 with strike                        problems   1 - TruMenu.cpp: kAtStyles[2] must be ('1', '0', 'kAtTextNone') (got ('1', '1', 'kAtTextNone'))
+ok   12 table with 7 rows                          problems   1 - TruMenu.cpp: kAtStyles must hold 8 rows (got 7)
+ok   13 style 5 name English only                  problems   1 - TruMenu.cpp: kAtStyles[5] names must be Kreis, Text unten / circle, text below
+ok   14 default style 3                            problems   1 - TruMenu.cpp: kAtStyleN 8 / kAtStyleDefault 7 missing
+ok   15 AtStyleOf without clamp                    problems   1 - TruMenu.cpp: AtStyleOf must clamp to the default
+ok   16 strike in every style                      problems   1 - TruMenu.cpp: DrawAt must hold if (held && st.strike)
+ok   17 text only draws the circle                 problems   2 - TruMenu.cpp: DrawAt must hold if (!st.circle) {
+ok   18 inside circle not enlarged                 problems   1 - TruMenu.cpp: DrawAt must hold d = fs * 6.0f > need ? fs * 6.0f : need;
+ok   19 reason squeezed inside                     problems   1 - TruMenu.cpp: DrawAt must hold if (why[0] && textAt == kAtTextInside) textAt = kAtTextBelow;
+ok   20 inside text English only                   problems   1 - TruMenu.cpp: DrawAt texts without a de / en pair: no clock
+ok   21 text only path without End                 problems   1 - TruMenu.cpp: DrawAt must End / pop the colour on both paths
+ok   22 DrawAt writes the clock                    problems   2 - TruMenu.cpp: void DrawAt must not touch game memory
+ok   23 item type bool                             problems   1 - TruMenu.cpp: item menu.attracticon ("value", "0.22.40 0..7 ...", ValAt / RunAt) missing
+ok   24 RunAt takes on                             problems   1 - TruMenu.cpp: RunAt must not take on / true any more (1 = text only)
+ok   25 RunAt without the upper bound              problems   1 - TruMenu.cpp: RunAt must hold if (v < 0 || v >= kAtStyleN) {
+ok   26 RunAt keeps the old key                    problems   2 - TruMenu.cpp: "AttractIconText" only in AtStyleRead (read + remove) and RunAt (remove)
+ok   27 RunAt does not keep the INI                problems   2 - TruMenu.cpp: RunAt must hold IniKeepInt("Menu", "AttractIcon", v);
+ok   28 RunAt flips without an argument            problems   2 - TruMenu.cpp: RunAt must hold if (!arg || !arg[0]) { ValAt(o, n); return true; }
+ok   29 bar row bool again                         problems   2 - TruMenu.cpp: bar row "Teaser-Anzeige" (kQbValue kQvAtStyle) must follow menu.attracttimer in set_main
+ok   30 QbValueCount 7 steps                       problems   1 - TruMenu.cpp: QbValueCount must give kAtStyleN for kQvAtStyle
+ok   31 QbValueNow without the style               problems   1 - TruMenu.cpp: QbValueNow kQvAtStyle missing
+ok   32 bar row without the style name             problems   1 - TruMenu.cpp: ItemValueShort must name the style (DE / EN)
+ok   33 kVersion not 0.22.40                       problems   1 - TruMenu.cpp: kVersion must start with "TruMenu 0.22.40 (Q126b attract display styles"
+ok   34 help line over 60 characters               problems   1 - TruMenu.cpp: menu.attracticon help over 60 characters
+ok   35 INI with AttractIcon=1                     problems   1 - TruMenu_neg.ini: [Menu] AttractIcon=7 missing
+ok   36 INI with AttractIconText again             problems   1 - TruMenu_neg.ini: AttractIconText must be gone
+ok   37 switches row bool                          problems   3 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIcon | int:0..7 | ... | live | 7 | ... | TruMenu 0.22.40
+ok   38 switches row default 1                     problems   2 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIcon | int:0..7 | ... | live | 7 | ... | TruMenu 0.22.40
+ok   39 switches row restart                       problems   2 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIcon | int:0..7 | ... | live | 7 | ... | TruMenu 0.22.40
+ok   40 switches row since 0.22.39                 problems   1 - TruMenu_neg.switches.txt: row TruMenu | Menu | AttractIcon | int:0..7 | ... | live | 7 | ... | TruMenu 0.22.40
+ok   41 switches row AttractIconText again         problems   3 - TruMenu_neg.switches.txt: row AttractIconText must be gone
+ok   42 switches group tmhauptmenue missing        problems   1 - TruMenu_neg.switches.txt: group tmhauptmenue missing
+ok   43 README without TO TEST 0.22.40             problems   1 - README.md: section "## 0.22.40 - ..." with "### TO TEST 0.22.40" missing
+ok   44 Set-TruMenu without the 0.22.39 hash       problems   1 - Set-TruMenu.ps1: the 0.22.39 build hash (work/asi/menu0262) is missing
+45 cases, 45 as expected, 0 not
