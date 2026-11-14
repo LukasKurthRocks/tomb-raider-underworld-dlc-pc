@@ -43,6 +43,26 @@ Not covered: the
 meter's one-shot sounds of refill / drain (0x7c..0x86), rock veins (TruRockVein.asi), the shadow strike target states
 and the combat conditions (0.5 gaps below; TruShadowCombat.asi).
 
+## 0.27.2: the meter init's HUD store (W7, 2026-11-14)
+
+Built 2026-11-14 into `work\asi\w7_1411` (0 warnings), not installed, not played. Live 13.11. 20:49 (DLC 2 after
+DLC 1): the shadow bar showed the empty adrenaline bar until the first use. Cause: the HUD value `[0xfae8d4]` is written
+by the retail adrenaline bar (0.0) until the doppelganger flag is set (K11, 0.18), and after that only by Refill /
+Drain - a full meter refills nothing, so the old 0.0 stayed. The TU's meter init `0x823d7700` ends with a store the
+plugin had left out (`ppc_dis128.py` on the TU image): `0x823d7750..0x823d776c` player state `[0x829892b0]` and tuning
+`0x82415518` present -> `0x823d77cc..0x823d77e0` `[0x829ca6cc]` = meter +8 / tuning +0x10 (value only; no display
+group request, no HUD manager call). 0.27.2 (`InitHudTail`): every `MeterInit` (load, new game tracker) marks the
+store; the first doppelganger tick with player state and tuning writes value / max (1.0 after a new tracker) before
+that tick's Refill / Drain, one log line `0.27.2 meter init HUD: [0xfae8d4] 0.000 -> 1.000 (...)`. Under
+`[Meter] HudBar` (0 = no HUD writes, also not this one); same sample .ini as 0.27. Install:
+`scripts\windows\Set-TruShadowPower.ps1 -Install -SourceDir work\asi\w7_1411`.
+
+| # | TO TEST 0.27.2 | expected |
+|---|---|---|
+| 1 | DLC 1 (or main game) -> DLC 2, look at the shadow bar before using the power | bar full at once; log `0.27.2 meter init HUD: [0xfae8d4] 0.000 -> 1.000` right after `doppelganger flag 0 -> 1` |
+| 2 | DLC 2 started from the main menu (first tracker of the process) | the same line once, bar full |
+| 3 | use the power, let it run empty, release | bar drains / refills as before (Refill / Drain unchanged) |
+
 ## 0.27.1: dated log lines (Q107, 2026-11-12)
 
 Built 2026-11-12 into `work\asi\i_1211\TruShadowPower`, not installed, not played (0.27 is installed since
@@ -938,7 +958,7 @@ at least 60 %" before a shadow strike). Option `[Conditions] Enabled`.
 
 | Xbox TU function | plugin | PC parts used |
 |---|---|---|
-| `0x823d7700` meter init (value 1000) | `MeterInit` | - |
+| `0x823d7700` meter init (value 1000; with player state + tuning HUD `0x829ca6cc` = value / max, 0x823d77e0) | `MeterInit` + `InitHudTail` (0.27.2) | `0xfae8d4` |
 | `0x823d7a10` per-frame tick (button latch, drain / refill, stop when empty) | `MeterTick` | frame time `0xe7f190` |
 | `0x823d8120` may start (after "empty" only above tuning +0x28) | `CanStart` | - |
 | `0x823d7d40` start: request player = tuning +0x40, world = tuning +0x3c | `StartPower` | `SetPlayerTimeScale` / `SetWorldTimeScale`, 33 ms |

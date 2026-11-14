@@ -1564,7 +1564,12 @@ the TU creator, `[Meter] Fallback`).
 TruShadowPower translates TU 0x823d7700..0x823d8380: tick / start / stop / gates, slow motion via the time-scale natives
 (section 3), meter / bar from 858. Tick gate (0.16): `[0xfadb58]` != 0, `[0xe7f094]` != 0, main state 1, +0xb9 = 0 (fixes the
 AV at 0x77bdd3 when there is no Lara). HUD feed: fraction to float 0xfae8d4 (hudscreenmgr native 36), display group via
-0x77d9d0 on mask 0xfae924; the PC adrenaline bar 0x6f2930 writes 0xfae8d4 every frame. Adrenaline look: retail start
+0x77d9d0 on mask 0xfae924; the PC adrenaline bar 0x6f2930 writes 0xfae8d4 every frame. **Meter init HUD store (W7,
+2026-11-14):** TU 0x823d7700 ends (0x823d7750..0x823d77e0) with `[0x829ca6cc]` (= PC 0xfae8d4) = meter +8 / tuning +0x10
+when the player state `[0x829892b0]` and the tuning (0x82415518) exist - value only, no group / HUD manager call; Refill
+0x823d81a0 writes the HUD only while value < max, so without this store a full meter keeps the last adrenaline fraction
+(live 13.11. 20:49: empty bar after the switch to DLC 2 until the first use). TruShadowPower 0.27.2 `InitHudTail` ✅ static
+(live ⬜). Adrenaline look: retail start
 0x7189c0 / stop 0x718ad0, selector 0x5e7fe0 picks camera mode 0x34; TU uses meter flag 0x40 (`[Look] AdrenalineMode`).
 Time-scale requests (TU, TruXenia): meter object +0x40 = 7 slots x {f32 player, f32 world} (0 = unused); selector
 0x823d7520 (called with meter+0x40 at 0x823d7d1c) walks slot 6 -> 0, the highest slot > 0.0 wins per scale (threshold

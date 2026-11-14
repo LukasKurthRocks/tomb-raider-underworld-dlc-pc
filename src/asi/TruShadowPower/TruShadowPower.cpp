@@ -138,6 +138,10 @@
 // HUD value [0xfae8d4] every frame - over this plugin's meter. The TU calls both only while gameTracker+0x1244 is 0.
 // [Adrenaline] Translate=1 (default) does the same at the PC call sites; [Adrenaline] Log=1. Section "0.18" below.
 //
+// 0.27.2 (2026-11-14, project doc Befund-W7-DLC2-1411.md): the meter init's HUD store (TU 0x823d77cc..0x823d77e0,
+// [0x829ca6cc] = value / max) - after the switch to DLC 2 the bar shows the full meter at once instead of the last
+// adrenaline fraction until the first use. InitHudTail, under [Meter] HudBar.
+//
 // 0.19 (2026-11-07, project doc Befund-Padkette-StartView-0711.md): no re-wrap any more. 0.17 took the pad pointer
 // over TruMenu's hook (and over TruLink's while innermost) to see the pad as the game gets it. TruMenu 0.21.1 exports
 // TruMenuPadBlock(pad) - the buttons it keeps from the game right now (menu / ring neutral pad, quick bar D-pad / LB /
@@ -587,10 +591,21 @@ void ShowMeter(float fraction) {
     g_hudUpdate();
 }
 
-// 0x823d7700: flags 0, value / start value 1000, latch 0 (the HUD fraction is written once the tuning is known).
+// 0.27.2 (W7, project doc Befund-W7-DLC2-1411.md): the HUD tail of 0x823d7700. TU 0x823d7750..0x823d77e0: when the
+// player state [0x829892b0] (PC [0xfadb58]) is set and the tuning lookup 0x82415518 answers, the init stores
+// [0x829ca6cc] (PC [0xfae8d4]) = meter +8 (value) / tuning +0x10 (max) - the value only, no display-group request and no
+// HUD manager call (both stay with Refill / Drain). Up to 0.27 the plugin left it out, so after the switch to DLC 2 the
+// bar showed the last retail adrenaline fraction (0.0) until the first Refill / Drain wrote the meter. The plugin's init
+// runs where no tuning is known yet (load, new tracker), so it only marks the store; the first doppelganger tick with
+// player state + tuning does it (InitHudTail). [Meter] HudBar=0 (no HUD writes) leaves it out as well.
+bool g_initHudPending = true;
+LONG g_initHudStores = 0;
+
+// 0x823d7700: flags 0, value / start value 1000, latch 0; the HUD fraction is stored once the tuning is known (0.27.2).
 // 0.5: the request slots and the timer are not set by 0x823d7700 (the meter object is allocated elsewhere, not
 // inspected); they start empty here (-1.0, the TU's "no request" value) and 0.
 void MeterInit() {
+    g_initHudPending = true;                            // 0.27.2: TU 0x823d77cc..0x823d77e0, see InitHudTail
     g_meter.flags = 0;
     g_meter.startValue = kMeterStart;
     g_meter.latch = 0;
@@ -601,6 +616,26 @@ void MeterInit() {
                                                         // -1 is 0x823d77f0's own idle value (set on every tick while off)
     g_meter.requestTimer = kZero;
     for (int i = 0; i < 7; ++i) g_meter.request[i][0] = g_meter.request[i][1] = kNoRequest;
+}
+
+// 0.27.2: the store of TU 0x823d77cc..0x823d77e0 (lfs f0, 8(r31); lfs f13, 0x10(r27); fdivs; stfs [0x829ca6cc]), once per
+// MeterInit, on the first doppelganger tick that has the player state and the tuning (the TU's two conditions
+// 0x823d7758 / 0x823d776c). Stays pending while one of them is missing. Called before Refill / Drain of that tick.
+void InitHudTail(const BYTE *tuning) {
+    if (!g_initHudPending || !tuning) return;
+    if (!g_hudOk || !g_hudFeed) { g_initHudPending = false; return; }
+    if (!PlayerStateNow()) return;                      // TU 0x823d7758: no player state -> no store
+    const float max = Tune(tuning, kTuneMax);
+    g_initHudPending = false;
+    if (!(kZero < max)) {                               // not in the TU (fdivs); the data has max 1000
+        Log(0, "0.27.2 meter init HUD: tuning +0x10 (max) is %.3f - no store", max);
+        return;
+    }
+    const float before = *kHudValue;
+    *kHudValue = g_meter.value / max;
+    const LONG n = ++g_initHudStores;
+    Log(n <= 16 ? 1 : 2, "0.27.2 meter init HUD: [0xfae8d4] %.3f -> %.3f (meter %.1f / max %.1f, TU 0x823d77e0; store %ld)",
+        before, *kHudValue, g_meter.value, max, n);
 }
 
 // 0x823d7520 (request selector, argument meter +0x40): the highest slot with a player value > 0 sets the player
@@ -2570,6 +2605,7 @@ void MeterTick(bool padHeld) {
     if (!dg) return;
     const BYTE *tuning = FindTuning();
     g_tuning = tuning;
+    InitHudTail(tuning);                         // 0.27.2: HUD store of the meter init 0x823d7700 (once per init)
     InfiniteHold(tuning);                        // 0.23: [Meter] Infinite=1 - meter at max before the TU block
     float frames = *kFrameTime;
     if (!(frames >= 0.0f && frames < 30.0f)) frames = 0.0f;
@@ -5495,7 +5531,7 @@ void Start(HMODULE self) {
     _snprintf_s(g_logPath, sizeof(g_logPath), _TRUNCATE, "%sTruShadowPower.log", dir);
     ReadOptions(dir);
     InitFileTuning();
-    Log(1, "TruShadowPower 0.27 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
+    Log(1, "TruShadowPower 0.27.2 loaded (enabled %d, buttons 0x%04x, HUD bar %d, fallback %d, conditions %d, states %d, "
         "condition 1046 %d, condition 1055 %d, look %d, legacy pad start %d, game input %d, adrenaline mode %d, "
         "screen effect %d, GlobalParams7 %d, cinematic param %d, state 2102 %d; 0.14: loop sound %d, move events %d, "
         "camera flag %d, strike look %d; 0.15: cloth TU time step %d; 0.17: menu input %d; 0.18: adrenaline K11 %d, "
@@ -5652,7 +5688,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID) {
 
 // exported so the loader / tools can identify the plugin (the Ultimate ASI Loader needs no particular export)
 extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
-    return "TruShadowPower 0.27.1 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
+    return "TruShadowPower 0.27.2 (translated TU meter with the TU tick gates, tick only with a player in a level, LB / RB "
            "only as the game gets them (TruMenu's TruMenuPadBlock + a second pad read, no re-wrap of the pad chain, "
            "withheld buttons ignored until released), "
            "CombatManager::Update skips the adrenaline tick / bar in doppelganger mode as the TU (K11), Lara "
@@ -5666,7 +5702,7 @@ extern "C" __declspec(dllexport) const char *TruShadowPowerVersion() {
            "0x822c39c8 / 0x822c79d0, doppelganger camera settings 0x822bc198 / 0x822c61d8 (DTP 21237 / 21238, mode 2 "
            "with a stand-in: TU delay / ramp + 21237's per-mode tables), camera shake TU time step 0x822af4d8, player "
            "TU time step 0x8240cf88 / 0x8240e3a0 / 0x82411850 / 0x82411c30 / 0x82419c98, infinite meter [Meter] Infinite (live, not a TU feature), camera trace TruCam.log "
-           "(read only); 0.27.1: dated log lines)";
+           "(read only); 0.27.1: dated log lines; 0.27.2: HUD store of the meter init 0x823d7700)";
 }
 
 // 0.11: the TU meter object for other plugins (TruShadowCombat: condition 538, the shadow strike) - interface version

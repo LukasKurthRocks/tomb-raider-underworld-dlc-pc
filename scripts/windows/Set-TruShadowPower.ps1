@@ -65,6 +65,8 @@ $names   = 'TruShadowPower.asi', 'TruShadowPower.ini'
 # The current build 0.27 (Q50: [Camera] ShakeTuTimeStep and [Player] TuTimeStep, the TU's remaining divisions by the
 # world time scale, defaults 0; work\asi\power027, 2026-11-11, new sample .ini) is listed too (marked current). Install
 # it with -SourceDir <repo>\work\asi\power027.
+# The current build 0.27.2 (W7: the meter init's HUD store, TU 0x823d77e0; work\asi\w7_1411, 2026-11-14, sample .ini
+# as 0.27) - install it with -SourceDir <repo>\work\asi\w7_1411.
 $earlierBuilds = @{
     'TruShadowPower.asi' = @('5eaeeb3d33d5e53b7059ff39323907cc38d2288625c09439943efabb20093366',
                              '0e307cab2bae9e805ecd0a2c4fb645b943ec792c47ae8a32d489d5441b2e335e',
@@ -94,7 +96,8 @@ $earlierBuilds = @{
                              '89d15879f6f32b7eb8402c95668fefeb4ea999c5f571c32e3d5d2157a88c9114',   # 0.25 camera trace / doppelganger settings (work\asi\power025, md5 ea3c85aa0b6c283f358a408add8faa6b, installed on 2026-11-10 22:21)
                              '8b89599bf6dae64bb8825935893bbd5ea1930dacb0c64a815821b42b16ec0891',   # 0.26 trace next to TruDataGuard / 21237 mode tables (work\asi\power026, md5 44466496213915f2baf9e66e7de2ab1f, not installed)
                              '09e84202e4821c0c0b1f446f941cc22bf1a35167ce07007660012ce9049bd540',   # 0.27 Q50 shake / player TU time step (work\asi\power027, md5 3cf7221657a229d114a4a1f4ee4199fc, installed 2026-11-11)
-                             'd0a91e1ba7d67525082b52093ab1b607cfe9f789825fbab4a39c430b660a097c')   # 0.27.1 dated log lines (work\asi\i_1211\TruShadowPower, current, not installed; sample .ini as 0.27)
+                             'd0a91e1ba7d67525082b52093ab1b607cfe9f789825fbab4a39c430b660a097c',   # 0.27.1 dated log lines (work\asi\i_1211\TruShadowPower, installed by 2026-11-13 - session header 0.27.1; sample .ini as 0.27)
+                             '893ca704ed9d6f03fd28aa47a0b841f22927d8034a3a73add272d0c124ce88c7')   # 0.27.2 W7 HUD store of the meter init (work\asi\w7_1411, current, not installed; sample .ini as 0.27)
     'TruShadowPower.ini' = @('03499f85d90031c5f0140b98be23f7b5dcb11f92ff8834b3ebe6d1b6aea4a0db',
                              '7130a68b309aedd422082beea02f78c9a8d67ba10ab16209561f5dabc614d42e',
                              '3001b5730bcecd218857143df32632b82dcb6c569f34c23853535f3b806a5f2a',
