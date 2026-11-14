@@ -1,0 +1,37 @@
+# TruMenu 0.22.49 = the 13 rows of 0.22.48 (work/menu48_1411/precheck_02248.txt) + 3 rows for AllFloors (A1) and the
+# map info. Workspace finding docs\Befund-TruMenu-02249-1411.md; disassembly work/sonar_1411/dis_more.txt (0x6e4130,
+# 0x6e53f0, 0x6dff20), work/sonar_1411/dis_units.txt (0x6e2e60, 0x6e4e80, 0x6dd780).
+# ---- 0.22.48 (unchanged) ----
+# draw 0x6e3a00 (unit, 0): the function head
+006e3a00 55 8bec 83e4f0 81ecf4000000 53 8b5d08
+# H3 0x6e3ab0: mov eax,[ecx+44h]; test eax,eax (5 bytes -> call stub), then only movs up to jle 0x6e3ad2 (uses the flags)
+006e3aa9 8984248c000000 8b4144 85c0 89942480000000 8b5128 89942488000000 8944243c c744242000000000 0f8ec6030000
+# the jle target 0x6e3e9e = the next mesh (add esi,1; cmp esi,2), esi / ebx reloaded before it on the loop path
+006e3e96 8b742424 8b5c2438 83c601 83fe02
+# C1 0x6e3b25 sete bl (vertex i0 state == 1), then mov al,bl; and al,1; test bl,bl
+006e3b1b 8b0dbc03ee00 2403 3c01 0f94c3 8ac3 2401 84db 885c240f
+# C2 0x6e3b59 sete [esp+11h] (vertex i1), then movzx / or (no flag reader)
+006e3b53 80e203 80fa01 0f94442411 0fb64c2411 084c240f
+# C3 0x6e3ba2 sete [esp+12h] (vertex i2), then mov / or
+006e3b98 80e203 80fa01 8a54240f 0f94442412 8a4c2412 0a542412
+# C4 0x6e40c6 je 0x6e4108 = the portal's seen-bit test (reveal entry +0x10) of the floor markers 0x6e4050
+006e40b6 0fb75010 0fbfcf b801000000 d3e0 85d0 7440 c1e105 034e0c
+# 0x6e4050: the marker draw 0x6e1e00 after the floor tests
+006e40f5 8b15a003ee00 52 83c110 51 e8fbdcffff
+# 0x6e4130 (the sonar frame): [0xee03e8] drawn / [0xee03ec] refused triangles set to 0; calls 0x6e3a00 per placed unit
+# (+0xb3) and 0x6e4050
+006e419a 33ff 50 8d4c2444 893de803ee00 893dec03ee00
+006e429d 80b8b300000000 7414 3bc7 7410 57 50 e84ff7ffff 8b0d3cff8a00
+006e43c9 e882fcffff b9f004ee00
+# 0x6dfa60 (one triangle): the cap 0x16d83 on [0xee03e8], a refused one counted in [0xee03ec]
+006dfa69 813de803ee00836d0100 56 8bf1 8b4d08 760e 8305ec03ee0001
+# the sonar mode [0xee03c8]: the switch 0x6e55f0 (1 .. 4 by the table 0x6e5638)
+006e55f0 a1c803ee00 83c0ff 83f803 773a ff248538566e00
+# ---- 0.22.49 ----
+# A1 0x6e429b je 0x6e42ba: the frame's unit loop - unit [0x8aff3c + 4 esi], mesh +0x8c (je 0x6e42ba), floor test
+# [eax+0xb0] & [0xedf268] (je = skip), then 0x6e429d cmp byte [eax+0xb3],0 sets the flags again
+006e4284 8b04b1 39b88c000000 742b 8a1568f2ed00 8490b0000000 741d
+# map info: the open 0x6e53f0 stores the unit of [0xe7f148] (0x6e2a60) in [0xedf254], then tests its +0x8c
+006e5459 e802d6ffff 83c420 a354f2ed00 39988c000000
+# map info: the close's 0x6dff20 sets the unit count [0x8aff34] to 0 after freeing every unit (0x6dd780 + 0x596b10)
+006dff58 33c0 391d10ff8a00 891d34ff8a00

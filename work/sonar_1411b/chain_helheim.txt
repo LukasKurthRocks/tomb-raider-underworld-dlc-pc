@@ -1,0 +1,45 @@
+=== start l7_helheim03
+game (FullMap only): floor bit 0x04; loaded 7 units, drawn 5 (38032 faces): l7_helheim03, l7_helheim02, l7_yggdrasil, l7_yggdrasil_hall01, l7_yggdrasil_hall02
+   loaded but other floor (placed by 0x6e2ef0(u, 0xff), skipped by the draw test 0x6e4295): l7_helheim01 0x02, l7_yggdrasil_end 0x08 (58855 faces)
+   no map file: -
+AllFloors draw-only (draw test off, no extra load): drawn 7 units, 96887 faces
+   map data bytes: game 4465883, extra for draw-only 0
+AllFloors with cross-floor loading (NOT built): loaded 13 units (179658 faces, 8331972 map bytes): l7_helheim03, l7_helheim02, l7_yggdrasil, l7_helheim01, l7_yggdrasil_hall01, l7_helheim_hall02, l7_yggdrasil_hall02, l7_helheim_hall01, l7_yggdrasil_end, l7_arctic_sea, l7_monastery, l7_thin_ice, l7_himalaya_end
+   extra loads against the game: 6 (l7_arctic_sea, l7_helheim_hall01, l7_helheim_hall02, l7_himalaya_end, l7_monastery, l7_thin_ice)
+
+=== start l7_helheim02
+game (FullMap only): floor bit 0x02; loaded 6 units, drawn 4 (67874 faces): l7_helheim02, l7_helheim01, l7_helheim_hall02, l7_helheim_hall01
+   loaded but other floor (placed by 0x6e2ef0(u, 0xff), skipped by the draw test 0x6e4295): l7_helheim03 0x04, l7_arctic_sea 0x01 (52701 faces)
+   no map file: -
+AllFloors draw-only (draw test off, no extra load): drawn 6 units, 120575 faces
+   map data bytes: game 5582480, extra for draw-only 0
+AllFloors with cross-floor loading (NOT built): loaded 13 units (179658 faces, 8331972 map bytes): l7_helheim02, l7_helheim01, l7_helheim03, l7_helheim_hall02, l7_yggdrasil, l7_helheim_hall01, l7_yggdrasil_hall01, l7_arctic_sea, l7_yggdrasil_hall02, l7_thin_ice, l7_yggdrasil_end, l7_monastery, l7_himalaya_end
+   extra loads against the game: 7 (l7_himalaya_end, l7_monastery, l7_thin_ice, l7_yggdrasil, l7_yggdrasil_end, l7_yggdrasil_hall01, l7_yggdrasil_hall02)
+
+=== start l7_helheim01
+game (FullMap only): floor bit 0x02; loaded 6 units, drawn 4 (67874 faces): l7_helheim01, l7_helheim_hall02, l7_helheim02, l7_helheim_hall01
+   loaded but other floor (placed by 0x6e2ef0(u, 0xff), skipped by the draw test 0x6e4295): l7_helheim03 0x04, l7_arctic_sea 0x01 (52701 faces)
+   no map file: -
+AllFloors draw-only (draw test off, no extra load): drawn 6 units, 120575 faces
+   map data bytes: game 5582480, extra for draw-only 0
+AllFloors with cross-floor loading (NOT built): loaded 13 units (179658 faces, 8331972 map bytes): l7_helheim01, l7_helheim_hall02, l7_helheim02, l7_helheim_hall01, l7_helheim03, l7_arctic_sea, l7_yggdrasil, l7_thin_ice, l7_yggdrasil_hall01, l7_yggdrasil_hall02, l7_yggdrasil_end, l7_monastery, l7_himalaya_end
+   extra loads against the game: 7 (l7_himalaya_end, l7_monastery, l7_thin_ice, l7_yggdrasil, l7_yggdrasil_end, l7_yggdrasil_hall01, l7_yggdrasil_hall02)
+
+=== start l7_helheim_hall02
+game (FullMap only): floor bit 0x02; loaded 6 units, drawn 4 (67874 faces): l7_helheim_hall02, l7_helheim_hall01, l7_helheim01, l7_helheim02
+   loaded but other floor (placed by 0x6e2ef0(u, 0xff), skipped by the draw test 0x6e4295): l7_arctic_sea 0x01, l7_helheim03 0x04 (52701 faces)
+   no map file: -
+AllFloors draw-only (draw test off, no extra load): drawn 6 units, 120575 faces
+   map data bytes: game 5582480, extra for draw-only 0
+AllFloors with cross-floor loading (NOT built): loaded 13 units (179658 faces, 8331972 map bytes): l7_helheim_hall02, l7_helheim_hall01, l7_helheim01, l7_arctic_sea, l7_helheim02, l7_thin_ice, l7_helheim03, l7_yggdrasil, l7_yggdrasil_hall01, l7_yggdrasil_hall02, l7_yggdrasil_end, l7_monastery, l7_himalaya_end
+   extra loads against the game: 7 (l7_himalaya_end, l7_monastery, l7_thin_ice, l7_yggdrasil, l7_yggdrasil_end, l7_yggdrasil_hall01, l7_yggdrasil_hall02)
+
+=== start l7_yggdrasil_hall02
+game (FullMap only): floor bit 0x04; loaded 7 units, drawn 5 (38032 faces): l7_yggdrasil_hall02, l7_yggdrasil_hall01, l7_yggdrasil, l7_helheim03, l7_helheim02
+   loaded but other floor (placed by 0x6e2ef0(u, 0xff), skipped by the draw test 0x6e4295): l7_yggdrasil_end 0x08, l7_helheim01 0x02 (58855 faces)
+   no map file: -
+AllFloors draw-only (draw test off, no extra load): drawn 7 units, 96887 faces
+   map data bytes: game 4465883, extra for draw-only 0
+AllFloors with cross-floor loading (NOT built): loaded 13 units (179658 faces, 8331972 map bytes): l7_yggdrasil_hall02, l7_yggdrasil_hall01, l7_yggdrasil_end, l7_yggdrasil, l7_monastery, l7_helheim03, l7_himalaya_end, l7_helheim02, l7_helheim01, l7_helheim_hall02, l7_helheim_hall01, l7_arctic_sea, l7_thin_ice
+   extra loads against the game: 6 (l7_arctic_sea, l7_helheim_hall01, l7_helheim_hall02, l7_himalaya_end, l7_monastery, l7_thin_ice)
+

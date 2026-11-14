@@ -1838,6 +1838,8 @@ SW_LIVE = {
     ('TruMenu', 'Sonar', 'FullMap'): 'void SoReadSwitch(',
     ('TruMenu', 'Sonar', 'HidePlaceholder'): 'void SoReadSwitch(',
     ('TruMenu', 'Sonar', 'FloorMarkers'): 'void SoReadSwitch(',
+    ('TruMenu', 'Sonar', 'AllFloors'): 'void SoReadSwitch(',             # TruMenu 0.22.49
+    ('TruMenu', 'Sonar', 'TriangleCap'): 'void SoReadSwitch(',
 }
 # Q75 (2026-11-11): keys the plugin re-reads at run time only when they were 1 at the game start (the code is patched
 # only then; a 1 after a start with 0 needs a restart). No "when" form of TruMenu says that: live-if:<Key> asks the key's
@@ -5418,10 +5420,11 @@ def check_02244(switches_path):
     if 'TruMenu:Input:DeviceGlyphs' not in sw_keys: problems.append('switches: TruMenu | Input | DeviceGlyphs missing')
     header, opt_rows = table(src)
     # 0.22.44 added none, 0.22.45 the three [Sound] wave log keys, 0.22.47 the seven sound monitor / sonar keys, 0.22.48
-    # the three [Sonar] keys
-    if len(opt_rows) != 283 + len(W6_KEYS_02245) + len(W7_KEYS_02247) + len(SO_KEYS_02248):
+    # the three [Sonar] keys, 0.22.49 [Sonar] AllFloors
+    if len(opt_rows) != 283 + len(W6_KEYS_02245) + len(W7_KEYS_02247) + len(SO_KEYS_02248) + 2:
         problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.44 adds no INI key (283), 0.22.45 adds %d, 0.22.47 adds %d, '
-                        '0.22.48 adds %d' % (len(opt_rows), len(W6_KEYS_02245), len(W7_KEYS_02247), len(SO_KEYS_02248)))
+                        '0.22.48 adds %d, 0.22.49 adds 2' % (len(opt_rows), len(W6_KEYS_02245), len(W7_KEYS_02247),
+                                                             len(SO_KEYS_02248)))
     readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
     if '\n## 0.22.44 - ' not in readme or '\n### TO TEST 0.22.44' not in readme:
         problems.append('README.md: section "## 0.22.44 - ..." with "### TO TEST 0.22.44" missing')
@@ -5859,8 +5862,8 @@ def check_02248(switches_path):
     problems = []
     src = read_cpp()
     code = re.sub(r'//[^\n]*', '', src)
-    if '"TruMenu 0.22.48 (adrenaline at Lara + sonar full map' not in src[:src.find('\n', src.find('kVersion = '))]:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.48 (adrenaline at Lara + sonar full map"')
+    if '0.22.48 (adrenaline at Lara + sonar full map' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.49: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.48 part "0.22.48 (adrenaline at Lara + sonar full map"')
     # ---- (1) adrenaline at Lara
     sw_rows = {}
     for line in open(switches_path, encoding='utf-8').read().splitlines():
@@ -5926,8 +5929,8 @@ def check_02248(switches_path):
     else:
         problems.append('work/menu48_1411/precheck_02248.txt (the offline byte list) is missing')
     rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kSoChecks')]
-    if rows != offline or len(rows) != 13:
-        problems.append('TruMenu.cpp: kSoChecks (%d rows) must be the 13 rows of precheck_02248.txt in order' % len(rows))
+    if rows[:13] != offline or len(offline) != 13:   # 0.22.49: 3 rows appended (check_02249 = precheck_02249.txt)
+        problems.append('TruMenu.cpp: kSoChecks (%d rows) must start with the 13 rows of precheck_02248.txt in order' % len(rows))
     if 'g_soOk = DvChecks(kSoChecks,' not in fn_body(src, 'void SoCheck('):
         problems.append('TruMenu.cpp: SoCheck must set g_soOk = DvChecks(kSoChecks, ...)')
     if not re.search(r'\n    W7Check\(\);[^\n]*\n    SoCheck\(\);', src):
@@ -6030,6 +6033,178 @@ def check_02248(switches_path):
                       'Tests copies only, 0.6.15 rows live); Sonar komplett (%d byte checks = precheck_02248, 5 sites, '
                       'stub, %d keys / %d items / set_sonar %d rows); chapter strings; Regression-DLC2 step 24' %
                       (len(in_adren), len(adren_sw), len(rows), len(SO_KEYS_02248), len(SO_ITEMS_02248), len(se)))
+
+
+SO_CHECKS_02249 = os.path.join(ROOT, 'work', 'menu49_1411', 'precheck_02249.txt')
+SO_HASH_02248 = '673b7bc62a2654a1e7f4e88856a298f0a7a9a78314b1911af4d38768bf138ef0'   # work/asi/menu0271
+# item, type, game thread (queued)
+SO_ITEMS_02249 = (('sonar.allfloors', 'bool', 'true'), ('sonar.unitmap', 'info', 'false'),
+                  ('adren.stayfull', 'bool', 'false'))
+SO_SET_02249 = (('sonar.allfloors', '', 'kQbBool'), ('sonar.unitmap', '', 'kQbInfo'),
+                ('sw.set', 'TruMenu:Sonar:TriangleCap', 'kQbSwitch'))
+# page Figur group fig_adren: the labels of the owner (14.11.): (item, arg) -> DE label
+SO_LABELS_02249 = {('adren.keep', ''): 'Nach Einsatz auffuellen', ('adren.stayfull', ''): 'Adrenalin bleibt voll',
+                   ('sw.set', 'TruShadowCombat:Adrenaline:ModeWithoutTarget'): 'Modus ohne Ziel',
+                   ('sw.set', 'TruShadowCombat:Adrenaline:StrikeWithoutButton'): 'Absprung-Schlag ohne X',
+                   ('sw.set', 'TruShadowCombat:Adrenaline:AssistPointer'): 'Zielhilfe Kreis'}
+
+
+def check_02249(switches_path):
+    """0.22.49 (owner wishes 2026-11-14; workspace docs/Befund-TruMenu-02249-1411.md): (1) [Sonar] AllFloors = the je at
+    0x6e429b (the floor test of the frame 0x6e4130) -> nop nop, only with FullMap, through SoPart / SoWrite like the other
+    sites; kSoChecks = the 16 rows of precheck_02249.txt; no load / unit-list write anywhere in the section (no call of
+    0x6e4e80 / 0x551470 / 0x6e2e60, no write of the floor / list globals); (2) the map info (SoReadUnit / SoLogUnits /
+    SoMapTick) reads only, only while the sonar mode is 1 .. 4 and only a unit of the live list; (3) adren.keep labelled
+    "Nach Einsatz auffuellen" everywhere, adren.stayfull = the two TruShadowCombat drain keys (no memory write), the 0.6.15
+    switches without "(Test)", AssistPointer "Zielhilfe Kreis", Paket A copies; (4) the snd.sonar log line has a %s for the
+    wave list; README 0.22.49 + TO TEST; Set-TruMenu knows the 0.22.48 hash"""
+    problems = []
+    src = read_cpp()
+    ver = src[:src.find('\n', src.find('kVersion = '))]
+    if '"TruMenu 0.22.49 (sonar all floors + map info' not in ver:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.49 (sonar all floors + map info"')
+    # ---- (1) AllFloors
+    offline = []
+    if os.path.exists(SO_CHECKS_02249):
+        for line in open(SO_CHECKS_02249, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/menu49_1411/precheck_02249.txt (the offline byte list) is missing')
+    rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kSoChecks')]
+    if rows != offline or len(rows) != 16:
+        problems.append('TruMenu.cpp: kSoChecks (%d rows) must be the 16 rows of precheck_02249.txt in order' % len(rows))
+    for want in ('const DWORD kSoA1 = 0x006e429b;', 'const BYTE kSoA1Game[2] = {0x74, 0x1d}, kSoA1New[2] = {0x90, 0x90};',
+                 'const SoSiteDef kSoPartA = {kSoA1, kSoA1Game, kSoA1New, 2, "A1"};'):
+        if want not in src: problems.append('TruMenu.cpp: %s missing' % want)
+    ap = fn_body(src, 'void SoApply(')
+    if 'const bool wantA = wantC && g_soAll != 0;' not in ap:
+        problems.append('TruMenu.cpp: SoApply: AllFloors only with FullMap (wantA = wantC && g_soAll != 0)')
+    for want in ('SoPart(&kSoPartA, 1, false, "all floors")', 'SoPart(&kSoPartA, 1, true, "all floors")'):
+        if want not in ap: problems.append('TruMenu.cpp: SoApply must write A1 through %s' % want)
+    if 'SoWrite(kSoPartA.at, kSoPartA.ours, kSoPartA.game, kSoPartA.len)' not in fn_body(src, 'void SoAllBack('):
+        problems.append('TruMenu.cpp: SoAllBack must put A1 back')
+    if 'GetPrivateProfileIntA("Sonar", "AllFloors"' not in fn_body(src, 'void SoReadSwitch('):
+        problems.append('TruMenu.cpp: SoReadSwitch lacks AllFloors')
+    # TriangleCap: T1 = the imm32 of 0x6dfa69 (bytes at 0x6dfa6f), only with FullMap, cap - 1, through SoPart
+    for want in ('const DWORD kSoT1 = 0x006dfa6f;', 'const BYTE kSoT1Game[4] = {0x83, 0x6d, 0x01, 0x00};',
+                 'kSoCapGame = 0x16d84, kSoCapMax = 1000000;'):
+        if want not in src: problems.append('TruMenu.cpp: %s missing' % want)
+    if 'const LONG wantT = wantC && g_soCap > kSoCapGame ? g_soCap : 0;' not in ap:
+        problems.append('TruMenu.cpp: SoApply: TriangleCap only with FullMap and above the game\'s 93572')
+    for want in ('const DWORD imm = static_cast<DWORD>(wantT - 1);', 'SoPart(&t, 1, true, "triangle cap")',
+                 'SoPart(&t, 1, false, "triangle cap")'):
+        if want not in ap: problems.append('TruMenu.cpp: SoApply lacks %s' % want)
+    if 'SoWrite(kSoT1, g_soT1New, kSoT1Game, 4)' not in fn_body(src, 'void SoAllBack('):
+        problems.append('TruMenu.cpp: SoAllBack must put T1 back')
+    if 'GetPrivateProfileIntA("Sonar", "TriangleCap"' not in fn_body(src, 'void SoReadSwitch('):
+        problems.append('TruMenu.cpp: SoReadSwitch lacks TriangleCap')
+    if 'OptInt(ini, "Sonar", "AllFloors")' not in fn_body(src, 'void SoReadOptions('):
+        problems.append('TruMenu.cpp: SoReadOptions lacks AllFloors')
+    if 'SoSetKey("AllFloors", &g_soAll, on, "sonar.allfloors");' not in fn_body(src, 'bool RunSoAll('):
+        problems.append('TruMenu.cpp: RunSoAll must go through SoSetKey (INI + SoApply)')
+    sec = src[src.find('// ---- 0.22.48 Sonar komplett'):src.find('// ---- end of 0.22.48 Sonar komplett ----')]
+    sec_code = re.sub(r'//[^\n]*', '', sec)
+    for bad in ('0x6e4e80', '0x006e4e80', '0x551470', '0x00551470', '0x6e2e60', '0x006e2e60', 'WriteDword(', 'PutByte(',
+                'WriteByte('):
+        if bad in sec_code: problems.append('TruMenu.cpp: the sonar section must not name %s (no load, no write)' % bad)
+    # ---- (2) map info: read only, sonar open, live list
+    for fn in ('bool SoReadUnit(', 'void SoLogUnits(', 'void SoMapTick('):
+        body = re.sub(r'//[^\n]*', '', fn_body(src, fn))
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn); continue
+        if any(w in body for w in ('WriteBytes(', 'WriteDword(', 'SoWrite(', 'memcpy(reinterpret_cast')):
+            problems.append('TruMenu.cpp: %s must only read' % fn)
+    mt = fn_body(src, 'void SoMapTick(')
+    if 'mode == 0 || mode > 4' not in mt or 'listed = ReadDword(list + 4 * k, &u) && u == anchor;' not in mt:
+        problems.append('TruMenu.cpp: SoMapTick must read only while the sonar is open and only a unit of the live list')
+    if 'SoMapTick(now);' not in re.sub(r'//[^\n]*', '', fn_body(src, 'void SoTick(')):
+        problems.append('TruMenu.cpp: SoTick must call SoMapTick(now)')
+    for want in ('kSoUnits = 0x008aff3c', 'kSoUnitCount = 0x008aff34', 'kSoAnchor = 0x00edf254', 'kSoFloor = 0x00edf268',
+                 'kSoTuning = 0x00ee03e0'):
+        if want not in src: problems.append('TruMenu.cpp: %s missing' % want)
+    # items, help, options, switches, bar rows
+    for item, typ, gt in SO_ITEMS_02249:
+        if not re.search(r'\{"%s", "%s", "0\.22\.49[^}]*?,\s+%s,\s+[A-Za-z0-9_<>]+,\s+[A-Za-z0-9_<>]+\},' %
+                         (re.escape(item), typ, gt), src, re.S):
+            problems.append('TruMenu.cpp: item %s (%s, game thread %s) missing in kItems' % (item, typ, gt))
+        hm = re.search(r'\{"%s", "", "((?:[^"\\]|\\.)*)"\}' % re.escape(item), src)
+        if not hm: problems.append('TruMenu.cpp: kQbHelp row %s missing' % item)
+        else:
+            de, en = unescape(hm.group(1)).split('|')
+            if len(de) > 60 or len(en) > 60: problems.append('TruMenu.cpp: help of %s over 60 characters' % item)
+    header, opt_rows = table(src)
+    keys = {(s, k): d for s, k, d, _ in opt_rows}
+    if keys.get(('Sonar', 'AllFloors')) != '0': problems.append('TruMenu.cpp: kOpts [Sonar] AllFloors=0 missing')
+    if keys.get(('Sonar', 'TriangleCap')) != '300000':
+        problems.append('TruMenu.cpp: kOpts [Sonar] TriangleCap=300000 missing')
+    sw_rows = {}
+    for line in open(switches_path, encoding='utf-8').read().splitlines():
+        f = [x.strip() for x in line.split('|')]
+        if line.startswith('#') or len(f) < 9 or f[0] == 'group': continue
+        sw_rows['%s:%s:%s' % (f[0], f[1], f[2])] = f
+    f = sw_rows.get('TruMenu:Sonar:AllFloors')
+    if not f or f[3] != 'bool' or f[6] != 'live' or f[7] != '0' or len(f) < 10 or f[9] != 'TruMenu 0.22.49':
+        problems.append('switches: row TruMenu | Sonar | AllFloors | bool | ... | live | 0 | ... | TruMenu 0.22.49 missing')
+    f = sw_rows.get('TruMenu:Sonar:TriangleCap')
+    if not f or f[3] != 'int:0..1000000:50000' or f[6] != 'live' or f[7] != '300000' or len(f) < 10 or \
+            f[9] != 'TruMenu 0.22.49':
+        problems.append('switches: row TruMenu | Sonar | TriangleCap | int:0..1000000:50000 | ... | live | 300000 | ... '
+                        '| TruMenu 0.22.49 missing')
+    for page, grp_key, flag in (('kQbSettings', 'set_sonar', None), ('kQbTests', 'tg_g', None)):
+        got, grp = set(), None
+        for r in qb_rows(src):
+            if r[0] != page: continue
+            if r[4] == 'kQbGroup': grp = r[3]; continue
+            if grp == grp_key: got.add((r[2], r[3], r[4]))
+        for it in SO_SET_02249:
+            if it not in got: problems.append('TruMenu.cpp: %s group %s lacks %s (%s)' % (page, grp_key, it[0], it[2]))
+    # ---- (3) adrenaline labels / stays full
+    lara, grp = {}, None
+    for r in qb_rows(src):
+        if r[0] != 'kQbLara': continue
+        if r[4] == 'kQbGroup': grp = r[3]; continue
+        if grp == 'fig_adren': lara[(r[2], r[3])] = unescape(r[1])   # read_cpp: umlaut escapes as ASCII (ue)
+    for k, want in SO_LABELS_02249.items():
+        if lara.get(k) != want: problems.append('TruMenu.cpp: fig_adren row %s %s must read "%s" (got %r)' % (k + (want, lara.get(k))))
+    if any('(Test)' in v for v in lara.values()): problems.append('TruMenu.cpp: fig_adren still has a "(Test)" label')
+    if re.search(r'\{"Adrenalin voll halten", ', src): problems.append('TruMenu.cpp: a row still reads "Adrenalin voll halten"')
+    tga, grp = set(), None
+    for r in qb_rows(src):
+        if r[0] != 'kQbTests': continue
+        if r[4] == 'kQbGroup': grp = r[3]; continue
+        if grp == 'tg_a': tga.add((r[2], r[3]))
+    for k in (('adren.stayfull', ''), ('adren.keep', ''), ('sw.set', 'TruShadowCombat:Adrenaline:ModeWithoutTarget'),
+              ('sw.set', 'TruShadowCombat:Adrenaline:StrikeWithoutButton')):
+        if k not in tga: problems.append('TruMenu.cpp: Paket A lacks the copy of %s %s' % k)
+    for key in ('TruShadowCombat:Adrenaline:ModeWithoutTarget', 'TruShadowCombat:Adrenaline:StrikeWithoutButton'):
+        f = sw_rows.get(key)
+        if not f or '(Test)' in f[4] or '(test)' in f[5]: problems.append('switches: %s still labelled as a test' % key)
+    st = re.sub(r'//[^\n]*', '', fn_body(src, 'bool RunAdmStay('))
+    writes = re.findall(r'WritePrivateProfileStringA\("([^"]+)", "([^"]+)", [^,]+, (\w+)\)', st)
+    if sorted(w for w in writes if w[2] == 'path') != [('Adrenaline', 'DrainModePercent', 'path'),
+                                                         ('Adrenaline', 'DrainPercent', 'path')]:
+        problems.append('TruMenu.cpp: RunAdmStay must write exactly [Adrenaline] DrainPercent / DrainModePercent of '
+                        'TruShadowCombat.ini (got %s)' % writes)
+    if any(w in st for w in ('WriteBytes(', 'WriteDword(', 'WriteCode(')):
+        problems.append('TruMenu.cpp: RunAdmStay must not patch memory (the INI way)')
+    for want in ('IniKeepInt("Adrenaline", "StayFullDrainWas", d);', 'IniKeepInt("Adrenaline", "StayFullDrainModeWas", m);',
+                 'if (nd == 0 && nm == 0) nd = nm = 100;', 'kAsMinVersion'):
+        if want not in st: problems.append('TruMenu.cpp: RunAdmStay lacks %s' % want)
+    if 'kAsDrain = "ini:TruShadowCombat:Adrenaline:DrainPercent"' not in src:
+        problems.append('TruMenu.cpp: kAsDrain (the TruShadowCombat.ini target) missing')
+    # ---- (4) snd.sonar log line, README, Set-TruMenu
+    if '"snd.sonar %d (src=%s, was %d): %s%s; [Sound] SonarMute=%d written"' not in fn_body(src, 'void W7SonarSet('):
+        problems.append('TruMenu.cpp: W7SonarSet: the log line needs %s for the wave list before SonarMute=%d')
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.49 - ' not in readme or '\n### TO TEST 0.22.49' not in readme:
+        problems.append('README.md: section "## 0.22.49 - ..." with "### TO TEST 0.22.49" missing')
+    if '| `[Sonar] AllFloors` |' not in readme: problems.append('README.md: options row `[Sonar] AllFloors` missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if SO_HASH_02248 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.48 build hash (work/asi/menu0271) is missing')
+    return problems, ('AllFloors (A1 0x6e429b, %d byte checks = precheck_02249), map info read only, adrenaline labels '
+                      '(%d checked) + stays full (INI keys only), snd.sonar log line' % (len(rows), len(SO_LABELS_02249)))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -6663,6 +6838,10 @@ def main(argv):
     for p in cproblems48: print('Q02248 %s' % p)
     if not cproblems48: print('ok: 0.22.48 %s' % csummary48)
     problems += cproblems48
+    cproblems49, csummary49 = check_02249(opt.get('--switches', SWITCHES))   # 0.22.49 (sonar all floors, adrenaline)
+    for p in cproblems49: print('Q02249 %s' % p)
+    if not cproblems49: print('ok: 0.22.49 %s' % csummary49)
+    problems += cproblems49
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

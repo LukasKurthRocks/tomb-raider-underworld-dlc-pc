@@ -1,0 +1,36 @@
+=== fn 00529640 .. 00529696
+00529640  56                             push esi
+00529641  8b35e475ad00                   mov esi, dword ptr [0xad75e4]
+00529647  8b9648020000                   mov edx, dword ptr [esi + 0x248]
+0052964d  8b4620                         mov eax, dword ptr [esi + 0x20]
+00529650  c1ea05                         shr edx, 5
+00529653  f6c201                         test dl, 1
+00529656  57                             push edi
+00529657  8bf9                           mov edi, ecx
+00529659  b900020000                     mov ecx, 0x200
+0052965e  7505                           jne 0x529665
+00529660  b908020000                     mov ecx, 0x208
+00529665  8b74240c                       mov esi, dword ptr [esp + 0xc]
+00529669  8b10                           mov edx, dword ptr [eax]
+0052966b  8b5268                         mov edx, dword ptr [edx + 0x68]
+0052966e  6a00                           push 0
+00529670  56                             push esi
+00529671  6a00                           push 0
+00529673  6a00                           push 0
+00529675  51                             push ecx
+00529676  8b4f0c                         mov ecx, dword ptr [edi + 0xc]
+00529679  51                             push ecx
+0052967a  50                             push eax
+0052967b  ffd2                           call edx
+0052967d  85c0                           test eax, eax
+0052967f  7d0e                           jge 0x52968f
+00529681  8bcf                           mov ecx, edi
+00529683  e8c8b5ffff                     call 0x524c50
+00529688  5f                             pop edi
+00529689  32c0                           xor al, al
+0052968b  5e                             pop esi
+0052968c  c20400                         ret 4
+0052968f  5f                             pop edi
+00529690  b001                           mov al, 1
+00529692  5e                             pop esi
+00529693  c20400                         ret 4

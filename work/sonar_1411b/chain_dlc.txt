@@ -1,0 +1,73 @@
+=== start dlc_level1_start
+dlc_level1_start_map.drm (Xbox pack10.000, header 76 B): floor mask 0x10 (bytes +0x10: 10 00 00 00), 1 portals, faces 100 verts 56 meshes [(100, 56)] PLACEHOLDER
+    portal -> dlc_caverns                      ids  194 /  184  at (-27374, 5689, -10398)  [mask 0x03]
+game (FullMap only): floor bit 0x10; loaded 2 units, drawn 1 (100 faces): dlc_level1_start
+   loaded but other floor (placed by 0x6e2ef0(u, 0xff), skipped by the draw test 0x6e4295): dlc_caverns 0x03 (19412 faces)
+   no map file: -
+AllFloors draw-only (draw test off, no extra load): drawn 2 units, 19512 faces
+   map data bytes: game 904542, extra for draw-only 0
+AllFloors with cross-floor loading (NOT built): loaded 10 units (251009 faces, 11602584 map bytes): dlc_level1_start, dlc_caverns, dlc_caverns_hall, dlc_water_wheel, dlc_pillory, dlc_watertunnel, dlc_dungeonhalla, dlc_dungeonhallb, dlc_dungeon, dlc_treasureroom
+   extra loads against the game: 8 (dlc_caverns_hall, dlc_dungeon, dlc_dungeonhalla, dlc_dungeonhallb, dlc_pillory, dlc_treasureroom, dlc_water_wheel, dlc_watertunnel)
+
+=== start dlc_caverns
+dlc_caverns_map.drm (Xbox pack10.000, header 130 B): floor mask 0x03 (bytes +0x10: 03 00 00 00), 2 portals, faces 19412 verts 9024 meshes [(19412, 9024)]
+    portal -> dlc_caverns_hall                 ids  183 /  182  at (17067, 9323, -6756)  [mask 0x02]
+    portal -> dlc_level1_start                 ids  184 /  194  at (9626, 2198, -2089)  [mask 0x10]
+game (FullMap only): floor bit 0x01; loaded 3 units, drawn 1 (19412 faces): dlc_caverns
+   loaded but other floor (placed by 0x6e2ef0(u, 0xff), skipped by the draw test 0x6e4295): dlc_caverns_hall 0x02, dlc_level1_start 0x10 (16788 faces)
+   no map file: -
+AllFloors draw-only (draw test off, no extra load): drawn 3 units, 36200 faces
+   map data bytes: game 1647198, extra for draw-only 0
+AllFloors with cross-floor loading (NOT built): loaded 10 units (251009 faces, 11602584 map bytes): dlc_caverns, dlc_caverns_hall, dlc_level1_start, dlc_water_wheel, dlc_pillory, dlc_watertunnel, dlc_dungeonhalla, dlc_dungeonhallb, dlc_dungeon, dlc_treasureroom
+   extra loads against the game: 7 (dlc_dungeon, dlc_dungeonhalla, dlc_dungeonhallb, dlc_pillory, dlc_treasureroom, dlc_water_wheel, dlc_watertunnel)
+
+=== start dlc_dungeon
+dlc_dungeon_map.drm (Xbox pack10.000, header 227 B): floor mask 0x08 (bytes +0x10: 08 00 00 00), 4 portals, faces 56464 verts 31208 meshes [(56464, 31208)]
+    portal -> dlc_dungeonhalla                 ids  174 /  175  at (-1896, 32705, -8850)  [mask 0x0c]
+    portal -> dlc_dungeonhallb                 ids  168 /  166  at (-3319, 15486, -8850)  [mask 0x0c]
+    portal -> dlc_watertunnel                  ids  172 /  170  at (-8534, 31921, -9561)  [mask 0x0a]
+    portal -> dlc_treasureroom                 ids  187 /  186  at (-25205, 18963, -8534)  [mask 0x01]
+game (FullMap only): floor bit 0x08; loaded 7 units, drawn 4 (142870 faces): dlc_dungeon, dlc_dungeonhalla, dlc_dungeonhallb, dlc_watertunnel
+   loaded but other floor (placed by 0x6e2ef0(u, 0xff), skipped by the draw test 0x6e4295): dlc_treasureroom 0x01, dlc_pillory 0x06, dlc_water_wheel 0x02 (71939 faces)
+   no map file: -
+AllFloors draw-only (draw test off, no extra load): drawn 7 units, 214809 faces
+   map data bytes: game 9955386, extra for draw-only 0
+AllFloors with cross-floor loading (NOT built): loaded 10 units (251009 faces, 11602584 map bytes): dlc_dungeon, dlc_dungeonhalla, dlc_dungeonhallb, dlc_watertunnel, dlc_treasureroom, dlc_pillory, dlc_water_wheel, dlc_caverns_hall, dlc_caverns, dlc_level1_start
+   extra loads against the game: 3 (dlc_caverns, dlc_caverns_hall, dlc_level1_start)
+
+=== start dlc_water_wheel
+dlc_water_wheel_map.drm (Xbox pack10.000, header 173 B): floor mask 0x02 (bytes +0x10: 02 00 00 00), 3 portals, faces 18649 verts 9520 meshes [(18607, 9484), (42, 36)]
+    portal -> dlc_pillory                      ids  179 /  178  at (4109, 21812, -8846)  [mask 0x06]
+    portal -> dlc_caverns_hall                 ids  180 /  181  at (10118, 16729, -10085)  [mask 0x02]
+    portal -> dlc_watertunnel                  ids  173 /  171  at (7111, 29780, -15091)  [mask 0x0a]
+game (FullMap only): floor bit 0x02; loaded 9 units, drawn 5 (121667 faces): dlc_water_wheel, dlc_pillory, dlc_caverns_hall, dlc_watertunnel, dlc_caverns
+   loaded but other floor (placed by 0x6e2ef0(u, 0xff), skipped by the draw test 0x6e4295): dlc_dungeonhalla 0x0c, dlc_dungeonhallb 0x0c, dlc_dungeon 0x08, dlc_level1_start 0x10 (129242 faces)
+   no map file: -
+AllFloors draw-only (draw test off, no extra load): drawn 9 units, 250909 faces
+   map data bytes: game 11598196, extra for draw-only 0
+AllFloors with cross-floor loading (NOT built): loaded 10 units (251009 faces, 11602584 map bytes): dlc_water_wheel, dlc_pillory, dlc_caverns_hall, dlc_watertunnel, dlc_dungeonhalla, dlc_dungeonhallb, dlc_caverns, dlc_dungeon, dlc_level1_start, dlc_treasureroom
+   extra loads against the game: 1 (dlc_treasureroom)
+
+=== start dlc_level2_start
+dlc_level2_start_map.drm (Xbox pack11.000, header 85 B): floor mask 0x01 (bytes +0x10: 01 00 00 00), 1 portals, faces 100 verts 56 meshes [(100, 56)] PLACEHOLDER
+    portal -> dlc_yggdrasil_hall01             ids  193 /  192  at (4109, -48, 1264)  [mask 0x04]
+game (FullMap only): floor bit 0x01; loaded 2 units, drawn 1 (100 faces): dlc_level2_start
+   loaded but other floor (placed by 0x6e2ef0(u, 0xff), skipped by the draw test 0x6e4295): dlc_yggdrasil_hall01 0x04 (5005 faces)
+   no map file: -
+AllFloors draw-only (draw test off, no extra load): drawn 2 units, 5105 faces
+   map data bytes: game 240379, extra for draw-only 0
+AllFloors with cross-floor loading (NOT built): loaded 4 units (44543 faces, 2079639 map bytes): dlc_level2_start, dlc_yggdrasil_hall01, dlc_yggdrasil_hall02, dlc_yggdrasil_end
+   extra loads against the game: 2 (dlc_yggdrasil_end, dlc_yggdrasil_hall02)
+
+=== start dlc_yggdrasil_hall01
+dlc_yggdrasil_hall01_map.drm (Xbox pack11.000, header 134 B): floor mask 0x04 (bytes +0x10: 04 00 00 00), 2 portals, faces 5005 verts 2545 meshes [(5005, 2545)]
+    portal -> dlc_level2_start                 ids  192 /  193  at (-8217, 0, 2528)  [mask 0x01]
+    portal -> dlc_yggdrasil_hall02             ids  191 /  189  at (1580, 6005, 1264)  [mask 0x0c]
+game (FullMap only): floor bit 0x04; loaded 4 units, drawn 2 (12684 faces): dlc_yggdrasil_hall01, dlc_yggdrasil_hall02
+   loaded but other floor (placed by 0x6e2ef0(u, 0xff), skipped by the draw test 0x6e4295): dlc_level2_start 0x01, dlc_yggdrasil_end 0x08 (31859 faces)
+   no map file: -
+AllFloors draw-only (draw test off, no extra load): drawn 4 units, 44543 faces
+   map data bytes: game 2079639, extra for draw-only 0
+AllFloors with cross-floor loading (NOT built): loaded 4 units (44543 faces, 2079639 map bytes): dlc_yggdrasil_hall01, dlc_level2_start, dlc_yggdrasil_hall02, dlc_yggdrasil_end
+   extra loads against the game: 0 ()
+

@@ -1,0 +1,105 @@
+OK    C1 0x006e3b25 original bytes 0f94c3 (found 0f94c3)
+OK    C1 0x006e3b25 original text "sete bl" (found "sete bl", 3 B)
+OK    C1 0x006e3b25 16-byte window unique in .text (count 1)
+OK    C1 negative: pattern not at 0x006e3b24
+OK    C1 negative: pattern not at 0x006e3b26
+OK    C1 new length 3 == original 3
+OK    C1 new text "mov bl, 1|nop" (got "mov bl, 1|nop", 3 B)
+OK    C1 ends on an instruction boundary at 0x006e3b28
+OK    C2 0x006e3b59 original bytes 0f94442411 (found 0f94442411)
+OK    C2 0x006e3b59 original text "sete byte ptr [esp + 0x11]" (found "sete byte ptr [esp + 0x11]", 5 B)
+OK    C2 0x006e3b59 16-byte window unique in .text (count 1)
+OK    C2 negative: pattern not at 0x006e3b58
+OK    C2 negative: pattern not at 0x006e3b5a
+OK    C2 new length 5 == original 5
+OK    C2 new text "mov byte ptr [esp + 0x11], 1" (got "mov byte ptr [esp + 0x11], 1", 5 B)
+OK    C2 ends on an instruction boundary at 0x006e3b5e
+OK    C3 0x006e3ba2 original bytes 0f94442412 (found 0f94442412)
+OK    C3 0x006e3ba2 original text "sete byte ptr [esp + 0x12]" (found "sete byte ptr [esp + 0x12]", 5 B)
+OK    C3 0x006e3ba2 16-byte window unique in .text (count 1)
+OK    C3 negative: pattern not at 0x006e3ba1
+OK    C3 negative: pattern not at 0x006e3ba3
+OK    C3 new length 5 == original 5
+OK    C3 new text "mov byte ptr [esp + 0x12], 1" (got "mov byte ptr [esp + 0x12], 1", 5 B)
+OK    C3 ends on an instruction boundary at 0x006e3ba7
+OK    C4 0x006e40c6 original bytes 7440 (found 7440)
+OK    C4 0x006e40c6 original text "je 0x6e4108" (found "je 0x6e4108", 2 B)
+OK    C4 0x006e40c6 16-byte window unique in .text (count 1)
+OK    C4 negative: pattern not at 0x006e40c5
+OK    C4 negative: pattern not at 0x006e40c7
+OK    C4 new length 2 == original 2
+OK    C4 new text "nop|nop" (got "nop|nop", 2 B)
+OK    C4 ends on an instruction boundary at 0x006e40c8
+OK    C5 0x006dfb1d original bytes 0f8b66030000 (found 0f8b66030000)
+OK    C5 0x006dfb1d original text "jnp 0x6dfe89" (found "jnp 0x6dfe89", 6 B)
+OK    C5 0x006dfb1d 16-byte window unique in .text (count 1)
+OK    C5 negative: pattern not at 0x006dfb1c
+OK    C5 negative: pattern not at 0x006dfb1e
+OK    C5 new length 6 == original 6
+OK    C5 new text "nop|nop|nop|nop|nop|nop" (got "nop|nop|nop|nop|nop|nop", 6 B)
+OK    C5 ends on an instruction boundary at 0x006dfb23
+OK    A1 0x006deed5 original bytes 753d (found 753d)
+OK    A1 0x006deed5 original text "jne 0x6def14" (found "jne 0x6def14", 2 B)
+OK    A1 0x006deed5 16-byte window unique in .text (count 1)
+OK    A1 negative: pattern not at 0x006deed4
+OK    A1 negative: pattern not at 0x006deed6
+OK    A1 new length 2 == original 2
+OK    A1 new text "nop|nop" (got "nop|nop", 2 B)
+OK    A1 ends on an instruction boundary at 0x006deed7
+OK    A2 0x006deeeb original bytes e800fbffff (found e800fbffff)
+OK    A2 0x006deeeb original text "call 0x6de9f0" (found "call 0x6de9f0", 5 B)
+OK    A2 0x006deeeb 16-byte window unique in .text (count 1)
+OK    A2 negative: pattern not at 0x006deeea
+OK    A2 negative: pattern not at 0x006deeec
+OK    A2 new length 5 == original 5
+OK    A2 new text "mov eax, 0" (got "mov eax, 0", 5 B)
+OK    A2 ends on an instruction boundary at 0x006deef0
+OK    A3 0x006e3686 original bytes e865b3ffff (found e865b3ffff)
+OK    A3 0x006e3686 original text "call 0x6de9f0" (found "call 0x6de9f0", 5 B)
+OK    A3 0x006e3686 16-byte window unique in .text (count 1)
+OK    A3 negative: pattern not at 0x006e3685
+OK    A3 negative: pattern not at 0x006e3687
+OK    A3 new length 5 == original 5
+OK    A3 new text "mov eax, 0" (got "mov eax, 0", 5 B)
+OK    A3 ends on an instruction boundary at 0x006e368b
+OK    H1 0x006e3783 original bytes c705c803ee0003000000 (found c705c803ee0003000000)
+OK    H1 0x006e3783 original text "mov dword ptr [0xee03c8], 3" (found "mov dword ptr [0xee03c8], 3", 10 B)
+OK    H1 0x006e3783 16-byte window unique in .text (count 1)
+OK    H1 negative: pattern not at 0x006e3782
+OK    H1 negative: pattern not at 0x006e3784
+OK    H2 0x006e4b06 original bytes c705c803ee0003000000 (found c705c803ee0003000000)
+OK    H2 0x006e4b06 original text "mov dword ptr [0xee03c8], 3" (found "mov dword ptr [0xee03c8], 3", 10 B)
+OK    H2 0x006e4b06 16-byte window unique in .text (count 1)
+OK    H2 negative: pattern not at 0x006e4b05
+OK    H2 negative: pattern not at 0x006e4b07
+OK    H3 0x006e3ab0 original bytes 8b414485c0 (found 8b414485c0)
+OK    H3 0x006e3ab0 original text "mov eax, dword ptr [ecx + 0x44]|test eax, eax" (found "mov eax, dword ptr [ecx + 0x44]|test eax, eax", 5 B)
+OK    H3 0x006e3ab0 16-byte window unique in .text (count 1)
+OK    H3 negative: pattern not at 0x006e3aaf
+OK    H3 negative: pattern not at 0x006e3ab1
+OK    context budget 500                                    0x006e36da bef4010000 "mov esi, 0x1f4"
+OK    context state == 2 test (stage 0)                     0x006dee35 3c02 "cmp al, 2"
+OK    context state 2 -> 0 clear                            0x006dee52 2010 "and byte ptr [eax], dl"
+OK    context LOS result != 2                               0x006deef7 83f802 "cmp eax, 2"
+OK    context set state bit 0                               0x006def09 0806 "or byte ptr [esi], al"
+OK    context budget decrement                              0x006def0f 8300ff "add dword ptr [eax], -1"
+OK    context arm: state 0 -> 2 (mesh 0)                    0x006e331e b302 "mov bl, 2"
+OK    context arm: state 0 -> 2 (mesh 1)                    0x006e3380 b302 "mov bl, 2"
+OK    context candidate list = current + portal neighbours  0x006ddad5 8904b5d802ee00 "mov dword ptr [esi*4 + 0xee02d8], eax"
+OK    context draw: state of i0 == 1                        0x006e3b23 3c01 "cmp al, 1"
+OK    context draw: state of i1 == 1                        0x006e3b56 80fa01 "cmp dl, 1"
+OK    context draw: state of i2 == 1                        0x006e3b9b 80fa01 "cmp dl, 1"
+OK    context draw: full triangle call                      0x006e3c14 e847beffff "call 0x6dfa60"
+OK    context triangle cap 0x16d83                          0x006dfa69 813de803ee00836d0100 "cmp dword ptr [0xee03e8], 0x16d83"
+OK    context save writer 0x3e800 block                     0x006df143 6800e80300 "push 0x3e800"
+OK    context save block at [0xc59264]+0x58c                0x006df13d 81c68c050000 "add esi, 0x58c"
+OK    context load reader [0xc59264]+0x590                  0x006e442e 0590050000 "add eax, 0x590"
+OK    context entry vertex count truncated to u16           0x006e2857 0fb7c0 "movzx eax, ax"
+OK    const eye offset (double)                      [0x008452a0] = 200.0 (want 200.0)
+OK    const LOS hit tolerance (float, squared)       [0x0085d6f8] = 10.0 (want 10.0)
+OK    const portal LOS tolerance (float, squared)    [0x0085d6fc] = 90000.0 (want 90000.0)
+OK    const draw range addend (double)               [0x0085d900] = 4000.0 (want 4000.0)
+OK    const view half-space offset (float)           [0x00851c7c] = 4000.0 (want 4000.0)
+OK    mode table 0x6e5638 = 006e5604 006e5609 006e561a 006e5626
+OK    stage table 0x6e3794 = 006e36f3 006e371a 006e373d 006e3762
+exit 0 (0 FAIL)

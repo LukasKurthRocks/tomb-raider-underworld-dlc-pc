@@ -1,0 +1,46 @@
+positive (unchanged sources): 0 problem(s) ok
+case version                 : 1 problem(s) ok - TruMenu.cpp: kVersion must start with "TruMenu 0.22.49 (sonar all floors + map info"
+case A1 address              : 1 problem(s) ok - TruMenu.cpp: const DWORD kSoA1 = 0x006e429b; missing
+case A1 game bytes           : 1 problem(s) ok - TruMenu.cpp: const BYTE kSoA1Game[2] = {0x74, 0x1d}, kSoA1New[2] = {0x90, 0x90}; missing
+case A1 new bytes            : 1 problem(s) ok - TruMenu.cpp: const BYTE kSoA1Game[2] = {0x74, 0x1d}, kSoA1New[2] = {0x90, 0x90}; missing
+case A1 check row            : 1 problem(s) ok - TruMenu.cpp: kSoChecks (16 rows) must be the 16 rows of precheck_02249.txt in order
+case close check row dropped : 1 problem(s) ok - TruMenu.cpp: kSoChecks (15 rows) must be the 16 rows of precheck_02249.txt in order
+case A1 without full         : 1 problem(s) ok - TruMenu.cpp: SoApply: AllFloors only with FullMap (wantA = wantC && g_soAll != 0)
+case A1 not put back         : 1 problem(s) ok - TruMenu.cpp: SoAllBack must put A1 back
+case A1 off through SoPart   : 1 problem(s) ok - TruMenu.cpp: SoApply must write A1 through SoPart(&kSoPartA, 1, false, "all floors")
+case read key                : 1 problem(s) ok - TruMenu.cpp: SoReadSwitch lacks AllFloors
+case options key             : 1 problem(s) ok - TruMenu.cpp: SoReadOptions lacks AllFloors
+case item not kept           : 1 problem(s) ok - TruMenu.cpp: RunSoAll must go through SoSetKey (INI + SoApply)
+case section loads           : 1 problem(s) ok - TruMenu.cpp: the sonar section must not name 0x006e4e80 (no load, no write)
+case map tick writes         : 1 problem(s) ok - TruMenu.cpp: void SoMapTick( must only read
+case map tick while closed   : 1 problem(s) ok - TruMenu.cpp: SoMapTick must read only while the sonar is open and only a unit of the live list
+case map tick no list test   : 1 problem(s) ok - TruMenu.cpp: SoMapTick must read only while the sonar is open and only a unit of the live list
+case map tick not called     : 1 problem(s) ok - TruMenu.cpp: SoTick must call SoMapTick(now)
+case item thread             : 1 problem(s) ok - TruMenu.cpp: item sonar.allfloors (bool, game thread true) missing in kItems
+case item help               : 1 problem(s) ok - TruMenu.cpp: kQbHelp row sonar.unitmap missing
+case key default             : 1 problem(s) ok - TruMenu.cpp: kOpts [Sonar] AllFloors=0 missing
+case settings row            : 1 problem(s) ok - TruMenu.cpp: kQbSettings group set_sonar lacks sonar.unitmap (kQbInfo)
+case Paket G row             : 1 problem(s) ok - TruMenu.cpp: kQbTests group tg_g lacks sonar.allfloors (kQbBool)
+case keep label              : 2 problem(s) ok - TruMenu.cpp: fig_adren row adren.keep  must read "Nach Einsatz auffuellen" (got 'Adrenalin voll halten')
+case mode label test         : 2 problem(s) ok - TruMenu.cpp: fig_adren row sw.set TruShadowCombat:Adrenaline:ModeWithoutTarget must read "Modus ohne Ziel" (got 'Modus ohne Ziel (Test)')
+case assist label            : 1 problem(s) ok - TruMenu.cpp: fig_adren row sw.set TruShadowCombat:Adrenaline:AssistPointer must read "Zielhilfe Kreis" (got 'Adrenalin: Zeiger im Ziel (Hilfe)')
+case stayfull row missing    : 1 problem(s) ok - TruMenu.cpp: fig_adren row adren.stayfull  must read "Adrenalin bleibt voll" (got None)
+case Paket A copy            : 1 problem(s) ok - TruMenu.cpp: Paket A lacks the copy of adren.stayfull 
+case stayfull other key      : 1 problem(s) ok - TruMenu.cpp: RunAdmStay must write exactly [Adrenaline] DrainPercent / DrainModePercent of TruShadowCombat.ini (got [('Adrenaline', 'DrainPercent', 'path'), ('Adrenaline', 'FillPercent', 'path'), ('Adrenaline', 'StayFullDrainWas', 'g_iniPath'), ('Adrenaline', 'StayFullDrainModeWas', 'g_iniPath')])
+case stayfull patches        : 1 problem(s) ok - TruMenu.cpp: RunAdmStay must not patch memory (the INI way)
+case stayfull not kept       : 1 problem(s) ok - TruMenu.cpp: RunAdmStay lacks IniKeepInt("Adrenaline", "StayFullDrainWas", d);
+case stayfull off onto 0     : 1 problem(s) ok - TruMenu.cpp: RunAdmStay lacks if (nd == 0 && nm == 0) nd = nm = 100;
+case cap without full        : 1 problem(s) ok - TruMenu.cpp: SoApply: TriangleCap only with FullMap and above the game's 93572
+case cap imm off by one      : 1 problem(s) ok - TruMenu.cpp: SoApply lacks const DWORD imm = static_cast<DWORD>(wantT - 1);
+case cap not put back        : 1 problem(s) ok - TruMenu.cpp: SoAllBack must put T1 back
+case cap game bytes          : 1 problem(s) ok - TruMenu.cpp: const BYTE kSoT1Game[4] = {0x83, 0x6d, 0x01, 0x00}; missing
+case cap key default         : 1 problem(s) ok - TruMenu.cpp: kOpts [Sonar] TriangleCap=300000 missing
+case sonar log fix undone    : 1 problem(s) ok - TruMenu.cpp: W7SonarSet: the log line needs %s for the wave list before SonarMute=%d
+case allfloors restart       : 1 problem(s) ok - switches: row TruMenu | Sonar | AllFloors | bool | ... | live | 0 | ... | TruMenu 0.22.49 missing
+case allfloors default       : 1 problem(s) ok - switches: row TruMenu | Sonar | AllFloors | bool | ... | live | 0 | ... | TruMenu 0.22.49 missing
+case allfloors since         : 1 problem(s) ok - switches: row TruMenu | Sonar | AllFloors | bool | ... | live | 0 | ... | TruMenu 0.22.49 missing
+case cap row default         : 1 problem(s) ok - switches: row TruMenu | Sonar | TriangleCap | int:0..1000000:50000 | ... | live | 300000 | ... | TruMenu 0.22.49 missing
+case cap row restart         : 1 problem(s) ok - switches: row TruMenu | Sonar | TriangleCap | int:0..1000000:50000 | ... | live | 300000 | ... | TruMenu 0.22.49 missing
+case mode test label         : 1 problem(s) ok - switches: TruShadowCombat:Adrenaline:ModeWithoutTarget still labelled as a test
+case strike test label       : 1 problem(s) ok - switches: TruShadowCombat:Adrenaline:StrikeWithoutButton still labelled as a test
+44 cases + 1 positive, 0 failed

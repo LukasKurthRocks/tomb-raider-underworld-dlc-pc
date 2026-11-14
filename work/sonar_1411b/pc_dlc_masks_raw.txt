@@ -1,0 +1,14 @@
+dlc_caverns_hall_map.drm (PC file, header 168 B): floor mask 0x02 (bytes +0x10: 02 00 00 00), 3 portals, faces 16688 verts 7737 meshes [(16688, 7737)]
+dlc_caverns_map.drm (PC file, header 130 B): floor mask 0x03 (bytes +0x10: 03 00 00 00), 2 portals, faces 19412 verts 9024 meshes [(19412, 9024)]
+dlc_dungeon_map.drm (PC file, header 227 B): floor mask 0x08 (bytes +0x10: 08 00 00 00), 4 portals, faces 56464 verts 31208 meshes [(56464, 31208)]
+dlc_dungeonhalla_map.drm (PC file, header 168 B): floor mask 0x0c (bytes +0x10: 0c 00 00 00), 3 portals, faces 32628 verts 16124 meshes [(32628, 16124)]
+dlc_dungeonhallb_map.drm (PC file, header 168 B): floor mask 0x0c (bytes +0x10: 0c 00 00 00), 3 portals, faces 40050 verts 19770 meshes [(40050, 19770)]
+dlc_level1_start_map.drm (PC file, header 76 B): floor mask 0x10 (bytes +0x10: 10 00 00 00), 1 portals, faces 100 verts 56 meshes [(100, 56)] PLACEHOLDER
+dlc_level2_start_map.drm (PC file, header 85 B): floor mask 0x01 (bytes +0x10: 01 00 00 00), 1 portals, faces 100 verts 56 meshes [(100, 56)] PLACEHOLDER
+dlc_pillory_map.drm (PC file, header 226 B): floor mask 0x06 (bytes +0x10: 06 00 00 00), 4 portals, faces 53190 verts 25133 meshes [(53190, 25133)]
+dlc_treasureroom_map.drm (PC file, header 76 B): floor mask 0x01 (bytes +0x10: 01 00 00 00), 1 portals, faces 100 verts 56 meshes [(100, 56)] PLACEHOLDER
+dlc_water_wheel_map.drm (PC file, header 173 B): floor mask 0x02 (bytes +0x10: 02 00 00 00), 3 portals, faces 18649 verts 9520 meshes [(18607, 9484), (42, 36)]
+dlc_watertunnel_map.drm (PC file, header 124 B): floor mask 0x0a (bytes +0x10: 0a 00 00 00), 2 portals, faces 13728 verts 6381 meshes [(13728, 6381)]
+dlc_yggdrasil_end_map.drm (PC file, header 85 B): floor mask 0x08 (bytes +0x10: 08 00 00 00), 1 portals, faces 31759 verts 15844 meshes [(31759, 15844)]
+dlc_yggdrasil_hall01_map.drm (PC file, header 134 B): floor mask 0x04 (bytes +0x10: 04 00 00 00), 2 portals, faces 5005 verts 2545 meshes [(5005, 2545)]
+dlc_yggdrasil_hall02_map.drm (PC file, header 135 B): floor mask 0x0c (bytes +0x10: 0c 00 00 00), 2 portals, faces 7679 verts 3883 meshes [(7679, 3883)]

@@ -2928,6 +2928,91 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.49 - sonar: all connected areas + map of this unit; adrenaline options, "Adrenalin bleibt voll" (2026-11-14)
+
+Built into `work\asi\menu0272`, not installed, no live test (owner live notes of 14.11. 16:28 - 16:33, Arena 1a; report in
+the workspace `docs\Befund-TruMenu-02249-1411.md`). 16 byte checks `kSoChecks` (the 13 of 0.22.48 + 3,
+`work\menu49_1411\precheck_02249.txt`, 0 mismatches on `data\pc\tru.exe`; the installed exe has the same SHA256), two
+more patches - 2 bytes for AllFloors, 4 bytes for the triangle cap - written only while `[Sonar] FullMap=1`.
+
+- **Why the sonar map is split** (proven from the map files, `work\sonar_1411b\sonar_floors.py`): every `<unit>_map.drm`
+  header carries a floor mask (byte +0x10). Opening the PDA sets the floor `[0xedf268]` to the lowest bit of the current
+  unit's mask; the load callback 0x6e4df0 -> 0x6e2e60 goes on from a unit only while its mask holds that bit, and the
+  frame 0x6e4130 draws only units with that bit. Helheim: `l7_helheim01` 0x02, `l7_helheim02` 0x06, `l7_helheim03` 0x04,
+  `l7_helheim_hall01` 0x03, `l7_helheim_hall02` 0x02, `l7_yggdrasil` / `_hall01` 0x04, `_hall02` 0x0c, `_end` 0x08.
+  Opened in helheim03 (floor 4): helheim03 + helheim02 + the Yggdrasil side, helheim01 loaded but skipped = the stop at
+  the portal helheim02 -> helheim01 seen live (the log names `l7_helheim03` as the unit until 16:33:10).
+- **"Alle verbundenen Bereiche"** (`sonar.allfloors`, `[Sonar] AllFloors`, default 0, live, only with FullMap): 0x6e429b
+  `74 1d` -> `90 90`, the frame's floor test skipped - every loaded, placed map unit is drawn. Loaded are only the units
+  the game's own open path asks for (the floor's units and their direct portal neighbours of any floor), so **no load is
+  added**: the sonar's own list, its own handles (+0x88), unloaded by the close 0x6e4800 -> 0x6dff20 as before; the
+  stream units and the shared loader 0x551470 see nothing new. Not built: loading across floors (it would put 6 - 8 more
+  map DRMs, about 3 - 4 MB, into the loader queue the streaming uses - the owner's condition "must not touch loading
+  zones" rules that out). So "all connected" = the floor + its direct neighbour units of other floors (helheim03 adds
+  helheim01 and `l7_yggdrasil_end`; helheim01 / 02 add helheim03 and `l7_arctic_sea`), not the whole level. Overlapping
+  floors are drawn on top of each other at their real heights (placement 0x6e2ef0(unit, 0xff) already places every
+  loaded unit in mode 1). Faces: helheim floor 2 = 67 874, with AllFloors 120 575 (> the game's 93 572, fits the new
+  TriangleCap 300000; the current unit is always drawn first).
+- **Triangle cap** (`[Sonar] TriangleCap`, default **300000**, live, only with FullMap; row "Sonar komplett:
+  Dreiecks-Grenze"): live 17:17 in `dlc_water_wheel` (FullMap 1) the log showed `drew 93572 triangles and refused
+  28709` every 10 s. The limit is the imm32 of `cmp dword [0xee03e8], 0x16d83; jbe` at 0x6dfa69 - a **per-frame
+  budget only**: `[0xee03e8]` has no other reader, the triangles go into 4 batch objects of 2000 (0x54 B each, flushed
+  at 2000 by 0x6dfe7c and at the frame end), every flush is copied into the render device's dynamic vertex pool, which
+  adds a 512 KiB D3D vertex buffer when the current one is full and is reset every frame (a failed allocation = a draw
+  without primitives, no crash). TruMenu writes `cap - 1` into the 4 bytes at 0x6dfa6f (game's `83 6d 01 00`) on the
+  game thread, only over the game's bytes, back with FullMap off. "Flush and continue" = what the game already does
+  (batches of 2000) - the counter is the only stop, so raising it is the fix. Draw order (for what was missing): the
+  frame walks the sonar's unit list in creation order = the open's unit, then its portal neighbours breadth-first; per
+  unit mesh 0 then 1, faces in file order (not by distance); after the cap every later triangle is refused - the rest
+  of the unit where it crossed (scattered pieces, file order) and every later unit, also the floor markers and icons
+  drawn after the units. Predicted for `dlc_water_wheel` floor 2: 121 581 faces, cut inside `dlc_watertunnel` (5 112
+  drawn, 8 601 refused), `dlc_caverns` (19 408) refused = 28 009 (23 %) - live 28 709 (the rest = markers / icons).
+  With 300000 the whole DLC 1 chain (250 805 faces with AllFloors) fits. The installed DLC maps are the P4.9-fixed
+  ones (`map_mesh_fix check` on the copies: exit 0; md5 now = the copies) - the gaps are the cap, not map data.
+- **"Karte dieser Unit"** (`sonar.unitmap`, read only): `<unit>: echt (N Flächen)` / `nur Platzhalter` / `keine Datei` /
+  `lädt ...`, read from the sonar's unit list while it is open (the unit of the open `[0xedf254]`, only if it is in the
+  live list `[0x8aff3c]`), kept after the close; before the first open "Sonar einmal öffnen". Plus one log line per
+  sonar open: `0.22.49 sonar open: floor [0xedf268] 0x.., radius .., view distance .., ...; n map units, k drawn with f
+  faces (cap 93572) - *unit m.. drawn|skipped|unplaced|loading|nofile faces, ...` and `0.22.49 sonar: map of <unit>:
+  real|placeholder only|no file ...` - the evidence for what the sonar draws (open point: in helheim01 helheim02 has
+  floor bit 2 too and should be drawn; the live note says it was not - the view distance (tuning +0x10 + 4000 around
+  the view centre) is the suspect, this line shows the value).
+- **Adrenaline (page Figur, group "Adrenalin (Lara)")**: `adren.keep` is now **"Nach Einsatz auffüllen" / "Refill
+  after use"** (same command, same behaviour: it refills only while bit 27 - the mode - is clear, so the bar still drains
+  during the mode and is full again after it). New **"Adrenalin bleibt voll" / "Adrenaline stays full"**
+  (`adren.stayfull`): writes TruShadowCombat `[Adrenaline] DrainPercent=0` and `DrainModePercent=0` (the two rows below
+  it show the values), keeps the values it found in TruMenu.ini `[Adrenaline] StayFullDrainWas` / `StayFullDrainModeWas`
+  and writes them back when switched off (missing = 100). TruShadowCombat 0.6.14 multiplies the bar's rate by the
+  percent: 0 = rate 0.0 exactly, the meter keeps its value bit for bit, in and out of the mode; nothing else changes
+  (fill, a strike that empties the meter outside the mode, the mode ends by LT / lock / target). No memory patch.
+  `ModeWithoutTarget` = **"Modus ohne Ziel"**, `StrikeWithoutButton` = **"Absprung-Schlag ohne X"** (both tested live
+  by the owner, options now; INI keys unchanged), `AssistPointer` = **"Zielhilfe Kreis"**; page Fixes: "Adrenalin-Modus
+  ohne Ziel", "Absprung-Schlag ohne X", "Adrenalin: Zielhilfe Kreis". A note row: "DLC 2 Doppelgängerin: Leiste + Modus
+  laufen nicht" (CombatManager::Update skips the tick 0x718bd0 and the bar 0x6f2930 there - TruShadowPower `[Adrenaline]
+  Translate=1`, the TU's test). Paket A keeps copies (+ "Adrenalin bleibt voll").
+- **Log fix**: `snd.sonar 0` logged `[Sound] SonarMute=1483714163 written` (live 14.11. 16:50:20) - the wave list had no
+  `%s` of its own, the INI got the right value; the line now prints the list and the value.
+- Options: `[Sonar] AllFloors`, `[Sonar] TriangleCap`; switch rows (group `tmsonar`, live). Checks: `trumenu_ini_check` `check_02249`,
+  `check_02248` (version part, the first 13 byte rows), `check_02244` key count; Set-TruMenu knows the 0.22.48 hash.
+
+### TO TEST 0.22.49
+
+| # | Where | Do | Expected |
+|---|---|---|---|
+| 1 | start | read `TruMenu.log` | `0.22.48 sonar: checks ok (16 rows); [Sonar] FullMap .., HidePlaceholder .., FloorMarkers .., AllFloors 0 (0.22.49) ...` |
+| 2 | Arena 1a (helheim03), Spiel-Einstellungen / PDA / Sonar | Sonar komplett on, open the sonar | log `0.22.49 sonar open: floor [0xedf268] 0x04 ...` lists helheim03 / helheim02 / yggdrasil* `drawn`, helheim01 + yggdrasil_end `skipped`; `0.22.49 sonar: map of l7_helheim03: real (faces 11634 ...)` |
+| 3 | same, sonar open | "Alle verbundenen Bereiche" right | log `... AllFloors 1 - 0x6e429b the loaded units of every floor drawn (no extra load)`; helheim01 and the Yggdrasil end appear (G.6); no load stutter, no streaming hitch after closing |
+| 4 | close the PDA, walk on | cross into helheim02 / helheim01 | the loading zones behave as always (nothing changed there) |
+| 5 | helheim01, sonar open | read the `sonar open` line | `floor 0x02`, helheim02 `drawn`? note the view distance - if helheim02 is `drawn` but not visible, it is the view distance |
+| 6 | Spiel-Einstellungen / PDA / Sonar | "Karte dieser Unit" | `l7_helheim01: echt (27096 Flächen)`; in a DLC 2 room: `nur Platzhalter` (G.7) |
+| 7 | Figur / Adrenalin (Lara) | read the labels | "Nach Einsatz auffüllen", "Adrenalin bleibt voll", "Modus ohne Ziel", "Absprung-Schlag ohne X", "Zielhilfe Kreis", no "(Test)" |
+| 8 | Figur | "Adrenalin bleibt voll" right | the two "Abbau" rows show 0 / 0 within ~1 s; `TruShadowCombat.log` `0.6.14 switches (run time): ... DrainPercent 0, DrainModePercent 0`; the bar stays where it is, also in the R3 mode (Zeitlupe lasts until LT is let go) |
+| 9 | Figur | "Adrenalin bleibt voll" left | the old values come back (100 / 100 or the owner's); TruMenu.ini `[Adrenaline]` keys gone |
+| 10 | Figur | "Nach Einsatz auffüllen" on, use the mode | the bar drains in the mode, is full again right after it |
+| 11 | Spiel-Einstellungen | Sonar-Ton aus off / on | log `snd.sonar 0 (... ): off - ...; [Sound] SonarMute=0 written` (no big number) |
+| 12 | DLC 1 `dlc_water_wheel`, FullMap 1 | open the sonar, look around (also with "Alle verbundenen Bereiche") | `0.22.48 sonar (...): ... triangle cap 300000 - 0x6dfa6f ours ...`; no `sonar: triangle cap hit` line; no floating pieces of `dlc_watertunnel`, `dlc_caverns` drawn; frame rate ok (G.8) |
+| 13 | same | "Dreiecks-Grenze" left down to 50000 (= the game's) | the cap line comes back (`the limit 93572 ..., the game's`), the gaps too |
+
 ## 0.22.48 - adrenaline at Lara, teaser style 12, page Kapitel, Sonar komplett (2026-11-14)
 
 Built into `work\asi\menu0271`, not installed, no live test (owner wishes of 14.11.; report in the workspace
@@ -5880,6 +5965,8 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Sonar] FullMap` | 0 | 0.22.48 (`sonar.full`): 1 = Sonar komplett - the PDA sonar draws every face of the loaded, placed map units of the floor, not only what the ping revealed (3 patches in the draw 0x6e3a00: every vertex counts as revealed); display only - the reveal state in the save (SaveInfo block 6) is not touched, off = the game's bytes and map at once. Live: TruMenu reads the key about once a second (switch row in group `PDA / Sonar (TruMenu)`), the item writes it |
 | `[Sonar] HidePlaceholder` | 1 | 0.22.48 (`sonar.placeholder`): only with `FullMap=1`: 1 = the placeholder mesh of units without a baked map (100 faces / 56 vertices = the big 3D letters "MAP" in DLC 2, `dlc_level1_start`, `dlc_treasureroom` and five base units) is not drawn (call stub at 0x6e3ab0); 0 = drawn. With `FullMap=0` nothing is hooked (the game's code). Live |
 | `[Sonar] FloorMarkers` | 0 | 0.22.48 (`sonar.markers`): only with `FullMap=1`: 1 = every stair / floor-change marker of the loaded units (0x6e40c6), not only the ones a ping saw; 0 = the game's. Live |
+| `[Sonar] AllFloors` | 0 | 0.22.49 (`sonar.allfloors`, "Alle verbundenen Bereiche"): only with `FullMap=1`: 1 = the sonar frame 0x6e4130 also draws the map units of other floors that the sonar loaded itself (0x6e429b `74 1d` -> `90 90`: the floor test `[unit+0xb0] & [0xedf268]` skipped). Loaded are only the units the game's own open path asks for - the floor's units and their direct portal neighbours of any floor - so no load is added and streaming is not touched; display only. Live |
+| `[Sonar] TriangleCap` | 300000 | 0.22.49 ("Sonar komplett: Dreiecks-Grenze"): only with `FullMap=1`: the sonar's per-frame triangle budget - TruMenu writes `cap - 1` into the imm32 of `cmp dword [0xee03e8], 0x16d83` (0x6dfa6f); values up to 93572 = the game's bytes, at most 1000000. A budget only (the triangles are flushed in batches of 2000 into the render device's growing dynamic vertex pool, 84 bytes each: 300000 = about 25 MB of vertex buffers per sonar frame). Live |
 
 ## Build, install, test (Windows)
 

@@ -168,7 +168,8 @@ $earlierBuilds = @{
                       'c9d397f7849fe79e1ba891cde0067047fd118d0b98d1bf39857f63ca1a785164',   # 0.22.44 W2 order (work\asi\menu0267)
                       '95246e56abd1950bf8623b683cd4d301578c58b738351c008990d22afce77639',   # 0.22.45 W6 sound switches (work\asi\menu0268)
                       '8358f69fd09a1092708448a8a0bbe9b7abb9c2b58ac2f6b4839ebb306c008876',   # 0.22.46 arena from the main menu (work\asi\menu0269)
-                      'c78918209e28ff41be82bf5deea56739b2f23a37e9736e027c3eb563a37c628b')   # 0.22.47 sound monitor, sonar sound off (work\asi\menu0270)
+                      'c78918209e28ff41be82bf5deea56739b2f23a37e9736e027c3eb563a37c628b',   # 0.22.47 sound monitor, sonar sound off (work\asi\menu0270)
+                      '673b7bc62a2654a1e7f4e88856a298f0a7a9a78314b1911af4d38768bf138ef0')   # 0.22.48 adrenaline at Lara, sonar full map (work\asi\menu0271)
     'TruMenu.ini' = @('9a82044330189540488a98f2d53224d60e7eadb53a9b3246582eb1109912896a',
                       'dea74bda46400d0f743494d85536c1d11011d347fdea16f3fc5978491e5bd9c1',
                       '91bde312e5a0c2e5bbcaab6d217328f7d63846c2a24ef714bd839177e19393da',

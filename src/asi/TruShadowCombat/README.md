@@ -1,10 +1,16 @@
 # TruShadowCombat.asi - DLC 2 combat of the title update (0.6.15)
 
-0.6.15 (2026-11-14, **offline, not yet seen in game**; two TEST switches, main workspace
+2026-11-14 evening: the owner tested `ModeWithoutTarget`, `StrikeWithoutButton` and `AssistPointer` live - all three
+work as expected, so they are **options** now (TruMenu 0.22.49 labels "Modus ohne Ziel", "Absprung-Schlag ohne X",
+"Zielhilfe Kreis"; INI comments say "PC option"). No rebuild for the wording: the plugin's own log lines still say
+`0.6.15 test switches: ...` (a string in the binary, left as it is). `DrainPercent=0` + `DrainModePercent=0` keep the
+meter where it is in and out of the mode (rate x 0.0 = 0.0; TruMenu 0.22.49 "Adrenalin bleibt voll" writes both).
+
+0.6.15 (2026-11-14, offline build; two switches, at first test switches, main workspace
 `docs\Befund-Adrenalin-ohne-Ziel-1411.md`, `docs\Befund-Adrenalin-Modus-Bedingung-1411.md`, ENGINE.md row "Adrenaline
 mode without a target, strike without X"): build `work\asi\tsc0615`, byte pre-checks `work\asi\tsc0615\precheck_0615.txt`
 (22 checks: the 10 of `SetupM15`, 12 proof facts; 0 mismatches against `data\pc\tru.exe` and the installed tru.exe).
-**PC test options, not TU translations; both default 0 = the game.**
+**PC options (tested live 14.11.), not TU translations; both default 0 = the game.**
 * **`[Adrenaline] ModeWithoutTarget`** (new, live, default **0**): R3 (action 37) starts the adrenaline mode in the tick
   0x718bd0 only with the **hard lock** (CM+0x1fc bit 10, set by 0x71edf0 only with a live target of targeter 0 in
   CM+0xc). LT without an enemy gives the **soft lock** (bit 9) and R3 runs the failure branch 0x718c71 = Lara event 0x3b

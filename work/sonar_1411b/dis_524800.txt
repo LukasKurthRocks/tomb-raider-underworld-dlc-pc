@@ -1,0 +1,168 @@
+005247c0  8b4108                         mov eax, dword ptr [ecx + 8]
+005247c3  c3                             ret 
+005247c4  cc                             int3 
+005247c5  cc                             int3 
+005247c6  cc                             int3 
+005247c7  cc                             int3 
+005247c8  cc                             int3 
+005247c9  cc                             int3 
+005247ca  cc                             int3 
+005247cb  cc                             int3 
+005247cc  cc                             int3 
+005247cd  cc                             int3 
+005247ce  cc                             int3 
+005247cf  cc                             int3 
+005247d0  668b410c                       mov ax, word ptr [ecx + 0xc]
+005247d4  c3                             ret 
+005247d5  cc                             int3 
+005247d6  cc                             int3 
+005247d7  cc                             int3 
+005247d8  cc                             int3 
+005247d9  cc                             int3 
+005247da  cc                             int3 
+005247db  cc                             int3 
+005247dc  cc                             int3 
+005247dd  cc                             int3 
+005247de  cc                             int3 
+005247df  cc                             int3 
+005247e0  f644240401                     test byte ptr [esp + 4], 1
+005247e5  56                             push esi
+005247e6  8bf1                           mov esi, ecx
+005247e8  c7061cb78400                   mov dword ptr [esi], 0x84b71c
+005247ee  7409                           je 0x5247f9
+005247f0  56                             push esi
+005247f1  e81a230700                     call 0x596b10
+005247f6  83c404                         add esp, 4
+005247f9  8bc6                           mov eax, esi
+005247fb  5e                             pop esi
+005247fc  c20400                         ret 4
+005247ff  cc                             int3 
+00524800  8b44240c                       mov eax, dword ptr [esp + 0xc]
+00524804  56                             push esi
+00524805  8bf1                           mov esi, ecx
+00524807  57                             push edi
+00524808  8b7c2410                       mov edi, dword ptr [esp + 0x10]
+0052480c  8d4c2410                       lea ecx, [esp + 0x10]
+00524810  51                             push ecx
+00524811  8bcf                           mov ecx, edi
+00524813  0fafc8                         imul ecx, eax
+00524816  8d5604                         lea edx, [esi + 4]
+00524819  52                             push edx
+0052481a  57                             push edi
+0052481b  51                             push ecx
+0052481c  8b4c241c                       mov ecx, dword ptr [esp + 0x1c]
+00524820  c70634b78400                   mov dword ptr [esi], 0x84b734
+00524826  897e0c                         mov dword ptr [esi + 0xc], edi
+00524829  894614                         mov dword ptr [esi + 0x14], eax
+0052482c  c744242000000000               mov dword ptr [esp + 0x20], 0
+00524834  e8d74f0000                     call 0x529810
+00524839  894608                         mov dword ptr [esi + 8], eax
+0052483c  8b442410                       mov eax, dword ptr [esp + 0x10]
+00524840  33d2                           xor edx, edx
+00524842  f7f7                           div edi
+00524844  5f                             pop edi
+00524845  894610                         mov dword ptr [esi + 0x10], eax
+00524848  8bc6                           mov eax, esi
+0052484a  5e                             pop esi
+0052484b  c20c00                         ret 0xc
+0052484e  cc                             int3 
+0052484f  cc                             int3 
+00524850  8b4110                         mov eax, dword ptr [ecx + 0x10]
+00524853  c3                             ret 
+00524854  cc                             int3 
+00524855  cc                             int3 
+00524856  cc                             int3 
+00524857  cc                             int3 
+00524858  cc                             int3 
+00524859  cc                             int3 
+0052485a  cc                             int3 
+0052485b  cc                             int3 
+0052485c  cc                             int3 
+0052485d  cc                             int3 
+0052485e  cc                             int3 
+0052485f  cc                             int3 
+00524860  8b4114                         mov eax, dword ptr [ecx + 0x14]
+00524863  c3                             ret 
+00524864  cc                             int3 
+00524865  cc                             int3 
+00524866  cc                             int3 
+00524867  cc                             int3 
+00524868  cc                             int3 
+00524869  cc                             int3 
+0052486a  cc                             int3 
+0052486b  cc                             int3 
+0052486c  cc                             int3 
+0052486d  cc                             int3 
+0052486e  cc                             int3 
+0052486f  cc                             int3 
+00524870  56                             push esi
+00524871  57                             push edi
+00524872  8b3de475ad00                   mov edi, dword ptr [0xad75e4]
+00524878  8b9748020000                   mov edx, dword ptr [edi + 0x248]
+0052487e  8b4720                         mov eax, dword ptr [edi + 0x20]
+00524881  c1ea05                         shr edx, 5
+00524884  f6c201                         test dl, 1
+00524887  8bf1                           mov esi, ecx
+00524889  b900020000                     mov ecx, 0x200
+0052488e  7505                           jne 0x524895
+00524890  b908020000                     mov ecx, 0x208
+00524895  8b10                           mov edx, dword ptr [eax]
+00524897  8b526c                         mov edx, dword ptr [edx + 0x6c]
+0052489a  6a00                           push 0
+0052489c  8d7e0c                         lea edi, [esi + 0xc]
+0052489f  57                             push edi
+005248a0  6a00                           push 0
+005248a2  6a65                           push 0x65
+005248a4  51                             push ecx
+005248a5  8b4e10                         mov ecx, dword ptr [esi + 0x10]
+005248a8  03c9                           add ecx, ecx
+005248aa  51                             push ecx
+005248ab  50                             push eax
+005248ac  ffd2                           call edx
+005248ae  85c0                           test eax, eax
+005248b0  7d0c                           jge 0x5248be
+005248b2  8bce                           mov ecx, esi
+005248b4  e897030000                     call 0x524c50
+005248b9  5f                             pop edi
+005248ba  32c0                           xor al, al
+005248bc  5e                             pop esi
+005248bd  c3                             ret 
+005248be  5f                             pop edi
+005248bf  b001                           mov al, 1
+005248c1  5e                             pop esi
+005248c2  c3                             ret 
+005248c3  cc                             int3 
+005248c4  cc                             int3 
+005248c5  cc                             int3 
+005248c6  cc                             int3 
+005248c7  cc                             int3 
+005248c8  cc                             int3 
+005248c9  cc                             int3 
+005248ca  cc                             int3 
+005248cb  cc                             int3 
+005248cc  cc                             int3 
+005248cd  cc                             int3 
+005248ce  cc                             int3 
+005248cf  cc                             int3 
+005248d0  83e904                         sub ecx, 4
+005248d3  e948000000                     jmp 0x524920
+005248d8  cc                             int3 
+005248d9  cc                             int3 
+005248da  cc                             int3 
+005248db  cc                             int3 
+005248dc  cc                             int3 
+005248dd  cc                             int3 
+005248de  cc                             int3 
+005248df  cc                             int3 
+005248e0  56                             push esi
+005248e1  8bf1                           mov esi, ecx
+005248e3  57                             push edi
+005248e4  8d7e04                         lea edi, [esi + 4]
+005248e7  8bcf                           mov ecx, edi
+005248e9  c706f0b68400                   mov dword ptr [esi], 0x84b6f0
+005248ef  e80c030000                     call 0x524c00
+005248f4  8b4c240c                       mov ecx, dword ptr [esp + 0xc]
+005248f8  33c0                           xor eax, eax
+005248fa  894e14                         mov dword ptr [esi + 0x14], ecx
+005248fd  8bcf                           mov ecx, edi
+005248ff  c7                             .byte 0xc7

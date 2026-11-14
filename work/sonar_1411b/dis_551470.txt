@@ -1,0 +1,95 @@
+=== fn 00551470 .. 00551551
+00551470  53                             push ebx
+00551471  8b5c2408                       mov ebx, dword ptr [esp + 8]
+00551475  56                             push esi
+00551476  57                             push edi
+00551477  53                             push ebx
+00551478  e823daffff                     call 0x54eea0
+0055147d  8bf0                           mov esi, eax
+0055147f  83c404                         add esp, 4
+00551482  85f6                           test esi, esi
+00551484  0f858f000000                   jne 0x551519
+0055148a  a1ac9ccd00                     mov eax, dword ptr [0xcd9cac]
+0055148f  8b4848                         mov ecx, dword ptr [eax + 0x48]
+00551492  8b11                           mov edx, dword ptr [ecx]
+00551494  8b4234                         mov eax, dword ptr [edx + 0x34]
+00551497  56                             push esi
+00551498  6a40                           push 0x40
+0055149a  ffd0                           call eax
+0055149c  85c0                           test eax, eax
+0055149e  740c                           je 0x5514ac
+005514a0  53                             push ebx
+005514a1  8bc8                           mov ecx, eax
+005514a3  e838feffff                     call 0x5512e0
+005514a8  8bf0                           mov esi, eax
+005514aa  eb02                           jmp 0x5514ae
+005514ac  33f6                           xor esi, esi
+005514ae  8b0dac9ccd00                   mov ecx, dword ptr [0xcd9cac]
+005514b4  8b4948                         mov ecx, dword ptr [ecx + 0x48]
+005514b7  8b11                           mov edx, dword ptr [ecx]
+005514b9  8b4234                         mov eax, dword ptr [edx + 0x34]
+005514bc  6a00                           push 0
+005514be  6a70                           push 0x70
+005514c0  ffd0                           call eax
+005514c2  85c0                           test eax, eax
+005514c4  7425                           je 0x5514eb
+005514c6  8b4c2424                       mov ecx, dword ptr [esp + 0x24]
+005514ca  8b542420                       mov edx, dword ptr [esp + 0x20]
+005514ce  51                             push ecx
+005514cf  8b4c2420                       mov ecx, dword ptr [esp + 0x20]
+005514d3  56                             push esi
+005514d4  52                             push edx
+005514d5  8b542424                       mov edx, dword ptr [esp + 0x24]
+005514d9  51                             push ecx
+005514da  8b4c2424                       mov ecx, dword ptr [esp + 0x24]
+005514de  52                             push edx
+005514df  51                             push ecx
+005514e0  8bc8                           mov ecx, eax
+005514e2  e8a9d6ffff                     call 0x54eb90
+005514e7  8bf8                           mov edi, eax
+005514e9  eb02                           jmp 0x5514ed
+005514eb  33ff                           xor edi, edi
+005514ed  e85e16f2ff                     call 0x472b50
+005514f2  8b10                           mov edx, dword ptr [eax]
+005514f4  6a00                           push 0
+005514f6  53                             push ebx
+005514f7  8bc8                           mov ecx, eax
+005514f9  8b02                           mov eax, dword ptr [edx]
+005514fb  57                             push edi
+005514fc  ffd0                           call eax
+005514fe  8b4c2428                       mov ecx, dword ptr [esp + 0x28]
+00551502  894608                         mov dword ptr [esi + 8], eax
+00551505  8b10                           mov edx, dword ptr [eax]
+00551507  8b5214                         mov edx, dword ptr [edx + 0x14]
+0055150a  51                             push ecx
+0055150b  8bc8                           mov ecx, eax
+0055150d  ffd2                           call edx
+0055150f  83461801                       add dword ptr [esi + 0x18], 1
+00551513  5f                             pop edi
+00551514  8bc6                           mov eax, esi
+00551516  5e                             pop esi
+00551517  5b                             pop ebx
+00551518  c3                             ret 
+00551519  8b7c2420                       mov edi, dword ptr [esp + 0x20]
+0055151d  85ff                           test edi, edi
+0055151f  7426                           je 0x551547
+00551521  8b460c                         mov eax, dword ptr [esi + 0xc]
+00551524  85c0                           test eax, eax
+00551526  741f                           je 0x551547
+00551528  83780400                       cmp dword ptr [eax + 4], 0
+0055152c  7419                           je 0x551547
+0055152e  8b00                           mov eax, dword ptr [eax]
+00551530  0fb74804                       movzx ecx, word ptr [eax + 4]
+00551534  8b0c8dc86fc500                 mov ecx, dword ptr [ecx*4 + 0xc56fc8]
+0055153b  8b11                           mov edx, dword ptr [ecx]
+0055153d  8b00                           mov eax, dword ptr [eax]
+0055153f  8b5230                         mov edx, dword ptr [edx + 0x30]
+00551542  50                             push eax
+00551543  ffd2                           call edx
+00551545  8907                           mov dword ptr [edi], eax
+00551547  83461801                       add dword ptr [esi + 0x18], 1
+0055154b  5f                             pop edi
+0055154c  8bc6                           mov eax, esi
+0055154e  5e                             pop esi
+0055154f  5b                             pop ebx
+00551550  c3                             ret 

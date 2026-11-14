@@ -1,0 +1,13 @@
+Built work\asi\menu0272\TruMenu.asi (2212352 bytes, x86 DLL, sha256 fa98427c3e4cac0d22886b05c5012232c6faf098b183a6c3d86663e1cbc8340d) - TruMenu 0.22.49
+  Build-TruAsi.ps1 -Name TruMenu -OutDir work/asi/menu0272 from Git Bash (second build of the session; the first, before
+  [Sonar] TriangleCap, was overwritten in the same folder)
+  warnings: 2 (both imgui_demo.cpp), 0 in TruMenu.cpp; imports / exports = 0.22.48 (tools/pe_import_export_diff.py: 151
+  functions, same 6 exports, no new DLL - imports_exports_0271_0272.txt)
+  INI / switches / radial / tour in the build folder = source (cmp)
+Byte checks: tools/pe_bytes_check.py --file work/menu49_1411/precheck_02249.txt -> 16 checks, 0 mismatches on
+  data\pc\tru.exe (precheck_02249_result.txt); the installed exe has the same SHA256 (6905b046...)
+  work/sonar_1411/sonar_patch_check.py: exit 0 (0 FAIL) on data\pc\tru.exe (sonar_patch_check_data.txt)
+trumenu_ini_check: exit 0, 59 ok lines, 0 others (ini_check_final.txt); negative cases m49_negative_tests.py: 44 cases +
+  1 positive, 0 failed (m49_negative_tests.txt)
+trumenu_quick_check: exit 1 - only "menupages: 28 page keys" FAIL (old, not this change; as in 0.22.45 .. 0.22.48)
+trumenu_readability_check: exit 0

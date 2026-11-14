@@ -1,0 +1,118 @@
+=== cap dlc_water_wheel (floor 0x02, AllFloors 0)
+   dlc_water_wheel          m02   18649 faces (0 flagged 0x40)  cumulative  18649  drawn
+   dlc_pillory              m06   53128 faces (62 flagged 0x40)  cumulative  71777  drawn
+   dlc_caverns_hall         m02   16683 faces (5 flagged 0x40)  cumulative  88460  drawn
+   dlc_watertunnel          m0a   13713 faces (15 flagged 0x40)  cumulative 102173  cut: 5112 drawn, 8601 refused
+   dlc_dungeonhalla         m0c  not drawn (other floor)
+   dlc_dungeonhallb         m0c  not drawn (other floor)
+   dlc_caverns              m03   19408 faces (4 flagged 0x40)  cumulative 121581  refused
+   dlc_dungeon              m08  not drawn (other floor)
+   dlc_level1_start         m10  not drawn (other floor)
+   total 121581, cap 93572 -> refused 28009 (23 %) + every marker / icon drawn after the units
+=== cap dlc_water_wheel (floor 0x02, AllFloors 1)
+   dlc_water_wheel          m02   18649 faces (0 flagged 0x40)  cumulative  18649  drawn
+   dlc_pillory              m06   53128 faces (62 flagged 0x40)  cumulative  71777  drawn
+   dlc_caverns_hall         m02   16683 faces (5 flagged 0x40)  cumulative  88460  drawn
+   dlc_watertunnel          m0a   13713 faces (15 flagged 0x40)  cumulative 102173  cut: 5112 drawn, 8601 refused
+   dlc_dungeonhalla         m0c   32622 faces (6 flagged 0x40)  cumulative 134795  refused
+   dlc_dungeonhallb         m0c   40044 faces (6 flagged 0x40)  cumulative 174839  refused
+   dlc_caverns              m03   19408 faces (4 flagged 0x40)  cumulative 194247  refused
+   dlc_dungeon              m08   56458 faces (6 flagged 0x40)  cumulative 250705  refused
+   dlc_level1_start         m10     100 faces (0 flagged 0x40)  cumulative 250805  refused
+   total 250805, cap 93572 -> refused 157233 (63 %) + every marker / icon drawn after the units
+=== cap dlc_pillory (floor 0x02, AllFloors 0)
+   dlc_pillory              m06   53128 faces (62 flagged 0x40)  cumulative  53128  drawn
+   dlc_water_wheel          m02   18649 faces (0 flagged 0x40)  cumulative  71777  drawn
+   dlc_dungeonhalla         m0c  not drawn (other floor)
+   dlc_dungeonhallb         m0c  not drawn (other floor)
+   dlc_watertunnel          m0a   13713 faces (15 flagged 0x40)  cumulative  85490  drawn
+   dlc_caverns_hall         m02   16683 faces (5 flagged 0x40)  cumulative 102173  cut: 8082 drawn, 8601 refused
+   dlc_dungeon              m08  not drawn (other floor)
+   dlc_caverns              m03   19408 faces (4 flagged 0x40)  cumulative 121581  refused
+   dlc_level1_start         m10  not drawn (other floor)
+   total 121581, cap 93572 -> refused 28009 (23 %) + every marker / icon drawn after the units
+=== cap dlc_pillory (floor 0x02, AllFloors 1)
+   dlc_pillory              m06   53128 faces (62 flagged 0x40)  cumulative  53128  drawn
+   dlc_water_wheel          m02   18649 faces (0 flagged 0x40)  cumulative  71777  drawn
+   dlc_dungeonhalla         m0c   32622 faces (6 flagged 0x40)  cumulative 104399  cut: 21795 drawn, 10827 refused
+   dlc_dungeonhallb         m0c   40044 faces (6 flagged 0x40)  cumulative 144443  refused
+   dlc_watertunnel          m0a   13713 faces (15 flagged 0x40)  cumulative 158156  refused
+   dlc_caverns_hall         m02   16683 faces (5 flagged 0x40)  cumulative 174839  refused
+   dlc_dungeon              m08   56458 faces (6 flagged 0x40)  cumulative 231297  refused
+   dlc_caverns              m03   19408 faces (4 flagged 0x40)  cumulative 250705  refused
+   dlc_level1_start         m10     100 faces (0 flagged 0x40)  cumulative 250805  refused
+   total 250805, cap 93572 -> refused 157233 (63 %) + every marker / icon drawn after the units
+=== cap dlc_watertunnel (floor 0x02, AllFloors 0)
+   dlc_watertunnel          m0a   13713 faces (15 flagged 0x40)  cumulative  13713  drawn
+   dlc_dungeon              m08  not drawn (other floor)
+   dlc_water_wheel          m02   18649 faces (0 flagged 0x40)  cumulative  32362  drawn
+   dlc_pillory              m06   53128 faces (62 flagged 0x40)  cumulative  85490  drawn
+   dlc_caverns_hall         m02   16683 faces (5 flagged 0x40)  cumulative 102173  cut: 8082 drawn, 8601 refused
+   dlc_dungeonhalla         m0c  not drawn (other floor)
+   dlc_dungeonhallb         m0c  not drawn (other floor)
+   dlc_caverns              m03   19408 faces (4 flagged 0x40)  cumulative 121581  refused
+   dlc_level1_start         m10  not drawn (other floor)
+   total 121581, cap 93572 -> refused 28009 (23 %) + every marker / icon drawn after the units
+=== cap dlc_watertunnel (floor 0x02, AllFloors 1)
+   dlc_watertunnel          m0a   13713 faces (15 flagged 0x40)  cumulative  13713  drawn
+   dlc_dungeon              m08   56458 faces (6 flagged 0x40)  cumulative  70171  drawn
+   dlc_water_wheel          m02   18649 faces (0 flagged 0x40)  cumulative  88820  drawn
+   dlc_pillory              m06   53128 faces (62 flagged 0x40)  cumulative 141948  cut: 4752 drawn, 48376 refused
+   dlc_caverns_hall         m02   16683 faces (5 flagged 0x40)  cumulative 158631  refused
+   dlc_dungeonhalla         m0c   32622 faces (6 flagged 0x40)  cumulative 191253  refused
+   dlc_dungeonhallb         m0c   40044 faces (6 flagged 0x40)  cumulative 231297  refused
+   dlc_caverns              m03   19408 faces (4 flagged 0x40)  cumulative 250705  refused
+   dlc_level1_start         m10     100 faces (0 flagged 0x40)  cumulative 250805  refused
+   total 250805, cap 93572 -> refused 157233 (63 %) + every marker / icon drawn after the units
+=== cap dlc_dungeon (floor 0x08, AllFloors 0)
+   dlc_dungeon              m08   56458 faces (6 flagged 0x40)  cumulative  56458  drawn
+   dlc_dungeonhalla         m0c   32622 faces (6 flagged 0x40)  cumulative  89080  drawn
+   dlc_dungeonhallb         m0c   40044 faces (6 flagged 0x40)  cumulative 129124  cut: 4492 drawn, 35552 refused
+   dlc_watertunnel          m0a   13713 faces (15 flagged 0x40)  cumulative 142837  refused
+   dlc_treasureroom         m01  not drawn (other floor)
+   dlc_pillory              m06  not drawn (other floor)
+   dlc_water_wheel          m02  not drawn (other floor)
+   total 142837, cap 93572 -> refused 49265 (34 %) + every marker / icon drawn after the units
+=== cap dlc_dungeon (floor 0x08, AllFloors 1)
+   dlc_dungeon              m08   56458 faces (6 flagged 0x40)  cumulative  56458  drawn
+   dlc_dungeonhalla         m0c   32622 faces (6 flagged 0x40)  cumulative  89080  drawn
+   dlc_dungeonhallb         m0c   40044 faces (6 flagged 0x40)  cumulative 129124  cut: 4492 drawn, 35552 refused
+   dlc_watertunnel          m0a   13713 faces (15 flagged 0x40)  cumulative 142837  refused
+   dlc_treasureroom         m01     100 faces (0 flagged 0x40)  cumulative 142937  refused
+   dlc_pillory              m06   53128 faces (62 flagged 0x40)  cumulative 196065  refused
+   dlc_water_wheel          m02   18649 faces (0 flagged 0x40)  cumulative 214714  refused
+   total 214714, cap 93572 -> refused 121142 (56 %) + every marker / icon drawn after the units
+=== cap l7_helheim01 (floor 0x02, AllFloors 0)
+   l7_helheim01             m02   27096 faces (0 flagged 0x40)  cumulative  27096  drawn
+   l7_helheim_hall02        m02   18521 faces (0 flagged 0x40)  cumulative  45617  drawn
+   l7_helheim02             m06    4388 faces (0 flagged 0x40)  cumulative  50005  drawn
+   l7_helheim_hall01        m03   17869 faces (0 flagged 0x40)  cumulative  67874  drawn
+   l7_helheim03             m04  not drawn (other floor)
+   l7_arctic_sea            m01  not drawn (other floor)
+   total 67874, cap 93572 -> refused 0 (0 %) + every marker / icon drawn after the units
+=== cap l7_helheim01 (floor 0x02, AllFloors 1)
+   l7_helheim01             m02   27096 faces (0 flagged 0x40)  cumulative  27096  drawn
+   l7_helheim_hall02        m02   18521 faces (0 flagged 0x40)  cumulative  45617  drawn
+   l7_helheim02             m06    4388 faces (0 flagged 0x40)  cumulative  50005  drawn
+   l7_helheim_hall01        m03   17869 faces (0 flagged 0x40)  cumulative  67874  drawn
+   l7_helheim03             m04   11634 faces (0 flagged 0x40)  cumulative  79508  drawn
+   l7_arctic_sea            m01   41065 faces (2 flagged 0x40)  cumulative 120573  cut: 14064 drawn, 27001 refused
+   total 120573, cap 93572 -> refused 27001 (22 %) + every marker / icon drawn after the units
+=== cap l7_helheim03 (floor 0x04, AllFloors 0)
+   l7_helheim03             m04   11634 faces (0 flagged 0x40)  cumulative  11634  drawn
+   l7_helheim02             m06    4388 faces (0 flagged 0x40)  cumulative  16022  drawn
+   l7_yggdrasil             m04    9326 faces (0 flagged 0x40)  cumulative  25348  drawn
+   l7_helheim01             m02  not drawn (other floor)
+   l7_yggdrasil_hall01      m04    5005 faces (0 flagged 0x40)  cumulative  30353  drawn
+   l7_yggdrasil_hall02      m0c    7679 faces (0 flagged 0x40)  cumulative  38032  drawn
+   l7_yggdrasil_end         m08  not drawn (other floor)
+   total 38032, cap 93572 -> refused 0 (0 %) + every marker / icon drawn after the units
+=== cap l7_helheim03 (floor 0x04, AllFloors 1)
+   l7_helheim03             m04   11634 faces (0 flagged 0x40)  cumulative  11634  drawn
+   l7_helheim02             m06    4388 faces (0 flagged 0x40)  cumulative  16022  drawn
+   l7_yggdrasil             m04    9326 faces (0 flagged 0x40)  cumulative  25348  drawn
+   l7_helheim01             m02   27096 faces (0 flagged 0x40)  cumulative  52444  drawn
+   l7_yggdrasil_hall01      m04    5005 faces (0 flagged 0x40)  cumulative  57449  drawn
+   l7_yggdrasil_hall02      m0c    7679 faces (0 flagged 0x40)  cumulative  65128  drawn
+   l7_yggdrasil_end         m08   31744 faces (15 flagged 0x40)  cumulative  96872  cut: 28444 drawn, 3300 refused
+   total 96872, cap 93572 -> refused 3300 (3 %) + every marker / icon drawn after the units

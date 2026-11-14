@@ -1,0 +1,132 @@
+=== fn 006f2930 .. 006f29f1
+006f2930  8b91fc010000                   mov edx, dword ptr [ecx + 0x1fc]
+006f2936  d9ee                           fldz 
+006f2938  83ec08                         sub esp, 8
+006f293b  f7c200004000                   test edx, 0x400000
+006f2941  756f                           jne 0x6f29b2
+006f2943  d8513c                         fcom dword ptr [ecx + 0x3c]
+006f2946  dfe0                           fnstsw ax
+006f2948  f6c405                         test ah, 5
+006f294b  7a65                           jp 0x6f29b2
+006f294d  d90588f1e700                   fld dword ptr [0xe7f188]
+006f2953  c1ea1b                         shr edx, 0x1b
+006f2956  f6c201                         test dl, 1
+006f2959  dc0db03c8400                   fmul qword ptr [0x843cb0]
+006f295f  d95c2404                       fstp dword ptr [esp + 4]
+006f2963  740d                           je 0x6f2972
+006f2965  a164d7fa00                     mov eax, dword ptr [0xfad764]
+006f296a  d980d8020000                   fld dword ptr [eax + 0x2d8]
+006f2970  eb0c                           jmp 0x6f297e
+006f2972  8b1564d7fa00                   mov edx, dword ptr [0xfad764]
+006f2978  d982d4020000                   fld dword ptr [edx + 0x2d4]
+006f297e  d91c24                         fstp dword ptr [esp]
+006f2981  d9413c                         fld dword ptr [ecx + 0x3c]
+006f2984  d90424                         fld dword ptr [esp]
+006f2987  d84c2404                       fmul dword ptr [esp + 4]
+006f298b  dee9                           fsubp st(1)
+006f298d  d95c2404                       fstp dword ptr [esp + 4]
+006f2991  d9442404                       fld dword ptr [esp + 4]
+006f2995  d9513c                         fst dword ptr [ecx + 0x3c]
+006f2998  d8d9                           fcomp st(1)
+006f299a  dfe0                           fnstsw ax
+006f299c  f6c405                         test ah, 5
+006f299f  7a03                           jp 0x6f29a4
+006f29a1  d9513c                         fst dword ptr [ecx + 0x3c]
+006f29a4  c605afe8fa0001                 mov byte ptr [0xfae8af], 1
+006f29ab  c605d8e8fa0000                 mov byte ptr [0xfae8d8], 0
+006f29b2  d9413c                         fld dword ptr [ecx + 0x3c]
+006f29b5  a164d7fa00                     mov eax, dword ptr [0xfad764]
+006f29ba  d8b0d0020000                   fdiv dword ptr [eax + 0x2d0]
+006f29c0  d91dd4e8fa00                   fstp dword ptr [0xfae8d4]
+006f29c6  f781fc01000000004000           test dword ptr [ecx + 0x1fc], 0x400000
+006f29d0  7519                           jne 0x6f29eb
+006f29d2  d8593c                         fcomp dword ptr [ecx + 0x3c]
+006f29d5  dfe0                           fnstsw ax
+006f29d7  f6c405                         test ah, 5
+006f29da  7a11                           jp 0x6f29ed
+006f29dc  6a01                           push 1
+006f29de  e8edaf0800                     call 0x77d9d0
+006f29e3  83c40c                         add esp, 0xc
+006f29e6  e985b00800                     jmp 0x77da70
+006f29eb  ddd8                           fstp st(0)
+006f29ed  83c408                         add esp, 8
+006f29f0  c3                             ret 
+=== fn 006f28c0 .. 006f29f1
+006f28c0  c605afe8fa0001                 mov byte ptr [0xfae8af], 1
+006f28c7  f781fc01000000004000           test dword ptr [ecx + 0x1fc], 0x400000
+006f28d1  7537                           jne 0x6f290a
+006f28d3  d9413c                         fld dword ptr [ecx + 0x3c]
+006f28d6  d8442404                       fadd dword ptr [esp + 4]
+006f28da  d9593c                         fstp dword ptr [ecx + 0x3c]
+006f28dd  8b1564d7fa00                   mov edx, dword ptr [0xfad764]
+006f28e3  c605d8e8fa0000                 mov byte ptr [0xfae8d8], 0
+006f28ea  d9413c                         fld dword ptr [ecx + 0x3c]
+006f28ed  d982d0020000                   fld dword ptr [edx + 0x2d0]
+006f28f3  ded9                           fcompp 
+006f28f5  dfe0                           fnstsw ax
+006f28f7  f6c441                         test ah, 0x41
+006f28fa  7a0e                           jp 0x6f290a
+006f28fc  d982d0020000                   fld dword ptr [edx + 0x2d0]
+006f2902  d9593c                         fstp dword ptr [ecx + 0x3c]
+006f2905  e8263dffff                     call 0x6e6630
+006f290a  d9413c                         fld dword ptr [ecx + 0x3c]
+006f290d  a164d7fa00                     mov eax, dword ptr [0xfad764]
+006f2912  d8b0d0020000                   fdiv dword ptr [eax + 0x2d0]
+006f2918  6a01                           push 1
+006f291a  d91dd4e8fa00                   fstp dword ptr [0xfae8d4]
+006f2920  e8abb00800                     call 0x77d9d0
+006f2925  83c404                         add esp, 4
+006f2928  e843b10800                     call 0x77da70
+006f292d  c20400                         ret 4
+006f2930  8b91fc010000                   mov edx, dword ptr [ecx + 0x1fc]
+006f2936  d9ee                           fldz 
+006f2938  83ec08                         sub esp, 8
+006f293b  f7c200004000                   test edx, 0x400000
+006f2941  756f                           jne 0x6f29b2
+006f2943  d8513c                         fcom dword ptr [ecx + 0x3c]
+006f2946  dfe0                           fnstsw ax
+006f2948  f6c405                         test ah, 5
+006f294b  7a65                           jp 0x6f29b2
+006f294d  d90588f1e700                   fld dword ptr [0xe7f188]
+006f2953  c1ea1b                         shr edx, 0x1b
+006f2956  f6c201                         test dl, 1
+006f2959  dc0db03c8400                   fmul qword ptr [0x843cb0]
+006f295f  d95c2404                       fstp dword ptr [esp + 4]
+006f2963  740d                           je 0x6f2972
+006f2965  a164d7fa00                     mov eax, dword ptr [0xfad764]
+006f296a  d980d8020000                   fld dword ptr [eax + 0x2d8]
+006f2970  eb0c                           jmp 0x6f297e
+006f2972  8b1564d7fa00                   mov edx, dword ptr [0xfad764]
+006f2978  d982d4020000                   fld dword ptr [edx + 0x2d4]
+006f297e  d91c24                         fstp dword ptr [esp]
+006f2981  d9413c                         fld dword ptr [ecx + 0x3c]
+006f2984  d90424                         fld dword ptr [esp]
+006f2987  d84c2404                       fmul dword ptr [esp + 4]
+006f298b  dee9                           fsubp st(1)
+006f298d  d95c2404                       fstp dword ptr [esp + 4]
+006f2991  d9442404                       fld dword ptr [esp + 4]
+006f2995  d9513c                         fst dword ptr [ecx + 0x3c]
+006f2998  d8d9                           fcomp st(1)
+006f299a  dfe0                           fnstsw ax
+006f299c  f6c405                         test ah, 5
+006f299f  7a03                           jp 0x6f29a4
+006f29a1  d9513c                         fst dword ptr [ecx + 0x3c]
+006f29a4  c605afe8fa0001                 mov byte ptr [0xfae8af], 1
+006f29ab  c605d8e8fa0000                 mov byte ptr [0xfae8d8], 0
+006f29b2  d9413c                         fld dword ptr [ecx + 0x3c]
+006f29b5  a164d7fa00                     mov eax, dword ptr [0xfad764]
+006f29ba  d8b0d0020000                   fdiv dword ptr [eax + 0x2d0]
+006f29c0  d91dd4e8fa00                   fstp dword ptr [0xfae8d4]
+006f29c6  f781fc01000000004000           test dword ptr [ecx + 0x1fc], 0x400000
+006f29d0  7519                           jne 0x6f29eb
+006f29d2  d8593c                         fcomp dword ptr [ecx + 0x3c]
+006f29d5  dfe0                           fnstsw ax
+006f29d7  f6c405                         test ah, 5
+006f29da  7a11                           jp 0x6f29ed
+006f29dc  6a01                           push 1
+006f29de  e8edaf0800                     call 0x77d9d0
+006f29e3  83c40c                         add esp, 0xc
+006f29e6  e985b00800                     jmp 0x77da70
+006f29eb  ddd8                           fstp st(0)
+006f29ed  83c408                         add esp, 8
+006f29f0  c3                             ret 

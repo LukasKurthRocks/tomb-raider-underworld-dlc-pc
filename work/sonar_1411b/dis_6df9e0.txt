@@ -1,0 +1,42 @@
+=== fn 006df9e0 .. 006dfa59
+006df9e0  55                             push ebp
+006df9e1  8bec                           mov ebp, esp
+006df9e3  83e4f0                         and esp, 0xfffffff0
+006df9e6  83ec48                         sub esp, 0x48
+006df9e9  56                             push esi
+006df9ea  8bf1                           mov esi, ecx
+006df9ec  6683be4090020000               cmp word ptr [esi + 0x29040], 0
+006df9f4  57                             push edi
+006df9f5  745c                           je 0x6dfa53
+006df9f7  8b3d7c40a100                   mov edi, dword ptr [0xa1407c]
+006df9fd  8d4c2410                       lea ecx, [esp + 0x10]
+006dfa01  e89abbd5ff                     call 0x43b5a0
+006dfa06  d9ee                           fldz 
+006dfa08  8a9648900200                   mov dl, byte ptr [esi + 0x29048]
+006dfa0e  8b07                           mov eax, dword ptr [edi]
+006dfa10  51                             push ecx
+006dfa11  8b8e44900200                   mov ecx, dword ptr [esi + 0x29044]
+006dfa17  d91c24                         fstp dword ptr [esp]
+006dfa1a  f6da                           neg dl
+006dfa1c  6a00                           push 0
+006dfa1e  51                             push ecx
+006dfa1f  0fbf8e40900200                 movsx ecx, word ptr [esi + 0x29040]
+006dfa26  1bd2                           sbb edx, edx
+006dfa28  81e244e0ffff                   and edx, 0xffffe044
+006dfa2e  81c200200000                   add edx, 0x2000
+006dfa34  52                             push edx
+006dfa35  8b156cf2ed00                   mov edx, dword ptr [0xedf26c]
+006dfa3b  51                             push ecx
+006dfa3c  52                             push edx
+006dfa3d  8b504c                         mov edx, dword ptr [eax + 0x4c]
+006dfa40  56                             push esi
+006dfa41  8d4c242c                       lea ecx, [esp + 0x2c]
+006dfa45  51                             push ecx
+006dfa46  8bcf                           mov ecx, edi
+006dfa48  ffd2                           call edx
+006dfa4a  66c786409002000000             mov word ptr [esi + 0x29040], 0
+006dfa53  5f                             pop edi
+006dfa54  5e                             pop esi
+006dfa55  8be5                           mov esp, ebp
+006dfa57  5d                             pop ebp
+006dfa58  c3                             ret 
