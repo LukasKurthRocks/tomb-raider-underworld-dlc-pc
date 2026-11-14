@@ -1,0 +1,35 @@
+positive (unchanged source): 0 problem(s) ok
+case version               : 1 problem(s) ok - TruMenu.cpp: kVersion must start with "TruMenu 0.22.47 (sound monitor"
+case check row changed     : 1 problem(s) ok - TruMenu.cpp: kW7Checks (6 rows) must be the 6 rows of precheck_02247.txt in order
+case check row dropped     : 1 problem(s) ok - TruMenu.cpp: kW7Checks (5 rows) must be the 6 rows of precheck_02247.txt in order
+case W7Check table         : 1 problem(s) ok - TruMenu.cpp: W7Check must set g_w7Ok = g_w6Ok && DvChecks(kW7Checks, ...)
+case load order            : 1 problem(s) ok - TruMenu.cpp: the load must call W7Check right after W6Check
+case options order         : 1 problem(s) ok - TruMenu.cpp: ReadOptions must call W7ReadOptions(ini, dir) right after W6ReadOptions(ini)
+case SnBuild old wave      : 2 problem(s) ok - TruMenu.cpp: SnBuild must take the wave from W7Wave and the emitter from W7Emitter
+case W6VoiceTick old emitter: 1 problem(s) ok - TruMenu.cpp: W6VoiceTick must take the wave from W7Wave and the emitter from W7Emitter
+case map entry +4          : 1 problem(s) ok - TruMenu.cpp: W7MapBuild lacks ReadDword(entry + 4, &sample)
+case map loaded test       : 1 problem(s) ok - TruMenu.cpp: W7MapBuild lacks ReadDword(entry, &loaded) || !loaded
+case emitter +0x74         : 1 problem(s) ok - TruMenu.cpp: W7Emitter lacks ReadDword(p + 0x74, &up)
+case emitter depth         : 1 problem(s) ok - TruMenu.cpp: W7Emitter lacks depth < 4;
+case sonar want            : 1 problem(s) ok - TruMenu.cpp: W6VoiceTick must test the sonar waves in its want test and feed the history
+case sonar group           : 1 problem(s) ok - TruMenu.cpp: W6CgTick must mute group 57 only for SonarMute 2
+case sonar group id        : 1 problem(s) ok - TruMenu.cpp: const int kW7SonarGroup = 57; missing
+case sonar waves default   : 1 problem(s) ok - TruMenu.cpp: int g_w7SonarWaves[8] = {914, 915, 916, missing
+case sonar not kept        : 1 problem(s) ok - TruMenu.cpp: W7SonarSet must keep [Sound] SonarMute (IniKeepInt)
+case style not kept        : 1 problem(s) ok - TruMenu.cpp: snd.logview must keep [Sound] OverlayStyle (IniKeepInt)
+case log overlay           : 1 problem(s) ok - TruMenu.cpp: DrawSoundList must hand over to DrawSoundLog with OverlayStyle 1
+case icon glyph            : 1 problem(s) ok - TruMenu.cpp: W7Icon must draw with ImDrawList primitives only (no font glyphs)
+case SnTick monitor        : 1 problem(s) ok - TruMenu.cpp: SnTick: W6Tick, then the monitor list without snd.list, then the snd.list gate
+case present tick          : 1 problem(s) ok - TruMenu.cpp: Render must call W7PresentTick(padIdle)
+case present thread        : 1 problem(s) ok - TruMenu.cpp: W7PresentTick may run SnTick only on the pad thread (or before any pad poll)
+case QbBuild rows          : 1 problem(s) ok - TruMenu.cpp: QbBuild must put the live monitor rows in place of a kQbSndMon row
+case QuickTick order       : 1 problem(s) ok - TruMenu.cpp: QuickTick must hand a monitor row to W7QbAct first
+case long menu             : 1 problem(s) ok - TruMenu.cpp: the long menu must draw a kQbSndMon row through W7MenuRows
+case writes memory         : 1 problem(s) ok - TruMenu.cpp: void W7HistEnd must not write game memory
+case item thread           : 1 problem(s) ok - TruMenu.cpp: item snd.sonar57 (bool, game thread true) missing in kItems
+case item dropped          : 1 problem(s) ok - TruMenu.cpp: item snd.history (action, game thread true) missing in kItems
+case key default           : 1 problem(s) ok - TruMenu.cpp: kOpts [Sound] SonarMute=0 missing
+case settings row          : 1 problem(s) ok - TruMenu.cpp: page Spiel-Einstellungen group ton_monitor lacks snd.sonar57  (kQbBool)
+case Paket B check         : 1 problem(s) ok - TruMenu.cpp: Paket B (tg_b) lacks the row test.mark tgB.sonar (kQbCheck)
+case built-in name         : 1 problem(s) ok - TruMenu.cpp: {914, "computer_hum_12"} missing
+33 cases + 1 positive, 0 failed

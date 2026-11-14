@@ -1,0 +1,8 @@
+Built work\asi\menu0270\TruMenu.asi (2183680 bytes, x86 DLL, sha256 c78918209e28ff41be82bf5deea56739b2f23a37e9736e027c3eb563a37c628b) - TruMenu 0.22.47
+  Build-TruAsi.ps1 -Name TruMenu -OutDir work/asi/menu0270 from Git Bash (third build of the session; the first two only checked the compile)
+  warnings: 2 (both imgui_demo.cpp), 0 in TruMenu.cpp; imports / exports = 0.22.46 (tools/pe_import_export_diff.py: 151 functions, same 6 exports, no new DLL)
+  INI / switches / radial / tour in the build folder = source (cmp)
+Byte checks: tools/pe_bytes_check.py <Steam tru.exe> --file work/sndui_1411/precheck_02247.txt -> 6 checks, 0 mismatches (precheck_02247_result.txt)
+trumenu_ini_check: exit 0, 57 ok lines, 0 other lines (ini_check_3.txt); negative cases w7_negative_tests.py: 33 cases + 1 positive, 0 failed
+trumenu_quick_check: exit 1 - only "menupages: 28 page keys" FAIL (old, not this change; as in 0.22.45 / 0.22.46)
+trumenu_readability_check: exit 0 (all pass); Test-TruUploadReady.ps1 -SkipGameData: 159

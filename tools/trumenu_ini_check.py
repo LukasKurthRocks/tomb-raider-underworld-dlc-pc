@@ -5401,9 +5401,10 @@ def check_02244(switches_path):
     if not ok: problems.append('TruMenu.cpp: page Spiel-Einstellungen group set_ctl lacks the switch row DeviceGlyphs')
     if 'TruMenu:Input:DeviceGlyphs' not in sw_keys: problems.append('switches: TruMenu | Input | DeviceGlyphs missing')
     header, opt_rows = table(src)
-    if len(opt_rows) != 283 + len(W6_KEYS_02245):   # 0.22.44 added none, 0.22.45 the three [Sound] wave log keys
-        problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.44 adds no INI key (283), 0.22.45 adds %d' %
-                        (len(opt_rows), len(W6_KEYS_02245)))
+    # 0.22.44 added none, 0.22.45 the three [Sound] wave log keys, 0.22.47 the seven sound monitor / sonar keys
+    if len(opt_rows) != 283 + len(W6_KEYS_02245) + len(W7_KEYS_02247):
+        problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.44 adds no INI key (283), 0.22.45 adds %d, 0.22.47 adds %d' %
+                        (len(opt_rows), len(W6_KEYS_02245), len(W7_KEYS_02247)))
     readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
     if '\n## 0.22.44 - ' not in readme or '\n### TO TEST 0.22.44' not in readme:
         problems.append('README.md: section "## 0.22.44 - ..." with "### TO TEST 0.22.44" missing')
@@ -5577,8 +5578,8 @@ def check_02246():
     note names the main menu; README 0.22.46 with TO TEST; Set-TruMenu knows the 0.22.45 hash"""
     problems = []
     src = read_cpp()
-    if '"TruMenu 0.22.46 (arena from the main menu' not in src[:src.find('\n', src.find('kVersion = '))]:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.46 (arena from the main menu"')
+    if '0.22.46 (arena from the main menu' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.47: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.46 part "0.22.46 (arena from the main menu"')
     offline = []
     if os.path.exists(FE_CHECKS_02246):
         for line in open(FE_CHECKS_02246, encoding='utf-8'):
@@ -5654,6 +5655,149 @@ def check_02246():
     return problems, ('arena from the main menu (%d byte checks = precheck_02246; +0xb9 in main state 10 = unserved '
                       'request, level.load refused in the front end, arena.go -> level.start <unit> 0 + wait + spot + '
                       'one-hit kill off + arena.mode)' % len(rows))
+
+
+W7_CHECKS_02247 = os.path.join(ROOT, 'work', 'sndui_1411', 'precheck_02247.txt')
+W7_HASH_02246 = '8358f69fd09a1092708448a8a0bbe9b7abb9c2b58ac2f6b4839ebb306c008876'
+W7_KEYS_02247 = (('History', '1'), ('HistoryMax', '30'), ('HistoryLog', '0'), ('OverlayStyle', '1'), ('LogFadeSec', '15'),
+                 ('SonarMute', '0'), ('SonarWaves', '914 915 916'))   # [Sound]
+# item, type, game thread (queued)
+W7_ITEMS_02247 = (('snd.monitor', 'action', 'true'), ('snd.history', 'action', 'true'), ('snd.logview', 'bool', 'false'),
+                  ('snd.sonar', 'bool', 'true'), ('snd.sonar57', 'bool', 'true'))
+W7_SET_02247 = (('snd.sonar', '', 'kQbBool'), ('snd.sonar57', '', 'kQbBool'), ('snd.list', '', 'kQbBool'),
+                ('snd.logview', '', 'kQbBool'), ('snd.monitor', 'rules', 'kQbSndMon'), ('snd.monitor', 'voices', 'kQbSndMon'),
+                ('snd.monitor', 'history', 'kQbSndMon'), ('snd.monitor', '', 'kQbAction'), ('snd.mute', 'all 0', 'kQbAction'))
+W7_TGB_02247 = (('snd.sonar', '', 'kQbBool'), ('snd.monitor', 'voices', 'kQbSndMon'), ('snd.monitor', 'history', 'kQbSndMon'),
+                ('test.mark', 'tgB.sonar', 'kQbCheck'), ('test.mark', 'tgB.monitor', 'kQbCheck'))
+W7_SWITCHES_02247 = ('TruMenu | Sound | SonarMute | int:0..2:1 |', 'TruMenu | Sound | OverlayStyle | bool |',
+                     'TruMenu | Sound | History | bool |', 'TruMenu | Sound | HistoryMax | int:5..200:5 |',
+                     'TruMenu | Sound | HistoryLog | bool |', 'TruMenu | Sound | LogFadeSec | int:0..120:5 |')
+
+
+def check_02247(switches_path):
+    """0.22.47 (sound monitor, log overlay, sonar sound off; owner wishes 2026-11-14, workspace
+    docs/Befund-Tonanzeige-1411.md): kW7Checks = precheck_02247.txt (6 rows: Play gets the wave entry's +4, Wave_Find's
+    entry layout, the wave node's new 0x90 params object and its ctor +0x74 = the node's params, ret 0x14); W7Check right
+    after W6Check, W7ReadOptions(ini, dir) right after W6ReadOptions; the wave id from W7Wave (map entry +4 -> id, the old
+    (sample - table) / 0x18 gone from SnBuild and W6VoiceTick), the emitter from W7Emitter (params -> +0x74, at most 4
+    steps, decided by W6Emitter's vtable test); the sonar switch per channel inside W6VoiceTick's want test (no new
+    W6ChMute call), group 57 only as SonarMute 2 through W6CgTick; SonarMute / OverlayStyle written back with IniKeepInt;
+    the overlay as a log (DrawSoundList -> DrawSoundLog), icons only ImDrawList primitives; the monitor rows (kQbSndMon in
+    QbBuild, src <= kQbSmSrc first in QuickTick, the long menu W7MenuRows); SnTick builds the list for the rows without
+    snd.list, Render runs SnTick from the Present hook while the game polls no pad (main menu) on the pad thread only;
+    no game memory written by the W7 functions; 5 items, 7 [Sound] keys, 6 switch rows, group ton_monitor + Paket B rows;
+    README 0.22.47 with TO TEST; Set-TruMenu knows the 0.22.46 hash"""
+    problems = []
+    src = read_cpp()
+    if '"TruMenu 0.22.47 (sound monitor' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.47 (sound monitor"')
+    offline = []
+    if os.path.exists(W7_CHECKS_02247):
+        for line in open(W7_CHECKS_02247, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/sndui_1411/precheck_02247.txt (the offline byte list) is missing')
+    rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kW7Checks')]
+    if rows != offline or len(rows) != 6:
+        problems.append('TruMenu.cpp: kW7Checks (%d rows) must be the 6 rows of precheck_02247.txt in order' % len(rows))
+    if 'g_w7Ok = g_w6Ok && DvChecks(kW7Checks,' not in fn_body(src, 'void W7Check('):
+        problems.append('TruMenu.cpp: W7Check must set g_w7Ok = g_w6Ok && DvChecks(kW7Checks, ...)')
+    if not re.search(r'\n    W6Check\(\);[^\n]*\n    W7Check\(\);', src):
+        problems.append('TruMenu.cpp: the load must call W7Check right after W6Check')
+    if not re.search(r'\n    W6ReadOptions\(ini\);[^\n]*\n    W7ReadOptions\(ini, dir\);', src):
+        problems.append('TruMenu.cpp: ReadOptions must call W7ReadOptions(ini, dir) right after W6ReadOptions(ini)')
+    sb, vt = fn_body(src, 'int SnBuild('), fn_body(src, 'void W6VoiceTick(')
+    for name, body in (('SnBuild', sb), ('W6VoiceTick', vt)):
+        if 'v.wave = W7Wave(v.sample);' not in body or 'v.emitter = W7Emitter(v.params);' not in body:
+            problems.append('TruMenu.cpp: %s must take the wave from W7Wave and the emitter from W7Emitter' % name)
+        if 'waveLo' in body or ') / 0x18)' in body:
+            problems.append('TruMenu.cpp: %s still holds the 0.20.1 wave id (sample - table) / 0x18' % name)
+    if 'if (!want && sonar && W7SonarWave(v.wave)) want = true;' not in vt or 'if (hist) W7HistVoice(v);' not in vt:
+        problems.append('TruMenu.cpp: W6VoiceTick must test the sonar waves in its want test and feed the history')
+    mb = fn_body(src, 'void W7MapBuild(')
+    for need in ('ReadDword(entry, &loaded) || !loaded', 'ReadDword(entry + 4, &sample)', 'mgr + 8 + static_cast<DWORD>(i) * 0x18',
+                 'qsort('):
+        if need not in mb: problems.append('TruMenu.cpp: W7MapBuild lacks %s' % need)
+    em = fn_body(src, 'DWORD W7Emitter(')
+    for need in ('const DWORD e = W6Emitter(p);', 'ReadDword(p + 0x74, &up)', 'depth < 4;'):
+        if need not in em: problems.append('TruMenu.cpp: W7Emitter lacks %s' % need)
+    if 'if (W7SonarMode() == 2 && wn < kW6CgMax) want[wn++] = kW7SonarGroup;' not in fn_body(src, 'void W6CgTick('):
+        problems.append('TruMenu.cpp: W6CgTick must mute group 57 only for SonarMute 2')
+    for need in ('const int kW7SonarGroup = 57;', 'int g_w7SonarWaves[8] = {914, 915, 916,', 'kQbSndMon };',
+                 'const int kQbSmSrc = -1000;', '{914, "computer_hum_12"}', '{915, "computer_hum_04"}', '{916, "alrm_radar_03"}'):
+        if need not in src: problems.append('TruMenu.cpp: %s missing' % need)
+    if 'IniKeepInt("Sound", "SonarMute", mode);' not in fn_body(src, 'void W7SonarSet('):
+        problems.append('TruMenu.cpp: W7SonarSet must keep [Sound] SonarMute (IniKeepInt)')
+    if 'IniKeepInt("Sound", "OverlayStyle", g_w7Style);' not in fn_body(src, 'bool RunW7LogView('):
+        problems.append('TruMenu.cpp: snd.logview must keep [Sound] OverlayStyle (IniKeepInt)')
+    if 'if (g_w7Style == 1) { DrawSoundLog(); return; }' not in fn_body(src, 'void DrawSoundList('):
+        problems.append('TruMenu.cpp: DrawSoundList must hand over to DrawSoundLog with OverlayStyle 1')
+    ic = fn_body(src, 'void W7Icon(')
+    if not ic or re.search(r'\\x[fF]0|\\36[0-7]|AddText', ic):
+        problems.append('TruMenu.cpp: W7Icon must draw with ImDrawList primitives only (no font glyphs)')
+    st = re.sub(r'//[^\n]*', '', fn_body(src, 'void SnTick('))
+    i_w, i_g = st.find('if (g_snOk && !g_snOn && W7SnapWanted()) { W7SnapTick(); return; }'), \
+        st.find('if (!g_snOk || !g_snOn) return;')
+    if not 0 <= st.find('W6Tick();') < i_w < i_g:
+        problems.append('TruMenu.cpp: SnTick: W6Tick, then the monitor list without snd.list, then the snd.list gate')
+    if 'W7PresentTick(padIdle);' not in re.sub(r'//[^\n]*', '', fn_body(src, 'void Render(')):
+        problems.append('TruMenu.cpp: Render must call W7PresentTick(padIdle)')
+    if 'const int state = !g_snGameThread || g_snGameThread == me ? 1 : 0;' not in fn_body(src, 'void W7PresentTick('):
+        problems.append('TruMenu.cpp: W7PresentTick may run SnTick only on the pad thread (or before any pad poll)')
+    qb = fn_body(src, 'void QbBuild(')
+    if 'if (r.kind == kQbSndMon) {' not in qb or 'W7QbRows(g_qbView + g_qbViewN, room, r.arg, lv, de)' not in qb \
+            or 'W7QbReset();' not in qb:
+        problems.append('TruMenu.cpp: QbBuild must put the live monitor rows in place of a kQbSndMon row')
+    qt = fn_body(src, 'void QuickTick(')
+    i_m, i_s = qt.find('if (g_qbView[row].src <= kQbSmSrc) {'), qt.find('const QbRow *src =')
+    if not 0 <= i_m < i_s: problems.append('TruMenu.cpp: QuickTick must hand a monitor row to W7QbAct first')
+    if 'W7MenuRows(r.arg, page, index);' not in fn_body(src, 'void PageQbRow('):
+        problems.append('TruMenu.cpp: the long menu must draw a kQbSndMon row through W7MenuRows')
+    for fn in ('void W7MapBuild(', 'int W7Wave(', 'DWORD W7Emitter(', 'void W7OwnBuild(', 'void W7HistAdd(', 'void W7Check(',
+               'void W7HistVoice(', 'void W7HistEnd(', 'void W7SnapTick(', 'void W7ReadOptions(', 'void W7NamesLoad(',
+               'void W7SonarSet(', 'bool RunW7Monitor(', 'bool RunW7History(', 'int W7QbRows(', 'void W7QbAct(',
+               'void DrawSoundLog(', 'void W7PresentTick('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('(')); continue
+        if any(w in body for w in ('WriteByte(', 'WriteBytes(', 'WriteDword(', 'reinterpret_cast<volatile', 'LcPatch(',
+                                   'VirtualProtect(')):
+            problems.append('TruMenu.cpp: %s must not write game memory' % fn.strip('('))
+    for item, typ, gt in W7_ITEMS_02247:
+        if not re.search(r'\{"%s", "%s", "0\.22\.47[^}]*?,\s+%s,\s+[A-Za-z0-9_<>]+,\s+[A-Za-z0-9_<>]+\},' %
+                         (re.escape(item), typ, gt), src, re.S):
+            problems.append('TruMenu.cpp: item %s (%s, game thread %s) missing in kItems' % (item, typ, gt))
+    header, opt_rows = table(src)
+    keys = {(s, k): d for s, k, d, _ in opt_rows}
+    for key, default in W7_KEYS_02247:
+        if keys.get(('Sound', key)) != default: problems.append('TruMenu.cpp: kOpts [Sound] %s=%s missing' % (key, default))
+    sw = open(switches_path, encoding='utf-8').read()
+    for row in W7_SWITCHES_02247:
+        if row not in sw: problems.append('switches: row "%s" missing' % row)
+    se, tg, grp = set(), set(), None
+    for r in qb_rows(src):
+        if r[4] == 'kQbGroup': grp = r[3]; continue
+        if r[0] == 'kQbSettings' and grp == 'ton_monitor': se.add((r[2], r[3], r[4]))
+        if r[0] == 'kQbTests' and grp == 'tg_b': tg.add((r[2], r[3], r[4]))
+    for it in W7_SET_02247:
+        if it not in se: problems.append('TruMenu.cpp: page Spiel-Einstellungen group ton_monitor lacks %s %s (%s)' % it)
+    for it in W7_TGB_02247:
+        if it not in tg: problems.append('TruMenu.cpp: Paket B (tg_b) lacks the row %s %s (%s)' % it)
+    if 'ton_monitor' not in [r[3] for r in qb_rows(src) if r[0] == 'kQbSettings' and r[4] == 'kQbGroup']:
+        problems.append('TruMenu.cpp: page Spiel-Einstellungen lacks the group ton_monitor')
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.47 - ' not in readme or '\n### TO TEST 0.22.47' not in readme:
+        problems.append('README.md: section "## 0.22.47 - ..." with "### TO TEST 0.22.47" missing')
+    for key, _ in W7_KEYS_02247:
+        if '`[Sound] %s`' % key not in readme: problems.append('README.md: options row `[Sound] %s` missing' % key)
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if W7_HASH_02246 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.46 build hash (work/asi/menu0269) is missing')
+    return problems, ('sound monitor (%d byte checks = precheck_02247; wave id from the entry +4 map, emitter via +0x74; '
+                      'sonar waves per channel / group 57 fallback; log overlay; %d items, %d keys, ton_monitor %d rows, '
+                      'Paket B %d rows)' % (len(rows), len(W7_ITEMS_02247), len(W7_KEYS_02247), len(W7_SET_02247),
+                                            len(W7_TGB_02247)))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -6279,6 +6423,10 @@ def main(argv):
     for p in cproblems46: print('Q02246 %s' % p)
     if not cproblems46: print('ok: 0.22.46 %s' % csummary46)
     problems += cproblems46
+    cproblems47, csummary47 = check_02247(opt.get('--switches', SWITCHES))   # 0.22.47 (sound monitor)
+    for p in cproblems47: print('Q02247 %s' % p)
+    if not cproblems47: print('ok: 0.22.47 %s' % csummary47)
+    problems += cproblems47
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

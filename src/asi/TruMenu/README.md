@@ -2928,6 +2928,87 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.47 - sound monitor, the sound box as a log, sonar sound off (2026-11-14)
+
+Built into `work\asi\menu0270`, not installed, no live test (finding in the workspace `docs\Befund-Tonanzeige-1411.md`;
+owner wishes of 14.11. after the sonar test: "Ton-Monitor", "Ton-Anzeige unten rechts als Log", "Sonar-Ton aus"). 6 byte
+checks `kW7Checks` (`work\sndui_1411\precheck_02247.txt`, 0 mismatches on the installed exe; start line `0.22.47 sound
+monitor: checks ok (6 rows); ...`), no hook, no patch - the voice pool walk of 0.20.1 / 0.22.45 is the only source.
+
+- **Fix: the wave id of a voice** (static, `work\sndui_1411\dis_*.txt`): the wave node 0x591220 gives VoicePool::Play
+  the wave table entry's **+4** (0x591348), so voice +0x10 is never an entry. 0.20.1 .. 0.22.46 computed `(sample -
+  table) / 0x18` and every voice read `Stream` (all `snd.now` / `snd.dump` lines of 14.11.) - `snd.mute w<id>`, `snd.solo
+  <wave>` and the wave 10 log line could not match. Now a map entry +4 -> id (rebuilt when a sample is unknown and the
+  map is older than 0.5 s, and every 2 s).
+- **Fix: the emitter of a voice**: before Play the node's +8 is replaced by a new 0x90-byte params object (0x5912f9 /
+  0x59131b / 0x59132c); voice +0x1c is that object, the params the node got sit at its **+0x74** (ctor 0x5906e0). The
+  emitter is found by walking params -> [params+0x74] (at most 4 steps), decided by the emitter vtable 0x851240 as in
+  0.22.45; none = `emitter ?`. `snd.mute s<id>` / `e<hex>`, `snd.now` and the object column use it.
+- **Sound monitor** (bar page Spiel-Einstellungen / Ton, sub-group **"Ton-Monitor (live)"**, and Tests / Paket B):
+  - "Aktive Stimmen": every voice of the pool, playing first, then paused / starting / muted: name (the wave name -
+    built-in for the PDA waves and wave 10, all others from an optional `TruMenu.wavenames.txt` next to tru.exe, else
+    `Welle <id>`; `Strom` / `Musik-Strom` for a stream), `w<id>` / `s<section>`, the source (`<object> #<intro>` from the
+    instance sound list `[inst+0x248]`, `Level / Skript` for an emitter in no list, `UI`, `Musik`, `Strom`), state, group
+    with a readable name (`g57 PDA & Sonar`, `g15 Umgebung`, ...), volume, 2D / 3D with the distance in metres.
+    Right = mute (`snd.mute w<id> 1`, or `e<hex> 1` when the wave is unknown), left = on again, X = toggle; a stream
+    with neither: only its whole group, right twice. A filled square / red state = muted now.
+  - "Zuletzt gestartet": the newest `[Sound] HistoryMax` starts (time, name, source, kind + group), same keys.
+  - "Aktive Ton-Regeln": every `snd.mute` rule and the sonar switch, left / right = that one off.
+  - "Monitor + Verlauf ins Log" = `snd.monitor`: one `snd.monitor` line per voice (name, wave, section, group, kind,
+    volume, distance, state, source, voice / channel / emitter) and the history to `TruMenu.log`.
+  - The rows are built from the list of the game thread; while they are drawn (bar or the long menu, where every row has
+    a mute / on button) the list is refreshed every 0.5 s even with `snd.list` off.
+- **Main menu**: while the game polls no pad (front end, loading - PadHook does not run) the sound list, the monitor,
+  the sound switches and the history run from the Present hook - only on the thread PadHook ran on (or before any pad
+  poll), the same rule queued items follow there; one log line `snd: the game polls no pad ...` says which.
+- **The bottom-right box as a log** (`snd.logview`, `[Sound] OverlayStyle=1`, written back by the bar; 0 = the 0.20.1
+  voice list): newest start on top, one short line `12:55:02  computer_hum_12  <- UI`, one colour and one icon per kind
+  (voice: speech bubble, ambience: wave line, UI: screen, music: note, enemy: warning triangle, effect: burst). The bar
+  font is ImGui's built-in one (TruMenu adds no font, no emoji glyphs), so the icons are ImDrawList primitives. A line
+  fades over `[Sound] LogFadeSec` (15 s) and goes after 4 x that; at most `[Sound] MaxLines` lines. The kind comes from
+  the group (table of the 80 groups, `docs\Befund-Ton-Gruppen-0611.md`) and the music / speech slider categories.
+- **Sonar-Ton aus** (`snd.sonar`, `[Sound] SonarMute=1`, kept in TruMenu.ini): **scope** - only the waves of `[Sound]
+  SonarWaves` (default `914 915 916`: `computer_hum_12` / `computer_hum_04` = the two-voice loop of SoundPlex section
+  3381 that plays while the PDA sonar is open, `alrm_radar_03` = section 3382, the radar ping), muted per channel
+  (FMOD's `ChannelI::setMute` as `snd.mute w<id>`); **when** - at every start of such a voice, so after a level load and
+  each new sonar open again, and after a game restart (read at the start); **undo** - the same row again
+  (`snd.sonar 0`), the row in "Aktive Ton-Regeln", or `SonarMute=0` in TruMenu.ini. `snd.mute all 0` does not touch
+  it (a separate, kept switch). Group 57 holds only the 8 waves of `g_pda.drm` (909 .. 916), but its child group **70 =
+  Lara's hint lines** - so the whole group is only the fallback `snd.sonar57` (`SonarMute=2`, row "Sonar: ganze Gruppe
+  57 aus (Notlösung)"), which silences her hints too.
+- **Start history** (`[Sound] History=1`, `HistoryMax=30`, `HistoryLog=0`): a voice counts as started when its (voice,
+  sample, channel) was not in the pool walk before (the first walk after a switch-on records nothing); `HistoryLog=1`
+  writes one `snd.start #n` line per start (at most 5000 per game start). `snd.history [n]` writes the newest n.
+- `snd.mutes` names the sonar switch; `snd.list` / `snd.dump` / `snd.now` lines show the wave name, section and source.
+- Options: `[Sound] History`, `[Sound] HistoryMax`, `[Sound] HistoryLog`, `[Sound] OverlayStyle`, `[Sound] LogFadeSec`,
+  `[Sound] SonarMute`, `[Sound] SonarWaves`; switch rows SonarMute / OverlayStyle / History / HistoryMax / HistoryLog /
+  LogFadeSec (read at the start).
+- Optional `TruMenu.wavenames.txt` next to tru.exe: `<group> TAB <wave id> TAB <name>` as `tools/sound_groups.py scan`
+  writes it (`groups_waves.tsv`), or `<id> <name>`; the first name of a wave wins, `.wav` is cut.
+- Checks: `trumenu_ini_check` `check_02247`; `check_02244` key count (283 + 3 + 7), `check_02246` version part adapted.
+
+### TO TEST 0.22.47
+
+1. Start, `TruMenu.log`: `0.22.47 sound monitor: checks ok (6 rows); wave names 9 built-in (no TruMenu.wavenames.txt);
+   [Sound] History 1 (max 30, log 0), OverlayStyle 1 (log), LogFadeSec 15, SonarMute 0 (off), SonarWaves 914 915 916`.
+2. Main menu, bar Spiel-Einstellungen / Ton / "Ton-Monitor (live)": "Aktive Stimmen" lists the menu music / clicks (not
+   `Stream` only: a click = `ui_drop_04 w10 <- UI` or another `Welle <id>`); "Zuletzt gestartet" gets a line per click.
+   If the game polls no pad there: log line `snd: the game polls no pad (front end / loading) - ... Present hook`.
+3. "Ton-Anzeige unten rechts" on: the box is a log, newest on top, colours / icons per kind, old lines fade.
+   "Ton-Anzeige als Log" off: the old list again (now with names and `<- source`).
+4. DLC 1 / 2 in a level: "Aktive Stimmen" - ambience `g23 Wasser` / `g22 Wind & Gewitter` with an object or
+   `Level / Skript`; Lara's steps / voice; right on one row - that sound goes, the row turns red; left - back.
+5. **Sonar**: open the PDA sonar - "Aktive Stimmen" shows `computer_hum_12 w914 ...` and `computer_hum_04 w915 ...`
+   (g57 PDA & Sonar); the ping at the opening appears in "Zuletzt gestartet" - note its wave. "Sonar-Ton aus" on - the
+   scan sound is gone, everything else unchanged; close / open the sonar again, load a level, restart the game: still
+   off (`[Sound] SonarMute=1` in TruMenu.ini). Lara's hint line (group 70) still audible with the sonar switch on.
+6. "Sonar: ganze Gruppe 57 aus (Notlösung)": log `snd.mute: group 57 muted`; off again: `group 57 unmuted`.
+7. "Monitor + Verlauf ins Log": `snd.monitor` lines with names, groups, sources; `snd.history` lines.
+8. Old W6 rows with real ids now: "Welle 10 stumm / an" (main menu click silent), "Nur Welle 10 (Solo)".
+9. Negative: `snd.history 0` / `snd.history 999` -> usage; `snd.sonar 2` -> bool (= on, mode 1); `[Sound] SonarMute=7`
+   / `HistoryMax=0` / `LogFadeSec=-1` in TruMenu.ini -> the defaults (start line); `SonarWaves=abc` -> 914 915 916; a
+   stream row (no wave / emitter) right once -> "only its whole group (right twice)", left -> nothing muted.
+
 ## 0.22.46 - arena from the main menu, GameTracker+0xb9 in the front end (2026-11-14)
 
 Built into `work\asi\menu0269`, not installed, no live test (finding in the workspace

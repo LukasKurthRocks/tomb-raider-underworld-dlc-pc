@@ -1,0 +1,15 @@
+# TruMenu 0.22.47 (sound monitor, sound log overlay, sonar sound switch): kW7Checks = the code the wave id and the
+# emitter link of a voice rest on, in the order of the table in TruMenu.cpp. Disassembly work/sndui_1411/dis_5906e0.txt,
+# dis_584300.txt, work/w6_1411/dis_591245.txt + dis_5912c0.txt (tools/pe_dis.py on the Steam tru.exe).
+# wave node 0x591220: Wave_Find gives the wave table entry (manager +8 + id * 0x18, +0 != 0 = loaded); VoicePool::Play
+# gets the entry's +4 (the sample object), not the entry - so voice +0x10 = [entry+4] (0.20.1 .. 0.22.46 took the entry)
+0059133f 8b4b04 50 e89812ffff 8b5b04 53 b908818a00 e86aacffff
+0058432e 8d0452 3974c108 8d44c108
+# before Play the node's +8 becomes a new 0x90-byte params object (allocator vtable +0x34, ctor 0x5906e0), so voice
+# +0x1c = that object, not the params the node got
+005912f9 6a00 6890000000 ffd0
+0059131b e8c0f3ffff eb02 33c0 8d5020 8bc8 894618 894608
+# ctor 0x5906e0(params, group params, R, R+0x20, parent node): +0x74 = params (the node's own, = &emitter+0x14 for a wave
+# directly under its emitter), +0x7c / +0x78 / +0x80 the others, ret 0x14
+00590766 8b4508 8b4d10 8b550c 894674 8b4514 898680000000 894e78 89567c
+0059079b c21400

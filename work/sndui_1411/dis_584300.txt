@@ -1,0 +1,38 @@
+00584300  8b542404             mov     edx, dword ptr [esp + 4]
+00584304  56                   push    esi
+00584305  33f6                 xor     esi, esi
+00584307  81fa00140000         cmp     edx, 0x1400
+0058430d  721f                 jb      0x58432e
+0058430f  a1f010cd00           mov     eax, dword ptr [0xcd10f0]
+00584314  6800140000           push    0x1400
+00584319  52                   push    edx
+0058431a  68a8088500           push    0x8508a8
+0058431f  50                   push    eax
+00584320  e87b140c00           call    0x6457a0
+00584325  83c410               add     esp, 0x10
+00584328  8bc6                 mov     eax, esi
+0058432a  5e                   pop     esi
+0058432b  c20400               ret     4
+0058432e  8d0452               lea     eax, [edx + edx*2]
+00584331  3974c108             cmp     dword ptr [ecx + eax*8 + 8], esi
+00584335  8d44c108             lea     eax, [ecx + eax*8 + 8]
+00584339  7517                 jne     0x584352
+0058433b  8b0df010cd00         mov     ecx, dword ptr [0xcd10f0]
+00584341  52                   push    edx
+00584342  688c088500           push    0x85088c
+00584347  51                   push    ecx
+00584348  e853140c00           call    0x6457a0
+0058434d  83c40c               add     esp, 0xc
+00584350  33c0                 xor     eax, eax
+00584352  5e                   pop     esi
+00584353  c20400               ret     4
+00584356  cc                   int3    
+00584357  cc                   int3    
+00584358  cc                   int3    
+00584359  cc                   int3    
+0058435a  cc                   int3    
+0058435b  cc                   int3    
+0058435c  cc                   int3    
+0058435d  cc                   int3    
+0058435e  cc                   int3    
+0058435f  cc                   int3    

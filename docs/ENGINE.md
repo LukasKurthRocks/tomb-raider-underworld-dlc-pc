@@ -1296,6 +1296,17 @@ file must not be copied over it (31 type-9 libs incl. 2943 / 2944 and 25 materia
   sound list `[inst+0x248]` (+0xc slot table, 0xc B per slot, [slot] = handle, [handle] = emitter; +0x10 dynamic list,
   node +0 next / +4 handle, end node `[0xcd3bb8]`) holds the emitter; an emitter in no list was released at once by its
   starter. TruMenu 0.22.45 `snd.wave` / `snd.now` / `snd.mute s<id>` use this. ✅ static / ⬜ live
+  **Correction (2026-11-14, TruMenu 0.22.47, `work/sndui_1411/dis_5906e0.txt`, `precheck_02247.txt`):** before Play the
+  node's +8 is replaced by a NEW 0x90-byte params object (alloc 0x5912f9, ctor **0x5906e0(params, group params, R,
+  R+0x20, parent node)** at 0x59131b, stored 0x59132c), so voice +0x1c is that object - voice +0x1c - 0x14 is never the
+  emitter. The ctor keeps the node's params at **+0x74** (0x59076f; +0x7c group params, +0x78 R, +0x80 R+0x20, node
+  +0x50 linked under the parent node). Emitter = the first of params -> [params+0x74] whose -0x14 holds the vtable
+  0x851240 (TruMenu walks at most 4 steps). ✅ static / ⬜ live
+* **Wave id of a voice** (2026-11-14, TruMenu 0.22.47): the wave node gets the wave table entry from Wave_Find (manager
+  vtable +0x64 = 0x584300: entry = manager +8 + id * 0x18, entry +0 != 0 = loaded) and hands VoicePool::Play the entry's
+  **+4** (0x591348 `mov ebx,[ebx+4]; push ebx`) - voice +0x10 is that sample object, never the entry. The id comes back
+  only through a lookup entry +4 -> id. TruMenu 0.20.1 .. 0.22.46 read `(sample - table) / 0x18` (every voice "Stream",
+  all `snd.now` / `snd.dump` lines of 14.11.). ✅ static / ⬜ live
 * Anim event kind 2 -> 0x5b9fd8 -> 0x5b69c0 (type table 0x5b6b30) -> slot object 0x593d50(slot, mode, p3, p4); instance
   sound object 0x58d6a0: count `[obj+0xa8]`, table `[obj+0xac]` (8 B per slot). TU passes a 5th argument (0x8226de00) - not
   ported ⬜. ✅
@@ -1338,6 +1349,13 @@ ChannelI method (thiscall), e.g. Channel::setPaused 0x7b9be0. `ChannelI::setMute
 effective mute bit 3 when it or a group of the chain (+0x8c, parent +0x1c, flag +0x58) is muted - then every
 sub-channel volume 0, else the channel volume +0xb8 put back; `getMute` 0x7c9346 = bit 1. TruMenu 0.22.45 `snd.mute`
 / `snd.solo` call it the same way. ✅ static / ⬜ live (audible effect)
+**PDA / sonar sounds** (2026-11-14, data: `tools/sound_groups.py scan`, `docs/Befund-Ton-Gruppen-0611`): group 57 (parent
+53 HUD) holds only the 8 waves of `g_pda.drm` - 909 ui_click_27, 910 ui_PDA_exit_01, 911 ui_PDA_enter_01 (sections
+3372 / 3374), 912 / 913 ui_convolution_23 / _22, **914 / 915 computer_hum_12 / _04 (both in SoundPlex section 3381 = the
+two-voice loop while the sonar is open; live 14.11.: 2 voices g57 vol 0.07, everything else paused)**, 916
+alrm_radar_03 (section 3382). **Group 70 (Lara's hint lines, ~500 streams) is a child of 57**: a group mute of 57
+silences her hints too. TruMenu 0.22.47 "Sonar-Ton aus" mutes 914 / 915 / 916 per channel (group 57 only as the
+fallback). ✅ data / ⬜ live (which wave is the opening ping)
 **Group DSP effect** (2026-11-10): entry +0x7c is a **u16** DSP kind and +0x80 points to its parameter block in the
 DTP (16 or 32 B of floats). The loop 0x58de50 over all groups tests `word ptr [entry+0x7c]` and, when non-zero (and
 the group's wrapper +0x5c is 0), calls 0x58dad0 -> 0x587620: `movzx` kind 1..11 -> jump table 0x5876fc -> FMOD DSP

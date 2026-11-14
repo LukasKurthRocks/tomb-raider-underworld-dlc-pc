@@ -62,6 +62,8 @@ TruShadowCombat | Adrenaline | FillPercent | int:0..1000:25 | Adrenalin: Auffül
 TruShadowCombat | Adrenaline | DrainPercent | int:0..1000:25 | Adrenalin: Abbau % | Adrenaline: drain % | live | 100 | Abbau 20/s x %, 0 = kein Abbau (100 = Daten) // Drain 20/s x %, 0 = no drain (100 = data) | TruShadowCombat 0.6.14
 TruShadowCombat | Adrenaline | DrainModePercent | int:0..1000:25 | Adrenalin: Abbau R3-Modus % | Adrenaline: drain R3 mode % | live | 100 | Abbau im R3-Modus 225/s x % (100 = Daten) // Drain in R3 mode 225/s x % (100 = data) | TruShadowCombat 0.6.14
 TruShadowCombat | Adrenaline | StrikeWithoutFullMeter | bool | Absprung-Schlag ohne volle Leiste | Vault strike without full meter | live | 0 | Bedingung 538 immer wahr (Hilfe, Hauptspiel) // Condition 538 always true (assist, main game) | TruShadowCombat 0.6.14
+TruShadowCombat | Adrenaline | ModeWithoutTarget | bool | Adrenalin-Modus ohne Ziel (Test) | Adrenaline mode without target (test) | restart | 0 | LT ohne Gegner + R3 startet den Modus // LT without an enemy + R3 starts the mode | TruShadowCombat 0.6.15
+TruShadowCombat | Adrenaline | StrikeWithoutButton | bool | Absprung-Schlag ohne X (Test) | Vault strike without X (test) | restart | 0 | Bedingung 150 nur für den Schlag wahr // Condition 150 true for the strike only | TruShadowCombat 0.6.15
 TruShadowCombat | States | Translate231Slot0 | bool | Zustand 231 Slot 0 | State 231 slot 0 | live | 0 | Zustand 231 Slot 0 mit dem TU-Doppel-Helfer // State 231 slot 0 with the TU doppelganger helper
 TruShadowCombat | States | Translate231Slot1 | bool | Zustand 231 Slot 1 | State 231 slot 1 | live | 0 | Zustand 231 Slot 1 wie TU // State 231 slot 1 as TU
 TruShadowCombat | Strike | Translate | bool | Schattenschlag wie TU | Shadow strike as TU | live | 0 | TU-Schattenschlag; braucht Gate oder Translate beim Start // TU shadow strike; needs Gate or Translate at start
@@ -241,6 +243,14 @@ TruMenu | Achievements | Enabled | bool | Erfolge aufzeichnen (Q20) | Record ach
 # switches the log at once; WaveIds is a text value, no switch)
 TruMenu | Sound | WaveLog | bool | Wellen-Log (Welle 10 beim Start) | Wave log (wave 10 at its start) | restart | 1 | Eine Zeile je Start: Unit, Emitter, Objekt // One line per start: unit, emitter, object | TruMenu 0.22.45
 TruMenu | Sound | WaveLogMax | int:0..5000:50 | Wellen-Log: höchstens n Zeilen | Wave log: at most n lines | restart | 500 | 0 = ohne Grenze; danach nur gezählt // 0 = no limit; after that only counted | TruMenu 0.22.45
+# 2026-11-14: TruMenu 0.22.47 - sound monitor / log overlay / sonar sound in [Sound], read at the start (the bar rows
+# snd.sonar / snd.sonar57 / snd.logview switch at once and write SonarMute / OverlayStyle back)
+TruMenu | Sound | SonarMute | int:0..2:1 | Sonar-Ton aus (1 Wellen, 2 Gruppe 57) | Sonar sound off (1 waves, 2 group 57) | restart | 0 | 1 = nur Sonar-Wellen 914-916; 2 = Gruppe 57 + Hinweise // 1 = sonar waves 914-916 only; 2 = group 57 + Lara's hints | TruMenu 0.22.47
+TruMenu | Sound | OverlayStyle | bool | Ton-Anzeige als Log | Sound box as a log | restart | 1 | Neueste oben, Farben je Art; 0 = alte Liste // Newest on top, colour per kind; 0 = old list | TruMenu 0.22.47
+TruMenu | Sound | History | bool | Ton-Verlauf (letzte Starts) | Sound history (last starts) | restart | 1 | Für Ton-Monitor und Log-Anzeige // For the sound monitor and the log box | TruMenu 0.22.47
+TruMenu | Sound | HistoryMax | int:5..200:5 | Ton-Verlauf: Zeilen | Sound history: rows | restart | 30 | Leiste, Log-Anzeige, snd.history // Bar, log box, snd.history | TruMenu 0.22.47
+TruMenu | Sound | HistoryLog | bool | Ton-Starts ins Log | Sound starts to the log | restart | 0 | Eine Zeile snd.start je Start (max. 5000) // One snd.start line per start (max 5000) | TruMenu 0.22.47
+TruMenu | Sound | LogFadeSec | int:0..120:5 | Log-Anzeige: Ausblenden (s) | Log box: fade (s) | restart | 15 | Zeile verblasst über n s, weg nach 4 x n // A line fades over n s, gone after 4 x n | TruMenu 0.22.47
 # 2026-11-12 (labels): TruMenu 0.22.36 - [Debug] LabelCollected / LabelLaraGear in TruMenu.ini (LgReadSwitch, about once a second = live)
 TruMenu | Debug | LabelCollected | bool | Namen: Eingesammeltes grau zeigen | Labels: show collected in grey | live | 0 | Aufgehobenes / Verstecktes: 0 kein Name, 1 grau // Picked up / hidden: 0 no label, 1 grey label | TruMenu 0.22.36
 TruMenu | Debug | LabelLaraGear | bool | Namen an Laras Ausrüstung | Labels on Lara's gear | live | 0 | Waffen / Geräte an Lara (aus den Spieldaten) // Weapons / tools on Lara (from the game data) | TruMenu 0.22.36
