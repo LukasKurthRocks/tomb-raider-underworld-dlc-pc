@@ -166,6 +166,7 @@ Technical detail (addresses, structs, tools) is in [ENGINE.md](ENGINE.md); the S
 | Sliders | Music slider = group 1 (menu theme, level music, stingers); Effects slider = group 4, 70 of 80 groups incl. Lara's voice and hint lines; Speech slider = group 7, only cutscene speech (25) and a few DLC 2 lines | ✅ | Befund-Ton-Gruppen-0611 |
 | Ambience | Group 15 with 16-24: loops 19, animals 20, fire 21, wind / storm 22, water 23, underwater 24. DLC 2 ambience beds run in the music group | ✅ | Befund-Ton-Gruppen-0611; Befund-W6-Toene-1411 |
 | HUD sounds | Group 53: binoculars 54, Lara special 55 (heartbeat, adrenaline time bend, rewards, targeting), menu 56, PDA 57; Lara's hint lines 70 sit under the PDA group | ✅ | Befund-Ton-Gruppen-0611 |
+| PDA / sonar sounds | Group 57 itself holds only the 8 PDA waves 909-916; muting the whole group also mutes Lara's hint lines (child group 70). The steady sonar hum is most likely section 3381 `computer_hum` (waves 914 / 915, the only two-wave sound there) | ✅ data / hum 🔶 | ENGINE §18.2; Befund-Tonanzeige-1411 |
 | Pause / death | The pause menu pauses groups 6, 25, 3, 9 (+79 on TU); Lara's death silences groups 70 and 76 | ✅ | ENGINE §18.3 |
 | Effects | Groups 58 / 59 carry a ParamEQ. TU group 77 = echo (500 ms; DLC 2 player's voice in bad water / drowning), 78 = chorus (75 ms; her body foley) | ✅ data | ENGINE §18.3 "Game DSP kinds" |
 | 3D falloff | A 3D sound is full inside 158 units, silent beyond 3161 units, squared falloff between (defaults) | ✅ static | ENGINE §18.3 "Why the group 78 voices sit at volume 0" |
