@@ -2928,6 +2928,116 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.48 - adrenaline at Lara, teaser style 12, page Kapitel, Sonar komplett (2026-11-14)
+
+Built into `work\asi\menu0271`, not installed, no live test (owner wishes of 14.11.; report in the workspace
+`docs\Befund-TruMenu-02248-1411.md`, the sonar finding `docs\Befund-Sonar-Komplett-1411.md`). 13 byte checks
+`kSoChecks` (`work\menu48_1411\precheck_02248.txt`, 0 mismatches on `data\pc\tru.exe` and the installed exe; start line
+`0.22.48 sonar: checks ok (13 rows); ...`), one call stub and three byte patches - all written only while
+`[Sonar] FullMap=1`.
+
+- **Adrenaline at Lara** (owner rule: "alles was Adrenalin betrifft kommt wie bei der Schattenpower zu Lara"): bar page
+  **Figur**, new group **"Adrenalin (Lara)"** (open at the start, not greyed while Lara is played - the switches act in
+  the main game): `adren.meter` (live), `adren.fill`, `adren.keep` and every TruShadowCombat `[Adrenaline]` switch as the
+  page Fixes row of `TruMenu.switches.txt` (kQbSwitch: one state, the file is the one source) - FillPercent,
+  DrainPercent, DrainModePercent, AssistPointer, StrikeWithoutFullMeter, ModeWithoutTarget ("Adrenalin-Modus ohne Ziel
+  (Test)"), StrikeWithoutButton ("Absprung-Schlag ohne X (Test)"), Log - plus a hint line "Ohne X / ohne volle Leiste:
+  braucht [Conditions] Enabled=1" and that switch (`TruShadowCombat [Conditions] Enabled`) right below it. Page Tests
+  keeps copies only: the old `adren.*` rows (Paket A, Arena 1, Paket 4) and in Paket A the three 0.6.14 / 0.6.15 test
+  switches with the checks A.6 / A.7. The shadow-power groups of 0.22.16 stay as they were.
+- **Switches rows corrected:** `ModeWithoutTarget` / `StrikeWithoutButton` are **live** (0.22.47 said restart):
+  TruShadowCombat 0.6.15 reads both in `M15ReadSwitches`, called from `Q108ReadSwitches` by the Q108 thread about once
+  a second (the INI comment "Read again at run time" is right). StrikeWithoutButton acts only when condition 150 was
+  wrapped at the start - that needs `[Conditions] Enabled=1`, as StrikeWithoutFullMeter (condition 538): both hints say
+  so now. `trumenu_ini_check` knows both as live keys (SW_LIVE).
+- **Teaser display default 12** (small circle + light blue count badge on its lower right; was 7): `[Menu] AttractIcon`
+  default, `kAtStyleDefault`, the switches row. An INI that holds a value keeps it.
+- **Page Kapitel** (was "Kapitel (debug)"): the name without "(debug)". The six unused unit slots
+  (`dlc_level3_start` .. `dlc_level6_start`, `dlc_level1_left` / `_right`: only named in the game's unit lists
+  `unitlist.txt` / `objlist.dat` / scripts, never built - no archive holds them) no longer show the work package names
+  "17p / 17s": group "nie gebaute Plätze / never-built slots", row "nie gebaut / never built", footer / help / answer
+  "nur in der Unit-Liste, nie gebaut ...", the long menu and `level.load` value list the same.
+- **Sonar komplett** (`sonar.full`, `[Sonar] FullMap`, live; finding option C only - display only): the PDA sonar keeps
+  2 bits per map vertex (0 unknown, 1 revealed, 2 pending) and the draw 0x6e3a00 shows a face only from vertices in
+  state 1. With FullMap the three tests become "= 1": 0x6e3b25 `0f 94 c3` -> `b3 01 90`, 0x6e3b59 `0f 94 44 24 11` ->
+  `c6 44 24 11 01`, 0x6e3ba2 `0f 94 44 24 12` -> `c6 44 24 12 01` - every face of every loaded, placed map unit of the
+  floor is drawn (the PDA loads all portal-connected units of the floor; a ping only tests the current unit and its
+  direct neighbours). The reveal state itself, the ping, the rays and the save block are not touched: off = the game's
+  bytes, the map is again exactly what the pings revealed (also after a save / load). Not built: the finding's options
+  A / B (they reveal for real and end up in the save).
+  - **MAP placeholder** (`sonar.placeholder`, `[Sonar] HidePlaceholder`, default 1, live): units without a baked map
+    carry a placeholder mesh (100 faces / 56 vertices = big 3D letters "MAP": DLC 2 rooms, `dlc_level1_start`,
+    `dlc_treasureroom`, five base units). With FullMap and HidePlaceholder 1 a call stub at 0x6e3ab0 (`8b 41 44 85 c0`
+    -> `call`) gives such a mesh the face count 0, the game's own `jle 0x6e3ad2` skips it. Decision: default 1, because
+    without it the full map would show the letters exactly where the owner plays DLC 2; with FullMap 0 the stub is not
+    written at all (the game's code, its letters only where a ping reveals them).
+  - **Floor markers** (`sonar.markers`, `[Sonar] FloorMarkers`, default 0, live, only with FullMap): 0x6e40c6 `74 40` ->
+    `90 90` - every stair / floor-change marker of the loaded units, not only those a ping saw. Display only (the
+    marker draw 0x6e1e00 with the game's own floor tests); off by default because it changes what the owner sees more
+    than the map itself.
+  - **Triangle cap**: the sonar draws at most 93572 triangles per frame (0x6dfa60, `[0xee03e8]`; `[0xee03ec]` counts
+    the refused ones, both reset at each sonar frame by 0x6e4130). While FullMap is written and the sonar is open
+    (`[0xee03c8]` 2 .. 4) TruMenu reads the counter: one line `sonar: triangle cap hit - the last sonar frame drew ...
+    triangles and refused ...` (at most one per 10 s, 40 per game start). Large DLC 1 areas (dungeon + halls ~129 000
+    faces) may hit it - then parts of the far map are missing; nothing else happens.
+  - **When written**: on the game thread only (PadHook, every pad poll; the sonar draws on the same thread), only over
+    the expected bytes and put back only over our own; a site found changed = one line `0.22.48 sonar: ... refused -
+    ... holds ..., not the ... bytes; Sonar komplett off for this run` and everything of ours goes back. One line per
+    change: `0.22.48 sonar (<why>): FullMap 1 - 0x6e3b25 / 0x6e3b59 / 0x6e3ba2 every vertex counts as revealed while
+    drawing (display only, the save untouched); HidePlaceholder 1 - 0x6e3ab0 call stub ...; FloorMarkers 0 - 0x6e40c6
+    the game's bytes (sonar mode [0xee03c8] = n)`. The INI is read again about once a second (`sonar: [Sonar] FullMap 0
+    -> 1, ... (TruMenu.ini, live)`); the items write it (`IniKeepInt`) and act at once.
+  - `sonar.status`: what is written now, the INI values, the sonar mode, the MAP meshes the stub skipped, the polls
+    with refused triangles.
+  - Bar page **Spiel-Einstellungen**, new group **"PDA / Sonar"**: Sonar komplett, MAP-Platzhalter aus, alle
+    Stockwerk-Marker, Stand, and a copy of "Sonar-Ton aus" (`snd.sonar`, the same `[Sound] SonarMute` as in
+    "Ton-Monitor (live)"). Page Fixes: group **"PDA / Sonar (TruMenu)"** with the three `[Sonar]` rows (live). Page
+    Tests: **"Paket G: Sonar komplett"** (copies of those rows, the dungeon load, checks G.1 - G.5).
+- `docs/Regression-DLC2.md` step 24 / `tests/regress/dlc2.txt` step 6: from the main menu `level.start l1_seatop 0` (or
+  `arena.go 1a`) - `level.load` is refused there since 0.22.46.
+- `kQbViewMax` 320 (was 256): page Tests has 259 static rows; with every group open 240 was the limit.
+- Options: `[Sonar] FullMap`, `[Sonar] HidePlaceholder`, `[Sonar] FloorMarkers`; switch rows for the three (group
+  `tmsonar`, live); `[Menu] AttractIcon` default 12.
+- Checks: `trumenu_ini_check` `check_02248` (negative cases `work\menu48_1411\m48_negative_tests.py`: 37 + 1 positive);
+  `check_02240` / `check_02241` default by `AT_DEFAULT`, `check_0217` page name, `check_02244` Paket G + key count +
+  kQbViewMax, `check_02247` version part; `trumenu_quick_check` QB_VIEW_MAX 320. The stub's compiled bytes:
+  `work\menu48_1411\stub_bytes.py` (one match, both `jne` land on `test eax,eax`).
+
+### TO TEST 0.22.48
+
+1. Start, `TruMenu.log`: `0.22.48 sonar: checks ok (13 rows); [Sonar] FullMap 0, HidePlaceholder 1, FloorMarkers 0
+   (live; ...)`; no `0.22.48 sonar: ... refused`.
+2. Bar page **Figur**: group "Adrenalin (Lara)" open, white rows (not grey) - Adrenalin (live), voll, voll halten, the
+   eight TruShadowCombat rows with their values (`keine INI` / missing key: TruShadowCombat 0.6.15 INI not installed),
+   the hint line, "Bedingungen 2005/2006/2013". The help line of "Absprung-Schlag ohne X (Test)" names
+   `[Conditions] Enabled=1`. Count column of ModeWithoutTarget / StrikeWithoutButton: `live`.
+3. "Adrenalin-Modus ohne Ziel (Test)" right: `TruShadowCombat.ini` `[Adrenaline] ModeWithoutTarget=1`, within ~1 s
+   `TruShadowCombat.log` `0.6.15 switches (run time) ...` (no restart). Page Tests / Paket A shows the same value.
+   Left: back to 0, the same log line with 0.
+4. Main menu: the teaser display is the small circle with the light blue count badge on its lower right - only if
+   TruMenu.ini has no `AttractIcon` (the owner's has `AttractIcon=12` = the same).
+5. Page **Kapitel** (name without "(debug)"): group "Ungenutzte DLC-Plätze 3 - 6 + left / right" shows "nie gebaute
+   Plätze"; a unit row "nie gebaut"; right on it: the answer "ungenutzt - nur in den Unit-Listen genannt, nie gebaut
+   ...". Nowhere "17p" / "17s".
+6. **Sonar komplett** in a level with a map (base game, e.g. Croft Manor, or DLC 1 `dlc_caverns`): open the PDA sonar
+   with FullMap 0 - note what is revealed. Close it, Spiel-Einstellungen / PDA / Sonar "Sonar komplett" right: log
+   `0.22.48 sonar (sonar.full): FullMap 1 - ... every vertex counts as revealed ...; HidePlaceholder 1 - 0x6e3ab0 call
+   stub ...`; open the sonar: the whole floor map (also rooms never visited), stair markers only where seen (G.1).
+   Also try it with the sonar open (bar over the PDA): the map changes at once.
+7. Off again: `FullMap 0 - ... the game's bytes`; the sonar shows exactly the earlier revealed part (G.2). Save, load
+   the save, open the sonar: as before the test (G.4) - nothing revealed for real.
+8. "alle Stockwerk-Marker" on (with FullMap): more stair / floor markers at the edges of the floor; off: as before.
+9. DLC 2 (`dlc_level2_start`, a `dlc2_*` room) with FullMap 1: no big letters "MAP" in the sonar (G.3); `sonar.status`
+   counts `MAP meshes skipped`. "MAP-Platzhalter aus" off (FullMap stays 1): the letters appear; on: gone.
+10. DLC 1 dungeon (`dlc_dungeon`, Paket G "Kerker laden"), FullMap 1, open the sonar, look around: frame rate; if
+    parts of the far map are missing, `sonar: triangle cap hit - ...` in the log (G.5); `sonar.status` cap hits > 0.
+11. Fixes page group "PDA / Sonar (TruMenu)": FullMap right -> `[Sonar] FullMap=1` in TruMenu.ini, within ~1 s
+    `sonar: [Sonar] FullMap 0 -> 1 ... (TruMenu.ini, live)` and the `0.22.48 sonar (run time): ...` line.
+12. Negative: `sonar.full 2` -> bool (= on); `[Sonar] FullMap=7` in the INI -> on (non-zero); a changed byte at a site
+    (another plugin) -> the `refused` line, `sonar.full` answers `disabled: pre-check failed (...)`; `sonar.placeholder
+    1` / `sonar.markers 1` with FullMap 0 -> "(wirkt erst mit Sonar komplett)", nothing written (`sonar.status`: full 0
+    placeholder 0 markers 0); main menu with FullMap 1: the bytes are written at the first pad poll in a level.
+
 ## 0.22.47 - sound monitor, the sound box as a log, sonar sound off (2026-11-14)
 
 Built into `work\asi\menu0270`, not installed, no live test (finding in the workspace `docs\Befund-Tonanzeige-1411.md`;
@@ -5767,6 +5877,9 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Sound] WaveLog` | 1 | 0.22.45 (W6): one `snd.wave <id> START` line in `TruMenu.log` per start of a wave in `WaveIds` - unit, voice, group, volume, emitter + SoundPlex section, the object whose sound list holds the emitter, the wave table entry; `snd.wavelog on / off` switches it for this game start (switch row in group `Diagnose (TruMenu)`, read at the start) |
 | `[Sound] WaveIds` | 10 | 0.22.45 (W6): the waves of `WaveLog`, decimal 0 .. 5119, at most 8 (space or comma between); 10 = `ui_drop_04` / the DLC 2 reuse of 6:10 (`docs\Befund-Gruppe-J-1211.md`); `snd.wavelog <ids>` for this game start |
 | `[Sound] WaveLogMax` | 500 | 0.22.45 (W6): at most n `snd.wave` lines per game start (0 = no limit); later starts are only counted (`snd.mutes`) |
+| `[Sonar] FullMap` | 0 | 0.22.48 (`sonar.full`): 1 = Sonar komplett - the PDA sonar draws every face of the loaded, placed map units of the floor, not only what the ping revealed (3 patches in the draw 0x6e3a00: every vertex counts as revealed); display only - the reveal state in the save (SaveInfo block 6) is not touched, off = the game's bytes and map at once. Live: TruMenu reads the key about once a second (switch row in group `PDA / Sonar (TruMenu)`), the item writes it |
+| `[Sonar] HidePlaceholder` | 1 | 0.22.48 (`sonar.placeholder`): only with `FullMap=1`: 1 = the placeholder mesh of units without a baked map (100 faces / 56 vertices = the big 3D letters "MAP" in DLC 2, `dlc_level1_start`, `dlc_treasureroom` and five base units) is not drawn (call stub at 0x6e3ab0); 0 = drawn. With `FullMap=0` nothing is hooked (the game's code). Live |
+| `[Sonar] FloorMarkers` | 0 | 0.22.48 (`sonar.markers`): only with `FullMap=1`: 1 = every stair / floor-change marker of the loaded units (0x6e40c6), not only the ones a ping saw; 0 = the game's. Live |
 
 ## Build, install, test (Windows)
 

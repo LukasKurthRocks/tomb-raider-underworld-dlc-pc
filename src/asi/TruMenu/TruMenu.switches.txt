@@ -61,9 +61,11 @@ TruShadowCombat | Chunk | RemoveLastPiece | bool | Letztes Chunk-Stück entferne
 TruShadowCombat | Adrenaline | FillPercent | int:0..1000:25 | Adrenalin: Auffüllen % | Adrenaline: fill % | live | 100 | Schaden x % füllt die Leiste (0xd9, 100 = Spiel) // Damage x % fills the meter (0xd9, 100 = game) | TruShadowCombat 0.6.14
 TruShadowCombat | Adrenaline | DrainPercent | int:0..1000:25 | Adrenalin: Abbau % | Adrenaline: drain % | live | 100 | Abbau 20/s x %, 0 = kein Abbau (100 = Daten) // Drain 20/s x %, 0 = no drain (100 = data) | TruShadowCombat 0.6.14
 TruShadowCombat | Adrenaline | DrainModePercent | int:0..1000:25 | Adrenalin: Abbau R3-Modus % | Adrenaline: drain R3 mode % | live | 100 | Abbau im R3-Modus 225/s x % (100 = Daten) // Drain in R3 mode 225/s x % (100 = data) | TruShadowCombat 0.6.14
-TruShadowCombat | Adrenaline | StrikeWithoutFullMeter | bool | Absprung-Schlag ohne volle Leiste | Vault strike without full meter | live | 0 | Bedingung 538 immer wahr (Hilfe, Hauptspiel) // Condition 538 always true (assist, main game) | TruShadowCombat 0.6.14
-TruShadowCombat | Adrenaline | ModeWithoutTarget | bool | Adrenalin-Modus ohne Ziel (Test) | Adrenaline mode without target (test) | restart | 0 | LT ohne Gegner + R3 startet den Modus // LT without an enemy + R3 starts the mode | TruShadowCombat 0.6.15
-TruShadowCombat | Adrenaline | StrikeWithoutButton | bool | Absprung-Schlag ohne X (Test) | Vault strike without X (test) | restart | 0 | Bedingung 150 nur für den Schlag wahr // Condition 150 true for the strike only | TruShadowCombat 0.6.15
+TruShadowCombat | Adrenaline | StrikeWithoutFullMeter | bool | Absprung-Schlag ohne volle Leiste | Vault strike without full meter | live | 0 | Bedingung 538 wahr; braucht [Conditions] Enabled=1 // Condition 538 true; needs [Conditions] Enabled=1 | TruShadowCombat 0.6.14
+# 2026-11-14 (TruMenu 0.22.48): ModeWithoutTarget / StrikeWithoutButton are live - TruShadowCombat 0.6.15 reads them in
+# M15ReadSwitches about once a second (Q108ReadSwitches from the Q108 thread); the rows of 0.22.47 said restart
+TruShadowCombat | Adrenaline | ModeWithoutTarget | bool | Adrenalin-Modus ohne Ziel (Test) | Adrenaline mode without target (test) | live | 0 | LT ohne Gegner + R3 startet den Modus // LT without an enemy + R3 starts the mode | TruShadowCombat 0.6.15
+TruShadowCombat | Adrenaline | StrikeWithoutButton | bool | Absprung-Schlag ohne X (Test) | Vault strike without X (test) | live | 0 | Schlag ohne X; braucht [Conditions] Enabled=1 // Strike without X; needs [Conditions] Enabled=1 | TruShadowCombat 0.6.15
 TruShadowCombat | States | Translate231Slot0 | bool | Zustand 231 Slot 0 | State 231 slot 0 | live | 0 | Zustand 231 Slot 0 mit dem TU-Doppel-Helfer // State 231 slot 0 with the TU doppelganger helper
 TruShadowCombat | States | Translate231Slot1 | bool | Zustand 231 Slot 1 | State 231 slot 1 | live | 0 | Zustand 231 Slot 1 wie TU // State 231 slot 1 as TU
 TruShadowCombat | Strike | Translate | bool | Schattenschlag wie TU | Shadow strike as TU | live | 0 | TU-Schattenschlag; braucht Gate oder Translate beim Start // TU shadow strike; needs Gate or Translate at start
@@ -287,5 +289,13 @@ TruMenu | Input | DeviceGlyphs | bool | Tasten-Hinweise nach Gerät (Pad / Tasta
 # 2026-11-13 (Q126, owner idea): TruMenu 0.22.39 - [Menu] AttractIcon (AtReadSwitch, about once a second = live)
 # 0.22.40 (Q126b): one cycle switch 0 .. 7 instead of AttractIcon 0 / 1 + AttractIconText (the bar row names the style)
 # 0.22.41 (Q126c): 8 .. 16 appended (small circle / terse text, no box); 0 .. 7 unchanged, default 7
+# 0.22.48 (owner 2026-11-14): default 12 (small circle + count badge on its lower right)
 group | tmhauptmenue | Hauptmenü (TruMenu) | Main menu (TruMenu)
-TruMenu | Menu | AttractIcon | int:0..16 | Teaser-Anzeige im Hauptmenü (0-16) | Teaser display in the main menu (0-16) | live | 7 | 0 aus, 1 Text, 2-7 Kreis, 8-12 klein o. Kasten, 13-16 knapp // 0 off, 1 text, 2-7 circle, 8-12 small no box, 13-16 terse | TruMenu 0.22.41
+TruMenu | Menu | AttractIcon | int:0..16 | Teaser-Anzeige im Hauptmenü (0-16) | Teaser display in the main menu (0-16) | live | 12 | 0 aus, 1 Text, 2-7 Kreis, 8-12 klein o. Kasten, 13-16 knapp // 0 off, 1 text, 2-7 circle, 8-12 small no box, 13-16 terse | TruMenu 0.22.41
+
+# 2026-11-14: TruMenu 0.22.48 Sonar komplett - [Sonar] in TruMenu.ini, read again about once a second (SoReadSwitch) =
+# live; HidePlaceholder / FloorMarkers act only while FullMap is 1 (bar page Spiel-Einstellungen, group PDA / Sonar)
+group | tmsonar | PDA / Sonar (TruMenu) | PDA / sonar (TruMenu)
+TruMenu | Sonar | FullMap | bool | Sonar komplett (ganze Karte) | Full sonar map | live | 0 | Ganze Karte, nur Anzeige; Spielstand bleibt // Whole map, display only; the save stays | TruMenu 0.22.48
+TruMenu | Sonar | HidePlaceholder | bool | Sonar komplett: MAP-Platzhalter aus | Full map: hide the MAP placeholder | live | 1 | Keine großen MAP-Buchstaben (mit FullMap) // No big MAP letters (with FullMap) | TruMenu 0.22.48
+TruMenu | Sonar | FloorMarkers | bool | Sonar komplett: alle Stockwerk-Marker | Full map: every floor marker | live | 0 | Alle Treppen-/Stockwerk-Marker (mit FullMap) // Every stair / floor marker (with FullMap) | TruMenu 0.22.48

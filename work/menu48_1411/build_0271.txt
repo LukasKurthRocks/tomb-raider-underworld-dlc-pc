@@ -1,0 +1,10 @@
+Built work\asi\menu0271\TruMenu.asi (2199040 bytes, x86 DLL, sha256 673b7bc62a2654a1e7f4e88856a298f0a7a9a78314b1911af4d38768bf138ef0) - TruMenu 0.22.48
+  Build-TruAsi.ps1 -Name TruMenu -OutDir work/asi/menu0271 from Git Bash (second build of the session; the first, before kQbViewMax 320, only checked the compile)
+  warnings: 2 (both imgui_demo.cpp), 0 in TruMenu.cpp; imports / exports = 0.22.47 (tools/pe_import_export_diff.py: 151 functions, same 6 exports, no new DLL - imports_exports_0270_0271.txt)
+  INI / switches / radial / tour in the build folder = source (cmp)
+  SoPlaceholderStub compiled as the source says (stub_bytes.py: one match, both jne land on test eax,eax - stub_bytes.txt)
+Byte checks: tools/pe_bytes_check.py --file work/menu48_1411/precheck_02248.txt -> 13 checks, 0 mismatches on data\pc\tru.exe (precheck_02248_result.txt) and on the installed exe (precheck_02248_installed.txt; same sha256 6905b046...a168)
+  work/sonar_1411/sonar_patch_check.py (the finding's checker): 104 OK, 0 FAIL on both (sonar_patch_check_data.txt / _installed.txt)
+trumenu_ini_check: see ini_check_final.txt; negative cases m48_negative_tests.py: 37 cases + 1 positive, 0 failed (m48_negative_tests.txt)
+trumenu_quick_check: exit 1 - only "menupages: 28 page keys" FAIL (old, not this change; as in 0.22.45 .. 0.22.47) (quick_check.txt)
+trumenu_readability_check: exit 0 (all pass) (readability_check.txt)

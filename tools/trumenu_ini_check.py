@@ -1802,6 +1802,9 @@ SW_LIVE = {
     ('TruShadowCombat', 'Adrenaline', 'DrainPercent'): 'void L14ReadSwitches(',
     ('TruShadowCombat', 'Adrenaline', 'DrainModePercent'): 'void L14ReadSwitches(',
     ('TruShadowCombat', 'Adrenaline', 'StrikeWithoutFullMeter'): 'void L14ReadSwitches(',
+    # 0.6.15 (2026-11-14; rows corrected to live with TruMenu 0.22.48): M15ReadSwitches from Q108ReadSwitches (once a second)
+    ('TruShadowCombat', 'Adrenaline', 'ModeWithoutTarget'): 'void M15ReadSwitches(',
+    ('TruShadowCombat', 'Adrenaline', 'StrikeWithoutButton'): 'void M15ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate231Slot0'): 'void ReadSwitches(',
     ('TruShadowCombat', 'States', 'Translate231Slot1'): 'void ReadSwitches(',
     ('TruShadowPower', 'Adrenaline', 'Translate'): 'void K11ReadSwitch(',
@@ -1831,6 +1834,10 @@ SW_LIVE = {
     ('TruMenu', 'Log', 'Save'): 'void SvReadSwitch(',                   # TruMenu 0.22.27 (Q79, TruSaveProbe.h)
     # TruMenu 0.22.39 (Q126, about once a second); 0.22.40 (Q126b): AtReadSwitch -> AtStyleRead, AttractIconText gone
     ('TruMenu', 'Menu', 'AttractIcon'): 'LONG AtStyleRead(',
+    # TruMenu 0.22.48 (Sonar komplett, about once a second from SoTick)
+    ('TruMenu', 'Sonar', 'FullMap'): 'void SoReadSwitch(',
+    ('TruMenu', 'Sonar', 'HidePlaceholder'): 'void SoReadSwitch(',
+    ('TruMenu', 'Sonar', 'FloorMarkers'): 'void SoReadSwitch(',
 }
 # Q75 (2026-11-11): keys the plugin re-reads at run time only when they were 1 at the game start (the code is patched
 # only then; a 1 after a start with 0 needs a restart). No "when" form of TruMenu says that: live-if:<Key> asks the key's
@@ -1842,8 +1849,9 @@ SW_START_GATED = {
 }
 SW_START_GATED_HINT = ('live nur wenn 1 beim Start', 'live if 1 at start')
 SW_MAX, SW_GROUP_MAX = 512, 24              # 0.22.23: 512 rows (was 160 - the shipped file had 159)
-QB_VIEW_MAX = 256                            # kQbViewMax: rows of one bar page (page Fixes: group rows + the open group);
-                                             # 0.22.44 (W2): 256 (was 128) - page Tests 227 static rows
+QB_VIEW_MAX = 320                            # kQbViewMax: rows of one bar page (page Fixes: group rows + the open group);
+                                             # 0.22.44 (W2): 256 (was 128) - page Tests 227 static rows; 0.22.48: 320 -
+                                             # page Tests 259 static rows (Paket A copies, Paket G)
 RING_FROZEN = 172                            # 0.21.5: the ring is frozen - no new entries
 
 
@@ -2506,7 +2514,8 @@ def check_0217(ini_path, switches_path):
     if '5d6dd6301472d6139706af928b6673679b04d4c2941ef89fb69e6f0f631a14b4' not in st or 'TruMenu.shaderlabel.txt' not in st:
         problems.append('Set-TruMenu.ps1: the 0.21.6 build in $earlierBuilds / the shader label data install missing')
     # 2 chapter units
-    if not re.search(r'QB_PAGE\("Kapitel \(debug\)", "Chapters \(debug\)", kQbChapters, kQsChapters\)', src):
+    # 0.22.48 (owner 2026-11-14): the page name without "(debug)"
+    if not re.search(r'QB_PAGE\("Kapitel", "Chapters", kQbChapters, kQsChapters\)', src):
         problems.append('TruMenu.cpp: page Kapitel must be kQsChapters (the units per chapter)')
     ub = src[src.index('const UnitRow kUnits[] = {'):]
     ub = ub[:ub.index('\n};')]
@@ -4734,6 +4743,7 @@ def check_02239(ini_path, switches_path):
                       'blink, front end only, help / greying (keys / row / item: check_02240)')
 
 
+AT_DEFAULT = '12'   # 0.22.48 (owner 2026-11-14): [Menu] AttractIcon default 12 (0.22.40 .. 0.22.47: 7)
 AT_STYLES_02240 = (('Aus', 'off'), ('Nur Text', 'text only'), ('Kreis', 'circle'), ('Kreis + Strich', 'circle + strike'),
                    ('Kreis, Text innen', 'circle, text inside'), ('Kreis, Text unten', 'circle, text below'),
                    ('Kreis + Strich, Text innen', 'circle + strike, text inside'),
@@ -4760,8 +4770,10 @@ def check_02240(ini_path, switches_path):
     src = read_cpp()
     if '0.22.40 (Q126b attract display styles' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.41: later part
         problems.append('TruMenu.cpp: kVersion must hold the 0.22.40 part "0.22.40 (Q126b attract display styles"')
-    # keys: one key, default 7; AttractIconText only in AtStyleRead / RunAt (the 0.22.39 mapping) and comments / texts
-    if not re.search(r'\{"Menu", "AttractIcon", "7",', src): problems.append('TruMenu.cpp: kOpts [Menu] AttractIcon must be "7"')
+    # keys: one key, default 7 (0.22.48: AT_DEFAULT 12); AttractIconText only in AtStyleRead / RunAt (the 0.22.39 mapping)
+    # and comments / texts
+    if not re.search(r'\{"Menu", "AttractIcon", "%s",' % AT_DEFAULT, src):
+        problems.append('TruMenu.cpp: kOpts [Menu] AttractIcon must be "%s"' % AT_DEFAULT)
     if re.search(r'\{"Menu", "AttractIconText",', src): problems.append('TruMenu.cpp: kOpts [Menu] AttractIconText must be gone')
     if 'g_atText' in src: problems.append('TruMenu.cpp: g_atText must be gone (the style replaces it)')
     code = re.sub(r'//[^\n]*', '', src)
@@ -4772,14 +4784,14 @@ def check_02240(ini_path, switches_path):
         problems.append('TruMenu.cpp: "AttractIconText" only in AtStyleRead (read + remove) and RunAt (remove)')
     ini = open(ini_path, encoding='utf-8').read().replace('\r\n', '\n')
     block = re.search(r'^\[Menu\]\n(.*?)(?=^\[|\Z)', ini, re.M | re.S)
-    if not block or not re.search(r'^AttractIcon=7$', block.group(1), re.M):
-        problems.append('%s: [Menu] AttractIcon=7 missing' % os.path.basename(ini_path))
+    if not block or not re.search(r'^AttractIcon=%s$' % AT_DEFAULT, block.group(1), re.M):
+        problems.append('%s: [Menu] AttractIcon=%s missing' % (os.path.basename(ini_path), AT_DEFAULT))
     if re.search(r'^AttractIconText=', ini, re.M): problems.append('%s: AttractIconText must be gone' % os.path.basename(ini_path))
     sw = [l.rstrip('\r\n').split(' | ') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Menu | ')]
     f = [x for x in sw if len(x) >= 10 and x[2] == 'AttractIcon']
-    if not f or not f[0][3].startswith('int:0..') or f[0][6] != 'live' or f[0][7] != '7':   # 0.22.41: range in check_02241
-        problems.append('%s: row TruMenu | Menu | AttractIcon | int:0..<n> | ... | live | 7 | ... missing'
-                        % os.path.basename(switches_path))
+    if not f or not f[0][3].startswith('int:0..') or f[0][6] != 'live' or f[0][7] != AT_DEFAULT:   # 0.22.41: range in check_02241
+        problems.append('%s: row TruMenu | Menu | AttractIcon | int:0..<n> | ... | live | %s | ... missing'
+                        % (os.path.basename(switches_path), AT_DEFAULT))
     if [x for x in sw if len(x) >= 3 and x[2] == 'AttractIconText']:
         problems.append('%s: row AttractIconText must be gone' % os.path.basename(switches_path))
     # the style table
@@ -4792,8 +4804,8 @@ def check_02240(ini_path, switches_path):
             if (unescape(row[3]), row[4]) != names:
                 problems.append('TruMenu.cpp: kAtStyles[%d] names must be %s / %s' % (i, names[0], names[1]))
             if len(names[0]) > 40 or len(names[1]) > 40: problems.append('kAtStyles[%d]: name over 40 characters' % i)
-    if not re.search(r'const int kAtStyleN = \d+, kAtStyleDefault = 7;', src):   # 0.22.41: N in check_02241
-        problems.append('TruMenu.cpp: kAtStyleN / kAtStyleDefault 7 missing')
+    if not re.search(r'const int kAtStyleN = \d+, kAtStyleDefault = %s;' % AT_DEFAULT, src):   # 0.22.41: N in check_02241
+        problems.append('TruMenu.cpp: kAtStyleN / kAtStyleDefault %s missing' % AT_DEFAULT)
     if 'return kAtStyles[s >= 0 && s < kAtStyleN ? s : kAtStyleDefault];' not in fn_body(src, 'const AtStyleDef &AtStyleOf('):
         problems.append('TruMenu.cpp: AtStyleOf must clamp to the default')
     # reading: the INI value, the 0.22.39 mapping, the range; migrate only from AtReadSwitch
@@ -4896,8 +4908,8 @@ def check_02241(ini_path, switches_path):
     raw = open(CPP, 'r', encoding='utf-8').read()
     if '0.22.41 (Q126c compact attract styles' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.42: a part
         problems.append('TruMenu.cpp: kVersion must hold the 0.22.41 part "0.22.41 (Q126c compact attract styles"')
-    if 'const int kAtStyleN = 17, kAtStyleDefault = 7;' not in src:
-        problems.append('TruMenu.cpp: kAtStyleN 17 / kAtStyleDefault 7 missing')
+    if 'const int kAtStyleN = 17, kAtStyleDefault = %s;' % AT_DEFAULT not in src:   # 0.22.48: AT_DEFAULT
+        problems.append('TruMenu.cpp: kAtStyleN 17 / kAtStyleDefault %s missing' % AT_DEFAULT)
     em = re.search(r'enum AtTextAt \{(.*?)\};', src, re.S)
     names = re.findall(r'kAtText[A-Za-z]+', re.sub(r'//[^\n]*', '', em.group(1))) if em else []
     want_enum = ['kAtTextNone', 'kAtTextOnly', 'kAtTextInside', 'kAtTextBelow', 'kAtTextLeft', 'kAtTextBare',
@@ -4974,10 +4986,10 @@ def check_02241(ini_path, switches_path):
     if not hm or '8-16' not in hm.group(1) + hm.group(2): problems.append('TruMenu.cpp: menu.attracticon help must name 8-16')
     sw = [l.rstrip('\r\n').split(' | ') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Menu | ')]
     f = [x for x in sw if len(x) >= 10 and x[2] == 'AttractIcon']
-    if not f or f[0][3] != 'int:0..16' or f[0][6] != 'live' or f[0][7] != '7' or f[0][9] != 'TruMenu 0.22.41' \
+    if not f or f[0][3] != 'int:0..16' or f[0][6] != 'live' or f[0][7] != AT_DEFAULT or f[0][9] != 'TruMenu 0.22.41' \
             or '(0-16)' not in f[0][4] or '(0-16)' not in f[0][5]:
-        problems.append('%s: row TruMenu | Menu | AttractIcon | int:0..16 | ...(0-16) | live | 7 | ... | TruMenu 0.22.41 '
-                        'missing' % os.path.basename(switches_path))
+        problems.append('%s: row TruMenu | Menu | AttractIcon | int:0..16 | ...(0-16) | live | %s | ... | TruMenu 0.22.41 '
+                        'missing' % (os.path.basename(switches_path), AT_DEFAULT))
     ini = open(ini_path, encoding='utf-8').read().replace('\r\n', '\n')
     if '\n; 0.22.40 / 0.22.41 (menu.attracticon)' not in ini or '; 7 the 0.22.39 look; no box: 8 / 9 small circle' not in ini:
         problems.append('%s: the [Menu] AttractIcon comment must name 0.22.41 and the styles 8 ..' % os.path.basename(ini_path))
@@ -5238,7 +5250,10 @@ W2_PACKAGES = (('a', 'Paket A: Adrenalin + Kampf', (('arena.go', '1a'), ('adren.
                ('c', 'Paket C: DLC 2 aus dem Pausemenue', ()),
                ('d', 'Paket D: Debug-Ansicht', (('dbg.roomonly', ''), ('dbg.metres', ''))),
                ('e', 'Paket E: Markup / Saeule / Wasser', (('draw.markup', ''), ('level.load', 'dlc_dungeon'))),
-               ('f', 'Paket F: Fixes 13.11.', (('level.start', 'dlc1'),)))
+               ('f', 'Paket F: Fixes 13.11.', (('level.start', 'dlc1'),)),
+               # 0.22.48: Paket G Sonar komplett (README 0.22.48 TO TEST; not in the 14.11. guide)
+               ('g', 'Paket G: Sonar komplett', (('sonar.full', ''), ('sonar.placeholder', ''), ('sonar.markers', ''),
+                                                 ('sonar.status', ''), ('snd.sonar', ''))))
 W2_ARCHIVED = ('tp_q90', 'ts_spots', 'light_diag', 'ts_diag', 'ts_hall02')   # sub-groups of ts_archive, in this order
 W2_KEPT = ('ts_teleport', 'ts_arena1', 'ts_cine')                           # level 0 between the TG block and the archive
 
@@ -5294,8 +5309,8 @@ def check_02244(switches_path):
                 if 'kQfSub' in tail or pkg is not None: problems.append(where + ': tg_1411 = the first row, level 0')
                 pkg = ''
                 continue
-            m = re.fullmatch(r'tg_([a-f])', arg)
-            if not m or 'kQfSub' not in tail: problems.append(where + ': a package group tg_<a-f> with kQfSub'); continue
+            m = re.fullmatch(r'tg_([a-g])', arg)   # 0.22.48: + g
+            if not m or 'kQfSub' not in tail: problems.append(where + ': a package group tg_<a-g> with kQfSub'); continue
             if arg not in starts: problems.append(where + ': %s missing in kQbStartClosed' % arg)
             pkg = m.group(1)
             if not de.startswith(labels[pkg]): problems.append(where + ': label must start "%s" (the guide)' % labels[pkg])
@@ -5307,8 +5322,8 @@ def check_02244(switches_path):
             if item != '-' or arg: problems.append(where + ': a note row has id "-" and no argument')
             if pkg in seen: seen[pkg]['note'] += 1
         elif kind == 'kQbCheck':
-            if item != 'test.mark' or not re.fullmatch(r'tg[A-F]\.[a-z0-9]+', arg) or len(arg) > 63:
-                problems.append(where + ': a check row is test.mark tg<A-F>.<name>')
+            if item != 'test.mark' or not re.fullmatch(r'tg[A-G]\.[a-z0-9]+', arg) or len(arg) > 63:
+                problems.append(where + ': a check row is test.mark tg<A-G>.<name>')
             elif arg[2].lower() != pkg: problems.append(where + ': check id of another package (group tg_%s)' % pkg)
             if arg in ids: problems.append(where + ': check id twice')
             ids.add(arg)
@@ -5320,7 +5335,7 @@ def check_02244(switches_path):
         elif kind in ('kQbLabel', 'kQbPlanned'): problems.append(where + ': no label / planned rows in the TG block')
         elif pkg in seen: seen[pkg]['items'].add((item, arg))
     if order != [p for p, _, _ in W2_PACKAGES]:
-        problems.append('TruMenu.cpp: TG package groups %s, wanted a .. f in order' % ''.join(order))
+        problems.append('TruMenu.cpp: TG package groups %s, wanted a .. g in order' % ''.join(order))
     for p, lab, need in W2_PACKAGES:
         c = seen.get(p)
         if not c: continue
@@ -5350,7 +5365,8 @@ def check_02244(switches_path):
     if '!strncmp(t.id, "tg", 2)' not in qt: problems.append('TruMenu.cpp: QbTestsRows must skip the tg<X>.<name> rows too')
     if '!_strnicmp(r.arg, "tg", 2) ? "1411" : "Q90"' not in fn_body(src, 'void TpCheckSet('):
         problems.append('TruMenu.cpp: TpCheckSet must tag the tg checks 1411 (the archived ones Q90)')
-    if 'const int kQbViewMax = 256;' not in src: problems.append('TruMenu.cpp: kQbViewMax must be 256')
+    if 'const int kQbViewMax = %d;' % QB_VIEW_MAX not in src:   # 0.22.48: QB_VIEW_MAX (320; 0.22.44: 256)
+        problems.append('TruMenu.cpp: kQbViewMax must be %d' % QB_VIEW_MAX)
     n_tests = len([r for r in qb_rows(src) if r[0] == 'kQbTests'])
     if n_tests + 16 > QB_VIEW_MAX:   # every group open: the static rows + room for the Prepare / TO TEST rows
         problems.append('TruMenu.cpp: page Tests has %d static rows - kQbViewMax %d leaves < 16 for Prepare / TO TEST' %
@@ -5401,10 +5417,11 @@ def check_02244(switches_path):
     if not ok: problems.append('TruMenu.cpp: page Spiel-Einstellungen group set_ctl lacks the switch row DeviceGlyphs')
     if 'TruMenu:Input:DeviceGlyphs' not in sw_keys: problems.append('switches: TruMenu | Input | DeviceGlyphs missing')
     header, opt_rows = table(src)
-    # 0.22.44 added none, 0.22.45 the three [Sound] wave log keys, 0.22.47 the seven sound monitor / sonar keys
-    if len(opt_rows) != 283 + len(W6_KEYS_02245) + len(W7_KEYS_02247):
-        problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.44 adds no INI key (283), 0.22.45 adds %d, 0.22.47 adds %d' %
-                        (len(opt_rows), len(W6_KEYS_02245), len(W7_KEYS_02247)))
+    # 0.22.44 added none, 0.22.45 the three [Sound] wave log keys, 0.22.47 the seven sound monitor / sonar keys, 0.22.48
+    # the three [Sonar] keys
+    if len(opt_rows) != 283 + len(W6_KEYS_02245) + len(W7_KEYS_02247) + len(SO_KEYS_02248):
+        problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.44 adds no INI key (283), 0.22.45 adds %d, 0.22.47 adds %d, '
+                        '0.22.48 adds %d' % (len(opt_rows), len(W6_KEYS_02245), len(W7_KEYS_02247), len(SO_KEYS_02248)))
     readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
     if '\n## 0.22.44 - ' not in readme or '\n### TO TEST 0.22.44' not in readme:
         problems.append('README.md: section "## 0.22.44 - ..." with "### TO TEST 0.22.44" missing')
@@ -5689,8 +5706,8 @@ def check_02247(switches_path):
     README 0.22.47 with TO TEST; Set-TruMenu knows the 0.22.46 hash"""
     problems = []
     src = read_cpp()
-    if '"TruMenu 0.22.47 (sound monitor' not in src[:src.find('\n', src.find('kVersion = '))]:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.47 (sound monitor"')
+    if '0.22.47 (sound monitor' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.48: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.47 part "0.22.47 (sound monitor"')
     offline = []
     if os.path.exists(W7_CHECKS_02247):
         for line in open(W7_CHECKS_02247, encoding='utf-8'):
@@ -5798,6 +5815,221 @@ def check_02247(switches_path):
                       'sonar waves per channel / group 57 fallback; log overlay; %d items, %d keys, ton_monitor %d rows, '
                       'Paket B %d rows)' % (len(rows), len(W7_ITEMS_02247), len(W7_KEYS_02247), len(W7_SET_02247),
                                             len(W7_TGB_02247)))
+
+
+SO_CHECKS_02248 = os.path.join(ROOT, 'work', 'menu48_1411', 'precheck_02248.txt')
+SO_HASH_02247 = 'c78918209e28ff41be82bf5deea56739b2f23a37e9736e027c3eb563a37c628b'   # work/asi/menu0270
+SO_KEYS_02248 = (('FullMap', '0'), ('HidePlaceholder', '1'), ('FloorMarkers', '0'))   # [Sonar]
+# item, type, game thread (queued)
+SO_ITEMS_02248 = (('sonar.full', 'bool', 'true'), ('sonar.placeholder', 'bool', 'true'), ('sonar.markers', 'bool', 'true'),
+                  ('sonar.status', 'info', 'false'))
+# the patch sites: (constant, address, the game's bytes, ours) - ours of H3 is the call built at run time
+SO_SITES_02248 = (('kSoC1', '0x006e3b25', '0x0f, 0x94, 0xc3', '0xb3, 0x01, 0x90'),
+                  ('kSoC2', '0x006e3b59', '0x0f, 0x94, 0x44, 0x24, 0x11', '0xc6, 0x44, 0x24, 0x11, 0x01'),
+                  ('kSoC3', '0x006e3ba2', '0x0f, 0x94, 0x44, 0x24, 0x12', '0xc6, 0x44, 0x24, 0x12, 0x01'),
+                  ('kSoH3', '0x006e3ab0', '0x8b, 0x41, 0x44, 0x85, 0xc0', None),
+                  ('kSoC4', '0x006e40c6', '0x74, 0x40', '0x90, 0x90'))
+# the rows of the bar: page Spiel-Einstellungen group set_sonar
+SO_SET_02248 = (('sonar.full', '', 'kQbBool'), ('sonar.placeholder', '', 'kQbBool'), ('sonar.markers', '', 'kQbBool'),
+                ('sonar.status', '', 'kQbInfo'), ('snd.sonar', '', 'kQbBool'))
+# page Figur group fig_adren: TruMenu's items and every TruShadowCombat [Adrenaline] switch (+ [Conditions] Enabled)
+SO_ADREN_ITEMS_02248 = (('adren.meter', '', 'kQbInfo'), ('adren.fill', '', 'kQbAction'), ('adren.keep', '', 'kQbBool'))
+SO_ADREN_DEP_02248 = 'TruShadowCombat:Conditions:Enabled'
+SO_TGA_02248 = ('TruShadowCombat:Adrenaline:ModeWithoutTarget', 'TruShadowCombat:Adrenaline:StrikeWithoutButton',
+                'TruShadowCombat:Adrenaline:StrikeWithoutFullMeter')
+# the sites of the finding's options A / B (they reveal for real and end up in the save) - never in TruMenu
+SO_NOT_02248 = ('0x006deed5', '0x006deeeb', '0x006e3686', '0x006e3783', '0x006e4b06', '0x006dfb1d')
+
+
+def check_02248(switches_path):
+    """0.22.48 (owner wishes 2026-11-14; workspace docs/Befund-TruMenu-02248-1411.md): (1) page Figur group fig_adren owns
+    adren.meter / adren.fill / adren.keep and every TruShadowCombat [Adrenaline] switch of TruMenu.switches.txt (kQbSwitch
+    rows + the [Conditions] Enabled row and a note naming it), page Tests rows of adrenaline items / switches are copies
+    of rows on page Figur, Paket A holds the 0.6.15 test switches; the rows ModeWithoutTarget / StrikeWithoutButton are
+    live (SW_LIVE M15ReadSwitches) and the hints of StrikeWithoutButton / StrikeWithoutFullMeter name [Conditions]
+    Enabled=1; (2) teaser default 12 (checked in check_02240 / check_02241 by AT_DEFAULT); (3) page Kapitel without
+    "(debug)" (check_0217), no package name 17p / 17s in any string of the code; (4) Sonar komplett = kSoChecks the 13 rows
+    of precheck_02248.txt, SoCheck after W7Check, SoReadOptions after W7ReadOptions, SoTick in PadHook every poll before
+    the clock test, the five sites with the finding's bytes, the stub (face count, 0 for 100 faces + 56 vertices, test
+    eax, ret), H3 / C4 only with FullMap, writes only through SoWrite over the expected bytes, the triangle-cap line reads
+    only, no site of the options A / B; 3 [Sonar] keys, 4 items, 3 live switch rows (group tmsonar), page
+    Spiel-Einstellungen group set_sonar (with a copy of snd.sonar), Paket G (check_02244); (5) docs/Regression-DLC2.md
+    step 24 and tests/regress/dlc2.txt step 6 without level.load in the main menu; README 0.22.48 with TO TEST, options
+    rows; Set-TruMenu knows the 0.22.47 hash"""
+    problems = []
+    src = read_cpp()
+    code = re.sub(r'//[^\n]*', '', src)
+    if '"TruMenu 0.22.48 (adrenaline at Lara + sonar full map' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.48 (adrenaline at Lara + sonar full map"')
+    # ---- (1) adrenaline at Lara
+    sw_rows = {}
+    for line in open(switches_path, encoding='utf-8').read().splitlines():
+        f = [x.strip() for x in line.split('|')]
+        if line.startswith('#') or len(f) < 9 or f[0] == 'group': continue
+        sw_rows['%s:%s:%s' % (f[0], f[1], f[2])] = f
+    adren_sw = sorted(k for k in sw_rows if k.startswith('TruShadowCombat:Adrenaline:'))
+    lara, grp, in_adren = [], None, []
+    for r in qb_rows(src):
+        if r[0] != 'kQbLara': continue
+        lara.append((r[2], r[3], r[4]))
+        if r[4] == 'kQbGroup': grp = r[3]; continue
+        if grp == 'fig_adren': in_adren.append((r[2], r[3], r[4]))
+    if ('-', 'fig_adren', 'kQbGroup') not in lara: problems.append('TruMenu.cpp: page Figur lacks the group fig_adren')
+    for it in SO_ADREN_ITEMS_02248:
+        if it not in in_adren: problems.append('TruMenu.cpp: group fig_adren lacks %s (%s)' % (it[0], it[2]))
+    for key in adren_sw + [SO_ADREN_DEP_02248]:
+        if ('sw.set', key, 'kQbSwitch') not in in_adren:
+            problems.append('TruMenu.cpp: group fig_adren lacks the switch row %s' % key)
+    if len(adren_sw) != 8: problems.append('switches: %d TruShadowCombat [Adrenaline] rows, 8 expected' % len(adren_sw))
+    for it in in_adren:
+        if it[2] == 'kQbSwitch' and it[1] not in sw_rows:
+            problems.append('TruMenu.cpp: fig_adren switch row %s not in %s' % (it[1], os.path.basename(switches_path)))
+    block = src[src.find('const QbRow kQbLara[] = {'):]
+    block = block[:block.find('\n};')]
+    notes = re.findall(r'\{"([^"]*)",\s+"[^"]*",\s+"-",\s+"",\s+kQbNote', block)
+    if not any('[Conditions] Enabled=1' in n for n in notes):
+        problems.append('TruMenu.cpp: group fig_adren needs a note naming [Conditions] Enabled=1')
+    tests = [(r[2], r[3], r[4]) for r in qb_rows(src) if r[0] == 'kQbTests']
+    lara_items = {(i, a) for i, a, k in lara}
+    for item, arg, kind in tests:
+        adren = item.startswith('adren.') or (item == 'sw.set' and arg.startswith('TruShadowCombat:Adrenaline:'))
+        if adren and (item, arg) not in lara_items:
+            problems.append('TruMenu.cpp: page Tests row %s %s is no copy of a page Figur row' % (item, arg))
+    tga, grp = set(), None
+    for r in qb_rows(src):
+        if r[0] != 'kQbTests': continue
+        if r[4] == 'kQbGroup': grp = r[3]; continue
+        if grp == 'tg_a' and r[2] == 'sw.set': tga.add(r[3])
+    for key in SO_TGA_02248:
+        if key not in tga: problems.append('TruMenu.cpp: Paket A lacks the copy of %s' % key)
+    for key in ('TruShadowCombat:Adrenaline:ModeWithoutTarget', 'TruShadowCombat:Adrenaline:StrikeWithoutButton'):
+        f = sw_rows.get(key)
+        if not f or f[6] != 'live': problems.append('switches: %s must be live (M15ReadSwitches)' % key)
+        if SW_LIVE.get(tuple(key.split(':'))) != 'void M15ReadSwitches(':
+            problems.append('trumenu_ini_check: SW_LIVE lacks %s -> M15ReadSwitches' % key)
+    for key in ('TruShadowCombat:Adrenaline:StrikeWithoutButton', 'TruShadowCombat:Adrenaline:StrikeWithoutFullMeter'):
+        f = sw_rows.get(key)
+        if not f or f[8].count('[Conditions] Enabled=1') != 2:
+            problems.append('switches: the hint of %s must name [Conditions] Enabled=1 (DE and EN)' % key)
+    # ---- (3) chapter page: no package names in the strings of the code
+    shown = re.sub(r'const char \*const kVersion = [^\n]*', '', code)   # the version history keeps its old words
+    pk = sorted({s for s in LIT.findall(shown) if re.search(r'\b17[ps]\b', s)})
+    if pk: problems.append('TruMenu.cpp: strings still name the packages 17p / 17s: %s' % ' | '.join(x[:50] for x in pk))
+    # ---- (4) Sonar komplett
+    offline = []
+    if os.path.exists(SO_CHECKS_02248):
+        for line in open(SO_CHECKS_02248, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/menu48_1411/precheck_02248.txt (the offline byte list) is missing')
+    rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kSoChecks')]
+    if rows != offline or len(rows) != 13:
+        problems.append('TruMenu.cpp: kSoChecks (%d rows) must be the 13 rows of precheck_02248.txt in order' % len(rows))
+    if 'g_soOk = DvChecks(kSoChecks,' not in fn_body(src, 'void SoCheck('):
+        problems.append('TruMenu.cpp: SoCheck must set g_soOk = DvChecks(kSoChecks, ...)')
+    if not re.search(r'\n    W7Check\(\);[^\n]*\n    SoCheck\(\);', src):
+        problems.append('TruMenu.cpp: the load must call SoCheck right after W7Check')
+    if not re.search(r'\n    W7ReadOptions\(ini, dir\);[^\n]*\n    SoReadOptions\(ini\);', src):
+        problems.append('TruMenu.cpp: ReadOptions must call SoReadOptions(ini) right after W7ReadOptions')
+    ph = re.sub(r'//[^\n]*', '', fn_body(src, 'DWORD WINAPI PadHook('))
+    i_so, i_clock = ph.find('SoTick();'), ph.find('DWORD clock = *kGameClock;')
+    if not 0 <= i_so < i_clock: problems.append('TruMenu.cpp: PadHook must call SoTick every poll (before the clock test)')
+    for name, addr, game, ours in SO_SITES_02248:
+        if not re.search(r'\b%s = %s\b' % (name, addr), src): problems.append('TruMenu.cpp: %s = %s missing' % (name, addr))
+        if not re.search(r'%sGame\[\d\] = \{%s\}' % (name, re.escape(game)), src):
+            problems.append('TruMenu.cpp: %sGame must be {%s}' % (name, game))
+        if ours and not re.search(r'%sNew\[\d\] = \{%s\}' % (name, re.escape(ours)), src):
+            problems.append('TruMenu.cpp: %sNew must be {%s}' % (name, ours))
+    stub = re.sub(r'//[^\n]*', '', fn_body(src, '__declspec(naked) void SoPlaceholderStub('))
+    seq = ('mov eax, dword ptr [ecx + 0x44]', 'cmp eax, 100', 'jne so_keep', 'cmp dword ptr [ecx + 0x48], 56', 'jne so_keep',
+           'xor eax, eax', 'so_keep:', 'test eax, eax', 'ret')
+    at = 0
+    for s in seq:
+        at = stub.find(s, at)
+        if at < 0: problems.append('TruMenu.cpp: SoPlaceholderStub must be %s (in order)' % ' / '.join(seq)); break
+    if re.search(r'\b(push|pop|esp|ebp|edx|ebx|esi|edi)\b', stub):
+        problems.append('TruMenu.cpp: SoPlaceholderStub may touch eax / ecx reads / flags only (no stack, no other register)')
+    if 'g_soH3New[0] = 0xe8;' not in fn_body(src, 'void SoCheck(') or \
+            'reinterpret_cast<DWORD>(&SoPlaceholderStub) - (kSoH3 + 5)' not in fn_body(src, 'void SoCheck('):
+        problems.append('TruMenu.cpp: SoCheck must build the call rel32 to SoPlaceholderStub from kSoH3 + 5')
+    ap = fn_body(src, 'void SoApply(')
+    if 'const bool wantC = g_soFull != 0, wantH = wantC && g_soHide != 0, wantM = wantC && g_soMarkers != 0;' not in ap:
+        problems.append('TruMenu.cpp: SoApply: the filter / markers only with FullMap')
+    if 'return SoBytesAre(at, from, len) && WriteBytes(at, to, len) && SoBytesAre(at, to, len);' not in \
+            fn_body(src, 'bool SoWrite('):
+        problems.append('TruMenu.cpp: SoWrite must test the old bytes, write, read back')
+    sec = src[src.find('// ---- 0.22.48 Sonar komplett'):src.find('// ---- end of 0.22.48 Sonar komplett ----')]
+    if not sec: problems.append('TruMenu.cpp: section "0.22.48 Sonar komplett" missing')
+    sec_code = re.sub(r'//[^\n]*', '', sec)
+    writers = [m.group(1) for m in re.finditer(r'\n(?:[A-Za-z_][A-Za-z0-9_<>*& ]* )?(\w+)\([^;{]*\) \{', sec_code)
+               if 'WriteBytes(' in fn_body(sec_code, m.group(0).strip('\n').split('(')[0] + '(')]
+    if writers != ['SoWrite']: problems.append('TruMenu.cpp: only SoWrite may call WriteBytes in the section (got %s)' % writers)
+    for bad in SO_NOT_02248:
+        if bad in sec_code: problems.append('TruMenu.cpp: section 0.22.48 names %s (options A / B - not built)' % bad)
+    cap = fn_body(src, 'void SoCapTick(')
+    if 'ReadDword(kSoTriRefused, &refused)' not in cap or any(w in cap for w in ('WriteBytes(', 'WriteDword(', 'PutByte(')):
+        problems.append('TruMenu.cpp: SoCapTick must only read [0xee03ec]')
+    if 'kSoMode = 0x00ee03c8, kSoTriDrawn = 0x00ee03e8, kSoTriRefused = 0x00ee03ec' not in src:
+        problems.append('TruMenu.cpp: kSoMode / kSoTriDrawn / kSoTriRefused addresses missing')
+    tick = fn_body(src, 'void SoTick(')
+    for want in ('if (!g_soOk) return;', 'if (now - g_soReadTick >= 1000) { g_soReadTick = now; SoReadSwitch(); }',
+                 'SoApply("run time");', 'if (g_soOnC) SoCapTick(now);'):
+        if want not in tick: problems.append('TruMenu.cpp: SoTick must hold %s' % want)
+    rs = fn_body(src, 'void SoReadSwitch(')
+    for key, _ in SO_KEYS_02248:
+        if 'GetPrivateProfileIntA("Sonar", "%s"' % key not in rs: problems.append('TruMenu.cpp: SoReadSwitch lacks %s' % key)
+    if 'IniKeepInt("Sonar", key, on ? 1 : 0);' not in fn_body(src, 'void SoSetKey('):
+        problems.append('TruMenu.cpp: SoSetKey must keep the [Sonar] key (IniKeepInt)')
+    for item, typ, gt in SO_ITEMS_02248:
+        if not re.search(r'\{"%s", "%s", "0\.22\.48[^}]*?,\s+%s,\s+[A-Za-z0-9_<>]+,\s+[A-Za-z0-9_<>]+\},' %
+                         (re.escape(item), typ, gt), src, re.S):
+            problems.append('TruMenu.cpp: item %s (%s, game thread %s) missing in kItems' % (item, typ, gt))
+        hm = re.search(r'\{"%s", "", "((?:[^"\\]|\\.)*)"\}' % re.escape(item), src)
+        if not hm: problems.append('TruMenu.cpp: kQbHelp row %s missing' % item)
+        else:
+            de, en = unescape(hm.group(1)).split('|')
+            if len(de) > 60 or len(en) > 60: problems.append('TruMenu.cpp: help of %s over 60 characters' % item)
+    header, opt_rows = table(src)
+    keys = {(s, k): d for s, k, d, _ in opt_rows}
+    for key, default in SO_KEYS_02248:
+        if keys.get(('Sonar', key)) != default: problems.append('TruMenu.cpp: kOpts [Sonar] %s=%s missing' % (key, default))
+    for key, default in SO_KEYS_02248:
+        f = sw_rows.get('TruMenu:Sonar:%s' % key)
+        if not f or f[3] != 'bool' or f[6] != 'live' or f[7] != default or (len(f) < 10 or f[9] != 'TruMenu 0.22.48'):
+            problems.append('switches: row TruMenu | Sonar | %s | bool | ... | live | %s | ... | TruMenu 0.22.48 missing'
+                            % (key, default))
+    if 'group | tmsonar | ' not in open(switches_path, encoding='utf-8').read():
+        problems.append('switches: group tmsonar missing')
+    se, grp = set(), None
+    for r in qb_rows(src):
+        if r[0] != 'kQbSettings': continue
+        if r[4] == 'kQbGroup': grp = r[3]; continue
+        if grp == 'set_sonar': se.add((r[2], r[3], r[4]))
+    for it in SO_SET_02248:
+        if it not in se: problems.append('TruMenu.cpp: page Spiel-Einstellungen group set_sonar lacks %s (%s)' % (it[0], it[2]))
+    # ---- (5) Regression-DLC2 step 24 / dlc2.txt step 6
+    reg = open(os.path.join(ROOT, 'docs', 'Regression-DLC2.md'), encoding='utf-8').read()
+    m = re.search(r'\n24\. (.*?)\n25\. ', reg, re.S)
+    if not m or '(TruMenu `level.load`' in m.group(1) or 'TruMenu `level.start l1_seatop 0`' not in m.group(1):
+        problems.append('docs/Regression-DLC2.md: step 24 must use level.start <unit> 0 (level.load is refused in the main menu)')
+    lst = open(os.path.join(ROOT, 'tests', 'regress', 'dlc2.txt'), encoding='utf-8').read()
+    s6 = [l for l in lst.splitlines() if l.startswith('step6\t')]
+    if not s6 or 'level.load' in s6[0] or 'level.start' not in s6[0]:
+        problems.append('tests/regress/dlc2.txt: step6 must use level.start <unit> 0')
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.48 - ' not in readme or '\n### TO TEST 0.22.48' not in readme:
+        problems.append('README.md: section "## 0.22.48 - ..." with "### TO TEST 0.22.48" missing')
+    for key, _ in SO_KEYS_02248:
+        if '| `[Sonar] %s` |' % key not in readme: problems.append('README.md: options row `[Sonar] %s` missing' % key)
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if SO_HASH_02247 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.47 build hash (work/asi/menu0270) is missing')
+    return problems, ('adrenaline at Lara (fig_adren: %d rows, %d TruShadowCombat [Adrenaline] switches + [Conditions], '
+                      'Tests copies only, 0.6.15 rows live); Sonar komplett (%d byte checks = precheck_02248, 5 sites, '
+                      'stub, %d keys / %d items / set_sonar %d rows); chapter strings; Regression-DLC2 step 24' %
+                      (len(in_adren), len(adren_sw), len(rows), len(SO_KEYS_02248), len(SO_ITEMS_02248), len(se)))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -6427,6 +6659,10 @@ def main(argv):
     for p in cproblems47: print('Q02247 %s' % p)
     if not cproblems47: print('ok: 0.22.47 %s' % csummary47)
     problems += cproblems47
+    cproblems48, csummary48 = check_02248(opt.get('--switches', SWITCHES))   # 0.22.48 (adrenaline at Lara, sonar)
+    for p in cproblems48: print('Q02248 %s' % p)
+    if not cproblems48: print('ok: 0.22.48 %s' % csummary48)
+    problems += cproblems48
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

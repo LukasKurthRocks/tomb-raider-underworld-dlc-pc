@@ -1,0 +1,39 @@
+positive (unchanged sources): 0 problem(s) ok
+case version                 : 1 problem(s) ok - TruMenu.cpp: kVersion must start with "TruMenu 0.22.48 (adrenaline at Lara + sonar full map"
+case check row changed       : 1 problem(s) ok - TruMenu.cpp: kSoChecks (13 rows) must be the 13 rows of precheck_02248.txt in order
+case check row dropped       : 1 problem(s) ok - TruMenu.cpp: kSoChecks (12 rows) must be the 13 rows of precheck_02248.txt in order
+case SoCheck table           : 1 problem(s) ok - TruMenu.cpp: SoCheck must set g_soOk = DvChecks(kSoChecks, ...)
+case load order              : 1 problem(s) ok - TruMenu.cpp: the load must call SoCheck right after W7Check
+case options order           : 1 problem(s) ok - TruMenu.cpp: ReadOptions must call SoReadOptions(ini) right after W7ReadOptions
+case PadHook tick            : 1 problem(s) ok - TruMenu.cpp: PadHook must call SoTick every poll (before the clock test)
+case site bytes              : 1 problem(s) ok - TruMenu.cpp: kSoC2New must be {0xc6, 0x44, 0x24, 0x11, 0x01}
+case site address            : 1 problem(s) ok - TruMenu.cpp: kSoC4 = 0x006e40c6 missing
+case game bytes              : 1 problem(s) ok - TruMenu.cpp: kSoH3Game must be {0x8b, 0x41, 0x44, 0x85, 0xc0}
+case stub vertex test        : 1 problem(s) ok - TruMenu.cpp: SoPlaceholderStub must be mov eax, dword ptr [ecx + 0x44] / cmp eax, 100 / jne so_keep / cmp dword ptr [ecx + 0x48], 56 / jne so_keep / xor eax, eax / so_keep: / test eax, eax / ret (in order)
+case stub register           : 1 problem(s) ok - TruMenu.cpp: SoPlaceholderStub may touch eax / ecx reads / flags only (no stack, no other register)
+case stub call               : 1 problem(s) ok - TruMenu.cpp: SoCheck must build the call rel32 to SoPlaceholderStub from kSoH3 + 5
+case filter without full     : 1 problem(s) ok - TruMenu.cpp: SoApply: the filter / markers only with FullMap
+case markers without full    : 1 problem(s) ok - TruMenu.cpp: SoApply: the filter / markers only with FullMap
+case no read back            : 1 problem(s) ok - TruMenu.cpp: SoWrite must test the old bytes, write, read back
+case cap tick writes         : 2 problem(s) ok - TruMenu.cpp: only SoWrite may call WriteBytes in the section (got ['SoWrite', 'SoCapTick'])
+case option A site           : 1 problem(s) ok - TruMenu.cpp: section 0.22.48 names 0x006deed5 (options A / B - not built)
+case tick read rate          : 1 problem(s) ok - TruMenu.cpp: SoTick must hold if (now - g_soReadTick >= 1000) { g_soReadTick = now; SoReadSwitch(); }
+case read key                : 1 problem(s) ok - TruMenu.cpp: SoReadSwitch lacks FloorMarkers
+case not kept                : 1 problem(s) ok - TruMenu.cpp: SoSetKey must keep the [Sonar] key (IniKeepInt)
+case item thread             : 1 problem(s) ok - TruMenu.cpp: item sonar.placeholder (bool, game thread true) missing in kItems
+case item help               : 1 problem(s) ok - TruMenu.cpp: kQbHelp row sonar.markers missing
+case key default             : 1 problem(s) ok - TruMenu.cpp: kOpts [Sonar] HidePlaceholder=1 missing
+case settings row            : 1 problem(s) ok - TruMenu.cpp: page Spiel-Einstellungen group set_sonar lacks sonar.markers (kQbBool)
+case Lara switch row         : 1 problem(s) ok - TruMenu.cpp: group fig_adren lacks the switch row TruShadowCombat:Adrenaline:DrainModePercent
+case Lara conditions row     : 1 problem(s) ok - TruMenu.cpp: group fig_adren lacks the switch row TruShadowCombat:Conditions:Enabled
+case Lara note               : 1 problem(s) ok - TruMenu.cpp: group fig_adren needs a note naming [Conditions] Enabled=1
+case Lara group key          : 13 problem(s) ok - TruMenu.cpp: page Figur lacks the group fig_adren
+case Tests own source        : 2 problem(s) ok - TruMenu.cpp: page Tests row sw.set TruShadowCombat:Adrenaline:Log2 is no copy of a page Figur row
+case Paket A copy            : 1 problem(s) ok - TruMenu.cpp: Paket A lacks the copy of TruShadowCombat:Adrenaline:ModeWithoutTarget
+case 17p string              : 1 problem(s) ok - TruMenu.cpp: strings still name the packages 17p / 17s: nie gebaut (17p)
+case switch restart          : 1 problem(s) ok - switches: TruShadowCombat:Adrenaline:ModeWithoutTarget must be live (M15ReadSwitches)
+case hint without Conditions : 1 problem(s) ok - switches: the hint of TruShadowCombat:Adrenaline:StrikeWithoutButton must name [Conditions] Enabled=1 (DE and EN)
+case sonar row restart       : 1 problem(s) ok - switches: row TruMenu | Sonar | FullMap | bool | ... | live | 0 | ... | TruMenu 0.22.48 missing
+case sonar default           : 1 problem(s) ok - switches: row TruMenu | Sonar | HidePlaceholder | bool | ... | live | 1 | ... | TruMenu 0.22.48 missing
+case sonar group             : 1 problem(s) ok - switches: group tmsonar missing
+37 cases + 1 positive, 0 failed

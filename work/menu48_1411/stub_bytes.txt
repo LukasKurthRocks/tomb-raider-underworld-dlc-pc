@@ -1,0 +1,5 @@
+1 match(es) of the stub pattern
+file offset 0xb5e50: 8b 41 44 83 f8 64 75 0f 83 79 48 38 75 09 f0 ff 05 60 13 8e 10 33 c0 85 c0 c3
+  jne 1 -> +0x17, jne 2 -> +0x17, test eax,eax at +0x17: ok
+stub ok
+exit 0

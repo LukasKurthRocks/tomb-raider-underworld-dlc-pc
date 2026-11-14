@@ -2307,7 +2307,8 @@ def sw_rows(counts, groups):                   # QbSwRows: group row + the open 
     return sum(1 + (c if o else 0) for c, o in zip(counts, groups))
 
 
-QB_VIEW_MAX = 256                              # kQbViewMax (0.22.44; 0.22.18 .. 0.22.43: 128; 0.21.1 .. 0.22.15: 64)
+QB_VIEW_MAX = 320                              # kQbViewMax (0.22.48; 0.22.44 .. 0.22.47: 256; 0.22.18 .. 0.22.43: 128;
+                                               # 0.21.1 .. 0.22.15: 64)
 
 
 def shipped_switch_counts():                   # 0.22.23: the shipped file's group sizes (was a fixed list of 9 groups)

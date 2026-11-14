@@ -26,7 +26,7 @@ health	open	Take a hit or fall from a small height: health drops			check		0	#Hit
 death-after-wall	open	After at least one wall run: jump to death - no crash; Lara reappears at the checkpoint, still as the doppelganger			check		0
 step5	open	time.scale 0.5 (Run), jump to death, then time.scale 1			step	time.scale:0.5	5	#Death test: god mode off, time.scale 0.5;cheat.god 0;time.scale 0.5
 death-timescale	open	Death with time.scale 0.5: no crash (then time.scale 1)			check		0
-step6	open	Quit to the main menu and load a base-game level (level.load, e.g. a level 1 unit)			step		6
+step6	open	Quit to the main menu and start a base-game level: level.start l1_seatop 0 (or arena.go 1a; the main menu refuses a direct unit load)			step		6
 leave-dlc2	open	Base game after DLC 2: Lara looks normal, RB gives no slow motion, no shadow meter (fail = known gap: doppelganger flag reset not ported)			check		0
 step7	open	Optional thrall fight: Prepare brings Lara to dlc_yggdrasil_hall02 (portal when loaded, else level load) with god mode; fight the viking thralls (X punch, Y kick, RB shadow power), then walk on a few minutes			step		7	#Thrall fight: hall02 + god mode;unit.go dlc_yggdrasil_hall02;cheat.god 1
 step8	open	Mark the checks (A ok, X fail, Y skip), then end the game normally			step		8

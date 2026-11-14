@@ -123,9 +123,11 @@ Ids in brackets are the TO TEST / regression check ids. Steps without an id are 
 
 **Leaving DLC 2**
 
-24. Quit to the main menu and load a base-game level (TruMenu `level.load`, e.g. a level 1 unit): Lara looks normal,
-    RB gives no slow motion, no shadow meter (`leave-dlc2`; the title update's reset of the doppelganger flag is not
-    ported yet - a fail here is the known gap).
+24. Quit to the main menu and start a base-game level from there with TruMenu `level.start l1_seatop 0` (the game's
+    mission start of that unit; since TruMenu 0.22.46 `level.load` is refused in the main menu - the game serves a level
+    change request only inside a level) or `arena.go 1a` (Helheim hall): Lara looks normal, RB gives no slow motion, no
+    shadow meter (`leave-dlc2`; the title update's reset of the doppelganger flag is not ported yet - a fail here is the
+    known gap).
 25. Mark the checks (A ok, X fail, Y skip), then end the game normally. Whole run: no crash, freeze or box
     (`no-crash`).
 
