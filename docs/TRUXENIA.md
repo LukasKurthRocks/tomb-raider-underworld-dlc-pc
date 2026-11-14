@@ -12,7 +12,8 @@ Xbox"). No plugin runs inside Xenia; the Xbox game behaves as it should.
   `ReadProcessMemory` is used - no debugger, no suspend (a debugger listing of all memory regions froze Xenia once).
 - **Proof words first.** Every TU address in `docs/data/xenia_tu_combat_addresses.json` carries TU instruction words
   that prove it; TruXenia compares all of them (139 since 2026-11-11, every JSON section with a `proof` block) with the guest memory
-  and refuses to read on a mismatch.
+  and refuses to read on a mismatch. Sections marked `"optional": true` (the four sonar sections, 89 words since
+  2026-11-14) are counted apart: a mismatch there does not stop TruXenia, it shows that section's values as `?`.
 - **Unproven fields are `?`.** Fields marked `"proven": false` (target slot, coordinator `Ko`) are shown as `?`; the
   check box "show unproven fields" shows them marked with `~`. Camera position / look-at / FOV are `?` (not proven).
 - **Writes are locked.** `set <inst> lp|stamina <value>` exists, but only with `--allow-write` and an explicit unlock
@@ -49,6 +50,7 @@ not saved (language and options only for the session).
 | Objekte / Objects | every instance of the instance list: kind, name, object id, enemy yes / no, distance; one coloured check box per kind = legend and filter |
 | Lara | chart record **indices** of machine 0 / 1 and their state id lists, LP (max), position, shadow meter value + flags (active), world time scale, the 7 time-scale request slots and the winning slot per scale, ramp targets player / world, doppelganger flag, camera mode / flags (position / FOV `?`) |
 | Geladene Daten / Loaded data | object table (loaded objects, state counts; read once per second) and the plan for units / sections / shaders (below) |
+| Sonar | PDA sonar (ping map): mode, stage, ping radius, view distance, current map unit, floor, triangles drawn / refused per frame (and the maximum of the last 2 s) against the limit 93571; one row per loaded map unit: name, faces, vertices, map kind (echt / Platzhalter "MAP" / kein Netz), floor mask, placed, revealed vertices (%); read every 0.5 s while the page is shown (section "Sonar" below) |
 | Log / Link | recording on / off (TSV of all values), the hit lines, the link address, the write lock |
 | Spielstände / Saves | named saves in `<workspace>/_archiv/xenia-saves/<name>/534307EC` (+ README): store the current saves under a name, restore one (Xenia closed) |
 
@@ -129,7 +131,12 @@ start / stop, 1 meter target, 2 strike look, 3 adrenaline look, 4 player event s
 
 `tools/truxenia_cmd.py <command>` sends one line to 127.0.0.1:47011 and prints the answer (also logged):
 `status`, `enemies`, `lara`, `objects [kind]`, `loaded`, `hits [n]`, `snapshot <file.json>`,
-`watch <seconds> <file.tsv>`, `saves`, `set <inst> lp|stamina <value>` (locked), `quit`.
+`watch <seconds> <file.tsv>`, `saves`, `set <inst> lp|stamina <value>` (locked), `sonar`, `peek <addr> <len>`, `quit`.
+
+`peek <guest address hex> <length>` (2026-11-14) is a generic **read-only** memory view: 1..4096 bytes inside guest RAM
+0x00010000..0xffffffff (anything else is refused, an unmapped page answers `unreadable`), printed as hex + ASCII
+lines and then every aligned word as big-endian u32 and float. It reads like every other value (ReadProcessMemory);
+there is no matching write command.
 
 ## Compare a fight
 
@@ -204,6 +211,29 @@ against instance +0x44; TU getter 0x82404568 = PC 0x719f00). Lara page line "Zie
 `aim_*` TSV columns. Read only. Not read on the Xbox (offsets not proven there): the pad word, the aim timers
 (TU player fields are shifted by +4 around +0x50f / +0x540), the candidate lists.
 
+### Sonar (PDA ping map, 2026-11-14)
+
+Purpose: see on the Xbox whether the DLC 2 sonar shows only the "MAP" placeholder (start unit and `dlc2_*` rooms) and
+whether the Xbox hits the same triangle limit as the PC in big DLC 1 areas. PC side: ENGINE.md rows "PDA sonar ...".
+Address-file sections `sonar`, `sonar_units`, `sonar_reveal`, `sonar_triangles` (89 proof words, all `"optional"`),
+found with `work/xsonar_1411/xsonar_tu.py` in the TU image; both TU dumps match 89 / 89, the retail image 0 / 89.
+
+| Value | TU | Proof (PC twin) |
+|---|---|---|
+| mode | `[0x829ca5a4]` 0 closed, 1 preparing, 2 building, 3 view, 4 area change | per-frame switch 0x823d6f9c (table 0x823d6fc4: 2 -> stage machine 0x823d2100), open 0x823d5690 sets 1, build end 0x823d21e4 sets 3 (PC `[0xee03c8]`, 0x6e55f0) |
+| stage / progress | `[0x827599ec]` (-1 = done) / `[0x82759a80]` | stage machine 0x823d2100 (budget 500) |
+| ping radius / view distance | `[[0x829ca5bc]+0xc]` / `[[0x829ca5bc]+0x10]` (+ 4000.0 at 0x8207dfb8) | stage 0 0x823d1a40, draw 0x823d4540 (PC `[0xee03e0]`) |
+| map units | `[0x8277b2e8]` array, count `[0x8277b2e0]`; unit 0xc0 B: +2 name, +0x84 key, +0x8c -> {mesh 0, mesh 1}, +0xb0 floor mask, +0xb3 placed; mesh +0x44 faces, +0x48 vertices | lookup 0x823cfd48 (PC 0x6e2a60), draw loop 0x823d467c, unit draw 0x823d26f8 (PC 0x6e3a00) |
+| current map unit | `[0x82987d40]`; floor `[0x8297f6e6]` (u8) | open 0x823d5734 (PC `[0xedf254]` / `[0xedf268]`) |
+| reveal entries | `[0x8277b2c4]` array, count `[0x8277b2bc]`; entry 0x14 B: +0 key, +4 unit, +8 -> 2 bits per vertex (1 = revealed), +0xc vertex count (u16) | entry getter 0x823cf980 (PC 0x6e27d0), stage 0 decode 0x823d1b64.. |
+| triangles per frame | drawn `[0x829ca5c4]`, refused `[0x829ca5c8]`, limit **93571** (`lis 1; ori 0x6d83`; refused when drawn > 93571) | triangle 0x823cf480 (PC 0x6dfa60, same limit), reset per frame 0x823d4560 |
+
+Placeholder = a mesh 0 of 100 faces / 56 vertices without a mesh 1 (the "MAP" letters, workspace
+`docs/Befund-Sonar-DLC2-1411.md`). Revealed % = vertices with state 1 / entry vertex count; `-` = no reveal entry (the
+sonar keeps entries only while it is open). The counters are reset every sonar frame, so a single read may land
+mid-frame - the 2 s maximum is the useful number; `refused` > 0 = limit hit (`LIMIT HIT` in the link answer).
+Everything is read only; while the sonar is closed the unit list is empty (the units are freed on close).
+
 ## State (2026-11-09)
 
 - First live session 09.11. 17:35-18:10 (hit log, values readable, proof words passed).
@@ -215,5 +245,9 @@ against instance +0x44; TU getter 0x82404568 = PC 0x719f00). Lara page line "Zie
   image dump passes 103 proof words (0 mismatches). Not yet run live.
 - 2026-11-11: camera values (section "Camera"), `--camtrace`; proof words 139 / 0 mismatches on both TU dumps,
   `--selftest` passes; read live 21:48 (Xenia running, read only) and used by the owner 21:49-21:53.
+- 2026-11-14 (offline): `sonar` + `peek` and the Sonar page; 89 optional proof words (both TU dumps 89 / 89, retail
+  0 / 89), `--selftest` passes with the sonar / peek checks (incl. refused peeks and '?' for a section with a proof
+  mismatch); the DLC 2 dump `dlc2_shadow_off_image.bin` reads mode 0 (closed), no units. Window page not opened
+  (Tk code path only reviewed). Not yet run live.
 - Open: `Ko` meaning, camera look-at point, units / sections / shaders, Xenia function-trace reader (stage 2).
 - TU addresses: ENGINE.md section 13 rows "TU combat addresses", "TU brain shift", "TU TruXenia stage 1b".

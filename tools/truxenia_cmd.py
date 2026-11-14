@@ -5,6 +5,8 @@ Usage (from the repository root):
   ../bin/pyt -t 30 tools/truxenia_cmd.py enemies | lara | hits 20 | saves
   ../bin/pyt -t 30 tools/truxenia_cmd.py snapshot ../logs/truxenia/snap.json
   ../bin/pyt -t 30 tools/truxenia_cmd.py watch 120 ../logs/truxenia/fight.tsv
+  ../bin/pyt -t 30 tools/truxenia_cmd.py sonar                   PDA sonar values (2026-11-14)
+  ../bin/pyt -t 30 tools/truxenia_cmd.py peek 829ca5a4 64        read-only memory view (guest address hex, length)
   ../bin/pyt -t 30 tools/truxenia_cmd.py --port 47011 quit
 Every answer is also written to TruXenia's own log. Exit 0 = answer received, 1 = no link.
 """

@@ -24,7 +24,13 @@ Usage (from the repository root):
 Options: --port N, --log PATH (default ../logs/truxenia/truxenia_<time>.log), --hitlog PATH (default next to the log),
   --unproven, --allow-write (unlocks `set` after a confirmation), --lang de|en, --verbose, --debug, --trace.
 Link commands (tools/truxenia_cmd.py): status | enemies | lara | snapshot <file> | watch <seconds> <file> |
-  hits [n] | saves | set <inst> lp|stamina <value> | quit
+  hits [n] | saves | set <inst> lp|stamina <value> | sonar | peek <guest addr> <len> | quit
+  sonar (2026-11-14): PDA sonar mode / stage, ping radius + view distance, current map unit, loaded map units with
+  face / vertex counts (real map or the "MAP" placeholder of 100 faces / 56 vertices), revealed vertices per unit,
+  triangles drawn / refused per frame and the limit 93571 (address-file sections sonar, sonar_units, sonar_reveal,
+  sonar_triangles - "optional": a proof mismatch there only turns that section into '?').
+  peek <addr> <len>: read only, guest address (hex), 1..4096 bytes inside guest RAM 0x00010000..0xffffffff; hex + ASCII,
+  then each aligned word as u32 and float (big endian).
 Exit codes: 0 ok, 1 proof mismatch / no Xenia, 2 usage.
 """
 import argparse
@@ -51,6 +57,11 @@ TITLE = '534307EC'
 DEFAULT_PORT = 47011
 PROCESS_VM_WRITE = 0x0020
 PROCESS_VM_OPERATION = 0x0008
+GUEST_LO, GUEST_HI = 0x00010000, 0x100000000   # `peek`: guest RAM window (32-bit guest addresses, page 0 refused)
+PEEK_MAX = 4096
+SONAR_SECTIONS = ('sonar', 'sonar_units', 'sonar_reveal', 'sonar_triangles')
+SONAR_MAX_UNITS = 256
+SONAR_TRI_WINDOW = 2.0                 # seconds: the sonar page / link show the max of the per-frame triangle counters
 HIT_WINDOW = 0.5                       # seconds after an LP drop in which the first state change is the reaction
 PATH_WINDOW = 2.0                      # Lara's records within this time before a hit = the combo path (as TruMenu)
 
@@ -81,7 +92,14 @@ T = {
     'objtable': ('Objekttabelle (0x82979280)', 'Object table (0x82979280)'),
     'loadplan': ('Einheiten, Sektionen, Shader: noch nicht belegt - Plan in docs/TRUXENIA.md',
                  'Units, sections, shaders: not proven yet - plan in docs/TRUXENIA.md'),
+    # 2026-11-14 sonar page
+    'sonar': ('Sonar', 'Sonar'), 'cur': ('akt.', 'cur.'), 'unit': ('Karten-Unit', 'Map unit'),
+    'faces': ('Flächen', 'Faces'), 'verts': ('Ecken', 'Vertices'), 'mapkind': ('Karte', 'Map'),
+    'floor': ('Stockwerk', 'Floor'), 'placed': ('platziert', 'placed'), 'revealed': ('aufgedeckt', 'revealed'),
+    'real': ('echt', 'real'), 'placeholder': ('Platzhalter "MAP"', 'placeholder "MAP"'),
+    'nomesh': ('kein Netz', 'no mesh'),
 }
+SONAR_KIND = {'real': 'real', 'placeholder': 'placeholder', 'no mesh': 'nomesh'}
 
 # object kinds (stage 1b): evidence = object name (+ the TU enemy brain test); unknown = other, never guessed
 CATS = (('lara', '#000000', 'Lara', 'Lara'),
@@ -276,6 +294,7 @@ class FakeMem:
             self.mem[e + 0xc], self.mem[e + 0xd] = (oid >> 8) & 0xff, oid & 0xff
             self.mem[e + 0xe], self.mem[e + 0xf] = 0, 2
         self.mac0, self.meter, self.gt = mac0, meter, g
+        self._sonar(A)
         self.script = [(0.3, 'rec', 1477), (0.5, 'rec', 1488), (0.6, 'hit', 0, 20.0, 'Hit'),
                        (0.9, 'state', 0, 'CombatStepIdle'), (1.0, 'state', 0, 'MeleeAttack'),
                        (1.2, 'rec', 1492), (1.3, 'hit', 0, 20.0, 'MeleeAttack'), (1.6, 'power', 1),
@@ -284,6 +303,52 @@ class FakeMem:
                        (2.6, 'hit', 1, 500.0, 'RegenerateDeath')]
         self.done = 0
         log.w('I', 'selftest memory: 2 thralls + goo spawner, Lara, charts, meter, object table (%d bytes)' % len(self.mem))
+
+    def _sonar(self, A):
+        """2026-11-14 sonar: view mode, DLC 2 start = placeholder unit "MAP" (100 / 56, current unit, nothing
+        revealed), dlc_yggdrasil_hall01 = real map (5005 faces / 3000 vertices, 600 revealed + 2 pending),
+        dlc2_costumes without a mesh (no reveal entry); 812 triangles drawn, 0 refused"""
+        s, su, sr, st = (A[k] for k in SONAR_SECTIONS)
+        self.w32(S.h(s['mode']), 3); self.w32(S.h(s['stage']), 0xffffffff); self.w32(S.h(s['progress']), 0)
+        tun = 0x48000000
+        self.w32(S.h(s['tuning_ptr']), tun)
+        self.wf(tun + S.h(s['tuning_radius']), 3000.0); self.wf(tun + S.h(s['tuning_view']), 6000.0)
+        arr, rarr = 0x48001000, 0x48002000
+        units = (('dlc_level2_start', 100, 56), ('dlc_yggdrasil_hall01', 5005, 3000), ('dlc2_costumes', None, None))
+        self.w32(S.h(su['list']) + S.h(su['count_offset']), len(units)); self.w32(S.h(su['list']) + 4, 4)
+        self.w32(S.h(su['list']) + S.h(su['array_offset']), arr)
+        self.sonar_units = []
+        for i, (name, faces, verts) in enumerate(units):
+            u = 0x48010000 + i * 0x10000
+            self.w32(arr + 4 * i, u)
+            self.mem[u], self.mem[u + 1] = 0, i
+            self.wstr(u + S.h(su['name_offset']), name)
+            self.w32(u + S.h(su['key_offset']), 0x1000 + i)
+            self.mem[u + S.h(su['floor_mask_offset'])] = 1
+            self.mem[u + S.h(su['placed_offset'])] = 1
+            if faces is None:
+                self.w32(u + S.h(su['meshes_offset']), 0)
+            else:
+                ms, mesh = u + 0x100, u + 0x200
+                self.w32(u + S.h(su['meshes_offset']), ms); self.w32(ms, mesh); self.w32(ms + 4, 0)
+                self.w32(mesh + S.h(su['mesh_faces']), faces); self.w32(mesh + S.h(su['mesh_vertices']), verts)
+            self.sonar_units.append(u)
+        self.w32(S.h(su['current_unit']), self.sonar_units[0])
+        self.mem[S.h(su['floor_mask'])] = 1
+        self.w32(S.h(sr['list']) + S.h(sr['count_offset']), 2); self.w32(S.h(sr['list']) + 4, 2)
+        self.w32(S.h(sr['list']) + S.h(sr['array_offset']), rarr)
+        for k, (ui, n, full, pending) in enumerate(((0, 56, 0, 0), (1, 3000, 150, 2))):
+            e, states = 0x48100000 + k * 0x100, 0x48200000 + k * 0x10000
+            self.w32(rarr + 4 * k, e)
+            self.w32(e + S.h(sr['entry_key']), 0x1000 + ui); self.w32(e + S.h(sr['entry_unit']), self.sonar_units[ui])
+            self.w32(e + S.h(sr['entry_states']), states); self.w32(e + S.h(sr['entry_count']), n)
+            self.mem[e + S.h(sr['entry_any'])] = 1 if full else 0
+            for b in range((n + 3) >> 2):
+                self.mem[states + b] = 0x55 if b < full else 0
+            if pending:
+                self.mem[states + full] = 0x0a           # vertices 4*full, 4*full+1 = 2 (pending), not revealed
+        self.w32(S.h(st['drawn']), 812); self.w32(S.h(st['refused']), 0)
+        self.wstr(0x48300000, 'peek test')
 
     def w32(self, a, v):
         for i, b in enumerate(struct.pack('>I', v & 0xffffffff)):
@@ -387,6 +452,9 @@ class Model:
         self.flights = {}                             # inst -> {'t', 'start', 'max', 'states'}
         self.lastfly = {}                             # inst -> 'N u in S s'
         self.loaded_t = 0.0
+        self.optional_ok = {}                         # optional address-file section -> proof words matched (main)
+        self.tri_hist = []                            # (time, drawn, refused) of the sonar triangle counters
+        self.sonar_cache = (0.0, None)
 
     # -- reads
     def _state_name(self, so):
@@ -705,6 +773,171 @@ class Model:
                 objs.append((oid, nm or '?'))
         return {'counts': counts, 'objects': sorted(objs), 'time': now_ts()}
 
+    # -- 2026-11-14 sonar (PDA ping map) and peek - read only
+    def peek(self, addr, n):
+        """read-only memory view: guest address, 1..PEEK_MAX bytes inside GUEST_LO..GUEST_HI; hex + ASCII lines, then
+        every aligned big-endian word as u32 and float"""
+        import math
+        if n < 1 or n > PEEK_MAX:
+            return ['refused: length %d (1..%d)' % (n, PEEK_MAX)]
+        if addr < GUEST_LO or addr + n > GUEST_HI:
+            return ['refused: 0x%x + %d outside guest RAM 0x%08x..0x%08x' % (addr, n, GUEST_LO, GUEST_HI - 1)]
+        b = self.mem.read(addr, n)
+        if not b or len(b) != n:
+            return ['unreadable: 0x%08x + %d' % (addr, n)]
+        out = ['peek 0x%08x %d bytes (read only)' % (addr, n)]
+        for o in range(0, n, 16):
+            row = b[o:o + 16]
+            out.append('0x%08x  %-47s  |%s|' % (addr + o, ' '.join('%02x' % c for c in row),
+                                                 ''.join(chr(c) if 32 <= c < 127 else '.' for c in row)))
+        first = (addr + 3) & ~3
+        for a in range(first, addr + n - 3, 4):
+            w = struct.unpack('>I', b[a - addr:a - addr + 4])[0]
+            f = struct.unpack('>f', b[a - addr:a - addr + 4])[0]
+            out.append('0x%08x  %08x  u32 %d  f32 %s' % (a, w, w, ('%g' % f) if math.isfinite(f) else str(f)))
+        return out
+
+    def _sonar_tri(self):
+        """the two per-frame triangle counters (cheap; every sample) -> history of SONAR_TRI_WINDOW seconds"""
+        if not self.optional_ok.get('sonar_triangles'):
+            return
+        st = self.A['sonar_triangles']
+        d, r = S.u32(self.mem, S.h(st['drawn'])), S.u32(self.mem, S.h(st['refused']))
+        t = time.time()
+        if d is not None and r is not None:
+            self.tri_hist.append((t, d, r))
+        self.tri_hist = [x for x in self.tri_hist if t - x[0] <= SONAR_TRI_WINDOW]
+
+    def sonar(self, max_age=0.5):
+        """sonar state dict (read only; cached max_age seconds). '?' = section not proven (proof mismatch)"""
+        t = time.time()
+        if self.sonar_cache[1] is not None and t - self.sonar_cache[0] < max_age:
+            return self.sonar_cache[1]
+        m, A, ok = self.mem, self.A, self.optional_ok
+        s, su, sr, st = (A[k] for k in SONAR_SECTIONS)
+        out = {'mode': '?', 'mode_name': '?', 'stage': '?', 'progress': '?', 'radius': '?', 'view': '?',
+               'margin': '?', 'current': '?', 'floor_mask': '?', 'units': None, 'unit_count': '?', 'entries': '?',
+               'drawn': '?', 'refused': '?', 'drawn_max': '?', 'refused_max': '?', 'limit': '?', 'time': now_ts()}
+        if ok.get('sonar'):
+            mode = S.u32(m, S.h(s['mode']))
+            out['mode'] = mode
+            out['mode_name'] = s['mode_names'].get(str(mode), 'unknown') if mode is not None else '-'
+            stg = S.u32(m, S.h(s['stage']))
+            out['stage'] = (stg - (1 << 32) if stg & 0x80000000 else stg) if stg is not None else None
+            prg = S.u32(m, S.h(s['progress']))
+            out['progress'] = (prg - (1 << 32) if prg & 0x80000000 else prg) if prg is not None else None
+            tun = S.u32(m, S.h(s['tuning_ptr']))
+            out['radius'] = S.f32(m, tun + S.h(s['tuning_radius'])) if tun else None
+            out['view'] = S.f32(m, tun + S.h(s['tuning_view'])) if tun else None
+            out['margin'] = S.f32(m, S.h(s['view_margin']))
+        reveal = {}
+        if ok.get('sonar_reveal'):
+            base = S.h(sr['list'])
+            cnt = S.u32(m, base + S.h(sr['count_offset']))
+            arr = S.u32(m, base + S.h(sr['array_offset']))
+            out['entries'] = cnt
+            for i in range(min(cnt or 0, SONAR_MAX_UNITS)):
+                e = S.u32(m, arr + 4 * i) if arr else None
+                if not e:
+                    continue
+                key = S.u32(m, e + S.h(sr['entry_key']))
+                n = (S.u32(m, e + S.h(sr['entry_count'])) or 0) & 0xffff      # the game keeps the count as u16
+                sp = S.u32(m, e + S.h(sr['entry_states']))
+                raw = m.read(sp, (n + 3) >> 2) if sp and n else b''
+                if raw is None or len(raw) < ((n + 3) >> 2):
+                    reveal[key] = (None, n)
+                    continue
+                got = 0
+                for k in range(n):                      # 2 bits per vertex: byte k>>2, bits (k&3)*2; 1 = revealed
+                    if (raw[k >> 2] >> ((k & 3) * 2)) & 3 == sr['state_revealed']:
+                        got += 1
+                reveal[key] = (got, n)
+        if ok.get('sonar_units'):
+            base = S.h(su['list'])
+            cnt = S.u32(m, base + S.h(su['count_offset']))
+            arr = S.u32(m, base + S.h(su['array_offset']))
+            cur = S.u32(m, S.h(su['current_unit']))
+            fm = u8(m, S.h(su['floor_mask']))
+            out['floor_mask'] = fm
+            out['unit_count'] = cnt
+            units = []
+            for i in range(min(cnt or 0, SONAR_MAX_UNITS)):
+                up = S.u32(m, arr + 4 * i) if arr else None
+                if not up:
+                    continue
+                name = S.cstr(m, up + S.h(su['name_offset']), 0x80) or '?'
+                key = S.u32(m, up + S.h(su['key_offset']))
+                ms = S.u32(m, up + S.h(su['meshes_offset']))
+                meshes = [S.u32(m, ms + 4 * j) for j in (0, 1)] if ms else [None, None]
+                fv = [((S.u32(m, me + S.h(su['mesh_faces'])), S.u32(m, me + S.h(su['mesh_vertices']))) if me else None)
+                      for me in meshes]
+                if not ms or not fv[0]:
+                    kind = 'no mesh'
+                elif fv[0] == (su['placeholder_faces'], su['placeholder_vertices']) and not fv[1]:
+                    kind = 'placeholder'
+                else:
+                    kind = 'real'
+                faces = sum((x[0] or 0) for x in fv if x) if ms else None
+                verts = sum((x[1] or 0) for x in fv if x) if ms else None
+                rv = reveal.get(key) if ok.get('sonar_reveal') else '?'
+                units.append({'unit': up, 'name': name, 'current': up == cur, 'faces': faces, 'verts': verts,
+                              'meshes': sum(1 for x in fv if x), 'kind': kind,
+                              'floor': u8(m, up + S.h(su['floor_mask_offset'])),
+                              'placed': u8(m, up + S.h(su['placed_offset'])), 'reveal': rv})
+            out['units'] = units
+            if cur:
+                out['current'] = next((u['name'] for u in units if u['unit'] == cur), None) or \
+                    S.cstr(m, cur + S.h(su['name_offset']), 0x80) or '0x%08x' % cur
+            else:
+                out['current'] = '-'
+        if ok.get('sonar_triangles'):
+            self._sonar_tri()
+            out['drawn'] = S.u32(m, S.h(st['drawn']))
+            out['refused'] = S.u32(m, S.h(st['refused']))
+            out['limit'] = st['limit']
+            if self.tri_hist:
+                out['drawn_max'] = max(x[1] for x in self.tri_hist)
+                out['refused_max'] = max(x[2] for x in self.tri_hist)
+        self.sonar_cache = (t, out)
+        return out
+
+    @staticmethod
+    def sonar_reveal_text(rv):
+        if rv == '?':
+            return '?'
+        if rv is None:
+            return '-'                                  # no reveal entry (sonar closed or unit never pinged)
+        got, n = rv
+        if got is None:
+            return '?/%d (unreadable)' % n
+        return '%d/%d (%.1f %%)' % (got, n, 100.0 * got / n) if n else '0/0'
+
+    def sonar_lines(self, so=None):
+        """the link answer of `sonar` (English); the GUI shows the same values"""
+        so = so or self.sonar(0.0)
+
+        def f(v, fm='%.1f'):
+            return v if isinstance(v, str) else S.fmt(v, fm)
+        head = ('sonar %s: mode %s (%s), stage %s, progress %s, ping radius %s, view distance %s (+%s), current unit %s, '
+                'floor mask %s, reveal entries %s' % (
+                    so['time'], f(so['mode'], '%d'), so['mode_name'], f(so['stage'], '%d'), f(so['progress'], '%d'),
+                    f(so['radius']), f(so['view']), f(so['margin'], '%.0f'), so['current'], f(so['floor_mask'], '0x%02x'),
+                    f(so['entries'], '%d')))
+        tri = ('triangles per frame: drawn %s (max %s in %.0f s), refused %s (max %s), limit %s%s' % (
+            f(so['drawn'], '%d'), f(so['drawn_max'], '%d'), SONAR_TRI_WINDOW, f(so['refused'], '%d'),
+            f(so['refused_max'], '%d'), f(so['limit'], '%d'),
+            ' - LIMIT HIT' if isinstance(so['refused_max'], int) and so['refused_max'] > 0 else ''))
+        out = [head, tri]
+        if so['units'] is None:
+            out.append('map units: ? (section sonar_units not proven)')
+            return out
+        out.append('map units loaded: %s' % f(so['unit_count'], '%d'))
+        for u in so['units']:
+            out.append('%s %-28s faces %s vertices %s meshes %d  %-11s floor %s placed %s  revealed %s' % (
+                '*' if u['current'] else ' ', u['name'], S.fmt(u['faces'], '%d'), S.fmt(u['verts'], '%d'), u['meshes'],
+                u['kind'], S.fmt(u['floor'], '0x%02x'), S.fmt(u['placed'], '%d'), self.sonar_reveal_text(u['reveal'])))
+        return out
+
     def sample(self):
         m, A = self.mem, self.A
         if isinstance(m, FakeMem):
@@ -800,6 +1033,7 @@ class Model:
         if t - self.loaded_t >= 1.0:
             loaded = self._loaded()
             self.loaded_t = t
+        self._sonar_tri()                                 # 2026-11-14: per-frame triangle counters -> 2 s maximum
         ts = now_ts()
         with self.lock:
             self.snap = {'time': ts, 'enemies': enemies, 'lara': lara, 'objects': objects, 'loaded': loaded}
@@ -1098,6 +1332,16 @@ class Link:
             return self.model.hits[-n:] or ['no hits yet']
         if c == 'saves':
             return list_saves() or ['no saves in %s' % SAVE_LIB]
+        if c == 'sonar':
+            return self.model.sonar_lines()
+        if c == 'peek':
+            if len(parts) != 3:
+                return ['usage: peek <guest addr hex> <length 1..%d>' % PEEK_MAX]
+            try:
+                addr, n = int(parts[1], 16), int(parts[2], 0)
+            except ValueError:
+                return ['usage: peek <guest addr hex> <length 1..%d>' % PEEK_MAX]
+            return self.model.peek(addr, n)
         if c == 'set':
             return [self.set_value(parts[1:])]
         if c == 'quit':
@@ -1222,6 +1466,20 @@ def run_gui(model, link, args, log):
     ttk.Label(pd, textvariable=ld_head, justify='left').pack(anchor='nw', padx=6, pady=4)
     ld_box = tk.Text(pd, height=18, font=('Consolas', 9))
     ld_box.pack(fill='both', expand=True)
+    # page sonar (2026-11-14): head lines + one row per loaded map unit; refreshed every 0.5 s while shown
+    psn = ttk.Frame(nb)
+    nb.add(psn, text='')
+    sn_head = tk.StringVar()
+    ttk.Label(psn, textvariable=sn_head, justify='left', font=('Consolas', 10)).pack(anchor='nw', padx=6, pady=4)
+    scols = ('cur', 'unit', 'faces', 'verts', 'mapkind', 'floor', 'placed', 'revealed')
+    sv = ttk.Treeview(psn, columns=scols, show='headings', height=14)
+    for c, w in zip(scols, (45, 260, 80, 80, 150, 80, 70, 170)):
+        sv.column(c, width=w, anchor='w')
+    sv.tag_configure('real', foreground='#000000')
+    sv.tag_configure('placeholder', foreground='#c00000')
+    sv.tag_configure('nomesh', foreground='#909090')
+    sv.pack(fill='both', expand=True)
+    sn_t = [0.0]
     # page log / link
     pg = ttk.Frame(nb)
     nb.add(pg, text='')
@@ -1256,8 +1514,11 @@ def run_gui(model, link, args, log):
     def texts():
         L = st['lang']
         root.title(tr('title', L))
-        for i, k in enumerate(('enemies', 'objects', 'lara', 'loaded', 'loglink', 'saves')):
+        for i, k in enumerate(('enemies', 'objects', 'lara', 'loaded', 'sonar', 'loglink', 'saves')):
             nb.tab(i, text=tr(k, L))
+        for c in scols:
+            sv.heading(c, text=tr(c, L))
+        sn_t[0] = 0.0
         for c in cols:
             tv.heading(c, text=tr(c, L))
         for c in ocols:
@@ -1376,6 +1637,19 @@ def run_gui(model, link, args, log):
                                                        len(ld.get('objects', [])), 'loaded (state 2)', tr('loadplan', L)))
             ld_box.delete('1.0', 'end')
             ld_box.insert('end', '\n'.join('%5s  %s' % o for o in ld.get('objects', [])))
+        if nb.select() == str(psn) and time.time() - sn_t[0] >= 0.5:
+            sn_t[0] = time.time()
+            so = model.sonar(0.0) if alive else model.sonar(3600.0)
+            lines = model.sonar_lines(so)
+            sn_head.set('\n'.join(lines[:2]))
+            sv.delete(*sv.get_children())
+            for u in so['units'] or []:
+                k = SONAR_KIND[u['kind']]
+                sv.insert('', 'end', tags=(k,), values=(
+                    '*' if u['current'] else '', u['name'], S.fmt(u['faces'], '%d'), S.fmt(u['verts'], '%d'), tr(k, L),
+                    S.fmt(u['floor'], '0x%02x'), S.fmt(u['placed'], '%d'), model.sonar_reveal_text(u['reveal'])))
+            if so['units'] is None:
+                sv.insert('', 'end', tags=('nomesh',), values=('', '?', '?', '?', '?', '?', '?', '?'))
         link_lbl.set('%s 127.0.0.1:%d' % (tr('link', L), args.port))
         if len(model.hits) != shown[0]:
             hits_box.delete('1.0', 'end')
@@ -1392,19 +1666,35 @@ def run_gui(model, link, args, log):
 
 
 # ---------------------------------------------------------------------------------------------------------- main
-def check_all_proof(m, A, log):
+def check_all_proof(m, A, log, optional=None):
+    """all proof words; sections with "optional": true (sonar) are counted apart: their result goes to `optional`
+    (section -> True / False) and does not make the return value False"""
     bad = n = 0
+    obad, on = {}, {}
     for sec, v in A.items():
         if not isinstance(v, dict) or 'proof' not in v:
             continue
+        opt = bool(v.get('optional'))
         for addr, word in v['proof'].items():
-            n += 1
             got = S.u32(m, S.h(addr))
+            if opt:
+                on[sec] = on.get(sec, 0) + 1
+                obad.setdefault(sec, 0)
+            else:
+                n += 1
             if got != S.h(word):
-                bad += 1
+                if opt:
+                    obad[sec] += 1
+                else:
+                    bad += 1
                 log.w('E', 'proof %s %s: expected %s, got %s' % (sec, addr, word,
                                                                  'unreadable' if got is None else '0x%08x' % got))
     log.w('I', 'proof words: %d checked, %d mismatches' % (n, bad))
+    if on:
+        log.w('I', 'optional proof words: %s (a mismatching section is shown as ?)' % ', '.join(
+            '%s %d/%d' % (sec, on[sec] - obad[sec], on[sec]) for sec in on))
+    if optional is not None:
+        optional.update({sec: obad[sec] == 0 for sec in on})
     return bad == 0
 
 
@@ -1421,7 +1711,8 @@ def selftest(model, link, args, log):
     ok = True
     out = {}
     for cmd in ('status', 'enemies', 'lara', 'hits 9', 'saves', 'set 0x41000000 lp 1', 'objects', 'objects goo',
-                'loaded'):
+                'loaded', 'sonar', 'peek 0x48300000 12', 'peek 0x829ca5a4 8', 'peek 0x10 4', 'peek 0xfffffffc 8',
+                'peek 0x48300000 5000', 'peek 0x5ff00000 4', 'peek zz 4'):
         out[cmd] = C.send(cmd, args.port)
         log.w('I', 'selftest link %s -> %s' % (cmd, ' | '.join(out[cmd])))
 
@@ -1473,6 +1764,35 @@ def selftest(model, link, args, log):
     need(all(v not in ('-', '?') for v in wl[-1].split('\t')[len(WATCH_COLS) - WATCH_CAM_N:]),
          'watch TSV: camera columns empty: %r' % wl[-1].split('\t')[len(WATCH_COLS) - WATCH_CAM_N:])
     need(any('loaded 2' in x for x in out['loaded']), 'object table: expected 2 loaded objects')
+    # 2026-11-14 sonar + peek
+    sn = '\n'.join(out['sonar'])
+    for want in ('mode 3 (Ansicht / view), stage -1', 'ping radius 3000.0, view distance 6000.0 (+4000)',
+                 'current unit dlc_level2_start', 'floor mask 0x01', 'reveal entries 2',
+                 'drawn 812 (max 812 in 2 s), refused 0 (max 0), limit 93571', 'map units loaded: 3'):
+        need(want in sn, 'sonar: %r missing' % want)
+    need(any(x.startswith('* dlc_level2_start') and 'faces 100 vertices 56' in x and 'placeholder' in x and
+             'revealed 0/56 (0.0 %)' in x for x in out['sonar']), 'sonar: placeholder start unit line wrong')
+    need(any('dlc_yggdrasil_hall01' in x and 'faces 5005 vertices 3000' in x and ' real ' in x and
+             'revealed 600/3000 (20.0 %)' in x for x in out['sonar']), 'sonar: real unit / revealed count wrong')
+    need(any('dlc2_costumes' in x and 'no mesh' in x and 'revealed -' in x for x in out['sonar']),
+         'sonar: unit without a mesh wrong')
+    need(len(out['peek 0x48300000 12']) == 5 and '|peek test...|' in out['peek 0x48300000 12'][1] and
+         any('0x48300000  7065656b  u32 1885693291' in x for x in out['peek 0x48300000 12']),
+         'peek: hex / ASCII / u32 view wrong: %r' % out['peek 0x48300000 12'])
+    need(any('0x829ca5a4  00000003  u32 3  f32 4.2039e-45' in x for x in out['peek 0x829ca5a4 8']),
+         'peek: sonar mode word wrong')
+    for cmd in ('peek 0x10 4', 'peek 0xfffffffc 8', 'peek 0x48300000 5000'):
+        need(out[cmd][0].startswith('refused'), '%s not refused: %r' % (cmd, out[cmd]))
+    need(out['peek 0x5ff00000 4'][0].startswith('unreadable'), 'peek of unmapped memory: %r' % out['peek 0x5ff00000 4'])
+    need(out['peek zz 4'][0].startswith('usage'), 'peek with a bad address: %r' % out['peek zz 4'])
+    keep = dict(model.optional_ok)
+    model.optional_ok['sonar_triangles'] = False                 # a section with a proof mismatch -> '?'
+    model.optional_ok['sonar_units'] = False
+    ql = model.sonar_lines(model.sonar(0.0))
+    model.optional_ok = keep
+    need('drawn ? (max ? in 2 s), refused ? (max ?), limit ?' in ql[1] and 'not proven' in ql[2] and
+         'mode 3' in ql[0], 'sonar: unproven sections not shown as ?: %r' % ql)
+    need(all(keep.get(k) for k in SONAR_SECTIONS), 'sonar proof words not all matched in the fake memory: %r' % keep)
     need(any('fly' in h for h in model.hits) and any(v != '-' for v in model.lastfly.values()), 'no flight measured')
     okst, msg = store_saves('selftest_dry', log, dry=True)
     log.w('I', 'selftest store (dry): %s %s' % (okst, msg))
@@ -1528,13 +1848,15 @@ def main():
     except Exception as ex:
         log.w('E', str(ex))
         return 1
-    ok = check_all_proof(mem, A, log)
+    opt = {}
+    ok = check_all_proof(mem, A, log, opt)
     if a.check:
-        return 0 if ok else 1
+        return 0 if ok and all(opt.values()) else 1
     if not ok and not a.force:
         log.w('E', 'refusing: proof words differ (use --force only if you know why)')
         return 1
     model = Model(mem, A, log, a.unproven)
+    model.optional_ok = opt
     if a.camtrace is not None and not a.selftest:
         cpath = a.camtrace or os.path.join(os.path.dirname(a.log), 'cam_%s.tsv' % stamp)
         ct = CamTrace(model, cpath)
@@ -1568,6 +1890,8 @@ def main():
                 e['req'], e['target'], e['dist']))
         print(link.handle('lara')[0])
         print('%d enemies' % len(snap['enemies']))
+        for line in model.sonar_lines():
+            print(line)
         return 0
     if a.selftest and not a.selftest_gui:
         return selftest(model, link, a, log)
