@@ -57,7 +57,7 @@ introtyped also takes, since 18e (2026-11-08), the words of the unit-DTP pointer
 Q5 rules (2026-11-11, workspace docs Befund-Datenwoerter-Schritt-1111.md: the R4 / R5 words of the played trees):
   lv90dtp    the DTP named at [Level+0x90] +0x1c (one family {u32 n, ptr, ptr, float records}): every word s32 (17p /
              17q; proof over the 81 base level units of the PC file list, 0 contradicting)
-  fpkeys     dtp_audit structure keys (dtp_audit.word_keys) with >= FP_MIN = 100 informative base samples whose
+  fpkeys     dtp_audit structure keys (dtp_audit.word_keys) with >= FP_MIN = 20 (P4.4, was 100) informative base samples whose
              explaining byte orders give ONE PC word for the Xbox word (17l "fp100"); not the unit DTP (introtyped /
              unitcurve own it; decision 7 decided for their table 2026-11-11, Q32), the lv90dtp DTP, fxrelayout's table-record DTPs, DTPs whose Xbox bytes are a base
              section or whose internal pointers differ; only DLC 1 / DLC 2 pack sources (FP_PACKS: the six DLC 2
@@ -121,7 +121,11 @@ PCBIG = '../data/pc/bigfile.000'
 LV90_UNIT = re.compile(r'^l\d_[a-z0-9_]+\.drm$')
 # fpkeys (Q5): a dtp_audit structure key rules a word when >= FP_MIN informative base samples exist and the byte orders
 # that explain ALL of them give one PC word for the Xbox word (17l "fp100" = the fp words of the installed b270cmp tree)
-FP_MIN = 100
+# P4.4 K-1 (2026-11-14, docs Befund-P43-P44-Pipeline-1411.md): 100 -> 20 (the 17l threshold), all exclusions unchanged
+# (unit DTP, lv90dtp, fxrelayout tables, base copies, pointer layout, FP_PACKS). Held-out 2-fold: keys with 20..99
+# samples 62 wrong of 415 706 decided (1.5e-4), all keys 157 / 2 507 884; on the Q94 own tree +149 words, every one =
+# the B270 word (B138: 42 = want, 1 = our old word). Override TRUDLC_FP_MIN (e.g. 100 = the 11.11. rule).
+FP_MIN = int(os.environ.get('TRUDLC_FP_MIN', '20'))
 FP_PACKS = ('pack10', 'pack11')      # fpkeys writes only DRMs whose Xbox source is the DLC 1 / DLC 2 pack (plan)
 # odtwin (Q5): DLC 2 thrall DRMs -> the base enemy whose object data is the aligned twin (17l align_twin.py)
 OD_TWINS = {'viking_thrall_dlc2_': 'viking_thrall', 'viking_thrall_tutorial_dlc2_': 'viking_thrall',
@@ -152,7 +156,10 @@ PROOF_EXPECT = {
     'lv90dtp': {'pairs': 81, 'ok': 517303, 'slot': 150293, 'amb': 44304, 'contra': 0},
     # Q5 2026-11-11: 3 838 860 informative base samples, 1714 keys with >= 100 unanimous samples; held-out 2-fold by
     # DRM: 2 092 178 decided words, 95 wrong (4.5e-5)
-    'fpkeys': {'keys': 1714, 'samples': 3838860, 'loo_n': 2092178, 'loo_wrong': 95, 'contra': 0},
+    # P4.4 K-1 2026-11-14 at FP_MIN 20: 12 539 keys, held-out 2 507 884 decided / 157 wrong (6.3e-5); at 100 (11.11.)
+    # 1714 / 2 092 178 / 95
+    'fpkeys': ({'keys': 12539, 'samples': 3838860, 'loo_n': 2507884, 'loo_wrong': 157, 'contra': 0} if FP_MIN == 20 else
+               {'keys': 1714, 'samples': 3838860, 'loo_n': 2092178, 'loo_wrong': 95, 'contra': 0} if FP_MIN == 100 else None),
     # Q5 2026-11-11: base viking_thrall vs yeti_thrall object data (34 948 / 35 740 B) aligned: equal Xbox words with a
     # single PC byte order on both sides agree in every case
     'odtwin': {'bases': 2, 'aligned': 8581, 'agree': 4165, 'no_single_order': 4251, 'contra': 0},

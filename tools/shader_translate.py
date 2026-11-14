@@ -19,8 +19,10 @@ unpaired) on OUR records (tu_batch.recs_full). Per group, in this order:
          --ids-from upwards (never an id of the base game, the layers or the lib store), then binding_check on every
          copy as above.
 VS rule: every interpolator the new PS reads must be written by the material's PC VS; otherwise a RECORDED VS lib of
-the store for the same Xbox VS (map.json) that writes them all is put on pass 3 (e.g. 3091 for Xbox 2066), else the
-group is refused ("needs a VS translation").
+the store for the same Xbox VS (map.json) that writes them all is put on pass 3 (e.g. 3091 for Xbox 2066), otherwise
+(P4.3, 2026-11-14) our own VS: tools/tu_vs.py vsmerge of the Xbox VS onto the PC VS with its unique base Xbox twin
+(build_vs; e.g. Xbox 2058 on 976 / base 1350 adds COLOR0 for the 2057 water), recorded as vs / vs_md5 / vs_build
+'XVS:PCVS' with a stable id; else the group is refused ("needs a VS translation"). Switch TRUDLC_TRANSLATE_VS=off.
 Lane rule (ENGINE 17.4, 17c): MaterialParams := the Xbox material's (tu_unlit apply); a c100+ lane that the pass-0 / 1
 PS of the material read and the new PS does not read keeps its old value; a lane both read with different values
 refuses the group.
@@ -49,7 +51,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import drm_write as DW
 
-REC_COLS = ['group', 'xlib', 'lit', 'smap', 'dxn', 'copies', 'action', 'lib', 'md5', 'vs', 'vs_md5', 'lanes_kept', 'note']
+REC_COLS = ['group', 'xlib', 'lit', 'smap', 'dxn', 'copies', 'action', 'lib', 'md5', 'vs', 'vs_md5', 'lanes_kept', 'vs_build', 'note']
+VS_BUILD = os.environ.get('TRUDLC_TRANSLATE_VS', 'on') != 'off'     # P4.3 (2026-11-14): own merged VS (build_vs)
 SCOPE_CLASSES = ('M_LIB_SAME_TU_VS',)
 PER_LANE = {'mov', 'add', 'mul', 'mad', 'max', 'min', 'slt', 'sge', 'frc', 'abs', 'cmp', 'lrp', 'dsx', 'dsy', 'mova',
             'exp', 'log', 'rcp', 'rsq', 'pow', 'sincos', 'texkill'}
@@ -122,6 +125,28 @@ def vs_writes(data):
         outs |= {((i.usage & 31), (i.usage >> 16) & 15) for i in F9.decode_pc(VL['entries'][o]['blob']).instrs()
                  if i.op == 'dcl' and i.ops[0].rtype == sm3asm.RT_TEXOUT}
     return outs
+
+
+def build_vs(xvs, pv, wd):
+    """P4.3 (14.11., water 20262: the translated 2057 PS reads COLOR0, PC VS 976 never writes it, no recorded VS for
+    Xbox VS 2058): our own VS via the proven merge route tools/tu_vs.py vsmerge (ENGINE 'VS merge rules': PC twin slot
+    kept whole, the DLC translation's extra outputs appended, common outputs decided by the base twin = the unique base
+    Xbox VS whose PC twin (shader_x2p) is pv; VM <= 1e-5 + D3DX9 valid per slot) -> (lib bytes, note) or (None, reason)"""
+    import io, contextlib, tu_vs as TV, tu_light_transplant as TLT
+    from tu_light_transplant import libs
+    L = libs()
+    if xvs not in L['D']: return None, 'Xbox VS %d is not a DLC VS lib' % xvs
+    xs = sorted(x for x, p in TLT.x2p().items() if p == pv and x in L['X'])
+    if len(xs) != 1: return None, 'PC VS %d has %d base Xbox twins %s - no merge base' % (pv, len(xs), xs[:4])
+    outp = os.path.join(wd, 'vs', '%d_on_%d.lib' % (xvs, pv)); os.makedirs(os.path.dirname(outp), exist_ok=True)
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf): TV.cmd_vsmerge(xvs, pv, xs[0], outp)
+    except Exception as ex:
+        return None, 'vsmerge %d on %d (base %d) refused: %s %s' % (xvs, pv, xs[0], type(ex).__name__, str(ex)[:120])
+    open(outp + '.txt', 'w', encoding='utf-8', newline='\n').write(buf.getvalue())
+    res = [l for l in buf.getvalue().splitlines() if l.startswith('RESULT')]
+    return open(outp, 'rb').read(), (res[-1] if res else 'vsmerge %d on %d' % (xvs, pv))
 
 
 def pct_of(xl, lit):
@@ -310,22 +335,25 @@ def run(argv):
     print('recorded libs for these Xbox libs (map.json): %d PS / %d VS (%.0f s)' % (
         sum(1 for r in REC if r[4] == 'ps'), sum(1 for r in REC if r[4] == 'vs'), time.time() - t0))
     # ---- per group: reuse / build, VS rule, lane rule, binding proof on every copy
-    taken = FST.known_hashes(); nid = ids_from
+    taken = FST.known_hashes(); ids_ctr = [ids_from]; cur_ps = [None]
+    vsb = {}; vs_ids = {}                  # P4.3: own merged VS per (Xbox VS, PC VS) -> (id, bytes, note); id -> md5
     # P4a: stable ids - a group the recipe (--expect / --ids-recipe) records as built keeps its recorded lib id; a NEW
     # build never takes a recorded id (before: sequential ids, so one newly built group shifted every later id)
-    recipe = {}
+    recipe = {}; recipe_vs = {}
     idsp = arg(argv, '--ids-recipe') or expp
     if idsp and os.path.isfile(idsp):
         for r_ in read_tsv(idsp):
             if r_['action'] == 'build' and r_['lib'].isdigit(): recipe[(r_['xlib'], r_['smap'], r_['dxn'], r_['copies'])] = int(r_['lib'])
-    rec_ids = set(recipe.values())
+            if r_['action'] == 'build' and r_.get('vs_build', '').count(':') == 1 and r_['vs'].isdigit():   # P4.3: own VS 'XVS:PCVS'
+                recipe_vs[tuple(int(x) for x in r_['vs_build'].split(':'))] = int(r_['vs'])
+    rec_ids = set(recipe.values()) | set(recipe_vs.values())
     plans = []                     # (group entry, {copy index: (new section, kept)}, ps (id, data), vs (id, data) or None)
     gres = []
     for gi, (key, cs) in enumerate(groups.items()):
         xl, smap, dxn, unp = key
         lit = bool(TB.lit_lib(xl)); pct = pct_of(xl, lit)
         g = dict(group=gi, xlib=xl, lit=lit, smap=dict(smap), dxn=list(dxn), copies=['%s:%d' % (c['rel'], c['mat']) for c in cs],
-                 action='refused', lib='-', md5='-', vs='-', vs_md5='-', lanes_kept='-', note='-')
+                 action='refused', lib='-', md5='-', vs='-', vs_md5='-', lanes_kept='-', vs_build='-', note='-')
         tg = time.time(); lg = []
         def prove(data):
             """-> (per copy (new section, kept, vs) or None, reason) - VS rule, lane rule, binding check on every copy"""
@@ -335,10 +363,27 @@ def run(argv):
                 pv = c['pt'][3]; outs = TB.vs_outputs_any(P, pv); vs = None
                 if outs is None or not need <= outs:
                     cand = [r_ for r_ in REC if r_[4] == 'vs' and r_[0] == c['xt'][3] and need <= vs_writes(r_[2])]
-                    if not cand:
-                        return None, 'PS reads %s, PC VS %d of %s:%d does not write them and no recorded VS for Xbox VS %d does - needs a VS translation' % (
-                            sorted(need - (outs or set())), pv, c['rel'], c['mat'], c['xt'][3])
-                    vs = (cand[0][1], cand[0][2])
+                    if cand: vs = (cand[0][1], cand[0][2])
+                    elif VS_BUILD:
+                        # P4.3: no recorded VS -> our own merged VS (build_vs), one per (Xbox VS, PC VS), stable id
+                        kv = (c['xt'][3], pv)
+                        if kv not in vsb:
+                            vd, vn = build_vs(c['xt'][3], pv, wd)
+                            if vd is not None and need <= vs_writes(vd):
+                                hit = [i_ for i_, d_ in vs_ids.items() if d_ == md5(vd)]
+                                vid = recipe_vs.get(kv) if recipe_vs.get(kv) is not None and recipe_vs[kv] not in used_ids else (hit[0] if hit else None)
+                                if vid is None:
+                                    while ids_ctr[0] in used_ids or ids_ctr[0] in rec_ids or ids_ctr[0] in vs_ids or ids_ctr[0] == cur_ps[0]: ids_ctr[0] += 1
+                                    vid = ids_ctr[0]
+                                vs_ids[vid] = md5(vd); vsb[kv] = (vid, vd, vn)
+                            else:
+                                vsb[kv] = (None, None, vn if vd is None else 'merged VS %d on %d still lacks %s' % (kv[0], pv, sorted(need - vs_writes(vd))))
+                            lg.append('VS %d on PC %d: %s' % (kv[0], pv, vsb[kv][2]))
+                        if vsb[kv][0] is not None: vs = (vsb[kv][0], vsb[kv][1])
+                    if vs is None:
+                        return None, 'PS reads %s, PC VS %d of %s:%d does not write them and no recorded VS for Xbox VS %d does - needs a VS translation%s' % (
+                            sorted(need - (outs or set())), pv, c['rel'], c['mat'], c['xt'][3],
+                            (' (own VS: %s)' % vsb[(c['xt'][3], pv)][2][:120]) if (c['xt'][3], pv) in vsb else '')
                 old01 = set()
                 for k in (0, 1):
                     lb = lib_of(P, c['pt'][k])
@@ -379,8 +424,9 @@ def run(argv):
                                    json.dumps(g['copies'], sort_keys=True)))
                 if want is not None and want not in used_ids: lid_new = want
                 else:
-                    while nid in used_ids or nid in rec_ids: nid += 1
-                    lid_new = nid
+                    while ids_ctr[0] in used_ids or ids_ctr[0] in rec_ids or ids_ctr[0] in vs_ids: ids_ctr[0] += 1
+                    lid_new = ids_ctr[0]
+                cur_ps[0] = lid_new
                 data = TB.pack_lib(built, lid_new, taken, len(built))
                 res, w = prove(data)
                 if res is None: why.append('build: %s' % w)
@@ -400,6 +446,12 @@ def run(argv):
                 src, min(r_[2] for r_ in res.values()), len(res), time.time() - tg))
             if vss:
                 g['vs'] = ','.join(str(v[0]) for v in sorted(vss)); g['vs_md5'] = ','.join(md5(v[1]) for v in sorted(vss))
+                own = sorted('%d:%d' % kv for kv, b_ in vsb.items() if b_[0] is not None and any(b_[0] == v[0] for v in vss))
+                if own: g['vs_build'] = ','.join(own)
+                for vid_, vd_ in vss:
+                    if idmd5.get(vid_) and md5(vd_) not in idmd5[vid_] and own:
+                        raise SystemExit('VS lib id %d already used with other bytes' % vid_)
+                    idmd5[vid_].add(md5(vd_))
             kl = sorted({'%s:%d c%d.%s %g->%g' % (cs[ci]['rel'].split('/')[-1], cs[ci]['mat'], r_, 'xyzw'[k], o_, x_)
                          for ci, (kept, _, _) in res.items() for r_, k, o_, x_ in kept})
             g['lanes_kept'] = '; '.join(kl[:6]) + (' (+%d)' % (len(kl) - 6) if len(kl) > 6 else '') if kl else '-'

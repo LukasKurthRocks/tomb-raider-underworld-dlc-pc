@@ -140,7 +140,7 @@ def taint_flags(i, rd, LX, flag, lo, hi):
     return F
 
 
-def xbox_analysis(xblob, K, samp, log):
+def xbox_analysis(xblob, K, samp, log, tail_move=False):
     xprog, i0, i1, tr = F9.translate_x(xblob, K.fn, samp, F9.xbools(xblob), opts=dict(TLT.EXTRA_OPTS))
     if i0 is None: raise Fail('no Xbox light block')
     B = F9.body(xprog); st = F9.stypes(xprog)
@@ -178,6 +178,42 @@ def xbox_analysis(xblob, K, samp, log):
     # BRDF = brdf / constant-only instructions before the first tail instruction; tail = everything non-geometry after it
     brdf = [k for k in range(c1s, ft) if cls[k] in ('brdf', 'hoist')]
     tail = [k for k in range(ft, c1e) if cls[k] != 'geo']
+    late = [k for k in tail if cls[k] in ('brdf', 'hoist')]
+    if late and tail_move:              # only when tail_linear() found the old split non-linear (build)
+        # P4.3 (14.11., Xbox 2057): the Xbox compiler interleaves: 2057 chunk 1 has the diffuse colour mad (201) BEFORE
+        # the specular math (202-207: log / exp of sat(R.V), x c108.y, x visibility, x the lerp term) and the specular
+        # colour mad (208). 'everything after the first tail instruction' put 202-207 in the tail, which the build
+        # replaces by acc += output x radiance -> the specular power was lost (Xbox-lit reference 0.000). Now the tail is
+        # only the colour / accumulator instructions and what reads their results; a later BRDF instruction moves into
+        # the BRDF (before the tail) unless it writes a lane an earlier tail instruction reads or writes (refused).
+        # only the backward slice of the true tail instructions (cls 'tail') through late BRDF instructions moves - the
+        # other late instructions (scratch movs / maxes the old route ran in the probe only) stay where they were, so
+        # builds without such a slice are byte-identical (base proof work/p43_1411/rad_fold_proof.py)
+        need = set(); mv = []
+        late_all = [k for k in range(ft, c1e) if cls[k] != 'geo']
+        for k in reversed(late_all):
+            if cls[k] == 'tail':
+                for t, n, ls in reads(B[k], st):
+                    if t == 't': need |= {(n, c) for c in ls}
+                continue
+            w_ = set(writes(B[k]))
+            if not (w_ & need): continue
+            mv.append(k); need -= w_
+            for l_ in w_:
+                for t, n, ls in lane_reads(B[k], st).get(l_[1], []):
+                    if t == 't': need |= {(n, c) for c in ls}
+        mv = sorted(mv)
+        tl = set(k for k in late_all if k not in mv)
+        tru = {k for k in late_all if cls[k] == 'tail'}
+        for k in mv:
+            for t_ in sorted(tru):                # hazard: an earlier TRUE tail instruction uses a lane the move rewrites
+                if t_ > k: break
+                rd_t = {(n, c) for t, n, ls in reads(B[t_], st) if t == 't' for c in ls}
+                if set(writes(B[k])) & (rd_t | set(writes(B[t_]))):
+                    raise Fail('tail reorder hazard: %s writes a lane tail instruction %d uses' % (sm3asm.fmt_instr(B[k], 'ps'), t_))
+        if mv:
+            brdf = brdf + mv; tail = sorted(tl)
+            log.append('P4.3 chunk 1: %d BRDF instructions after the first tail instruction moved into the BRDF (%s)' % (len(mv), mv))
     flag = fl0; wcls = {}; Lx = set(); Lfirst = {}; din = set(); DS = set(); DSat = {}; tail_pure = set(); written_brdf = set()
     bset, tset = set(brdf), set(tail)
     for k in range(c1s, c1e):
@@ -202,30 +238,114 @@ def xbox_analysis(xblob, K, samp, log):
                'outputs %s (first read %s), first tail %d, tail pure reads %s' % (i0, i1, c1s, c1e, sum(1 for v in cls.values() if v == 'geo'), len(brdf), len(tail),
                                                    len(hoist), sorted(Lx), len(din), sorted(DS), DSat, ft, sorted(tail_pure)))
     return dict(xprog=xprog, i0=i0, i1=i1, B=B, st=st, LX=LX, c1s=c1s, c1e=c1e, hoist=hoist, hoist_lanes=hoist_lanes, brdf=brdf, tail=tail, Lx=sorted(Lx), Lfirst=Lfirst,
-                din=sorted(din), DS=sorted(DS), tail_pure=sorted(tail_pure), lit=lit)
+                din=sorted(din), DS=sorted(DS), tail_pure=sorted(tail_pure), lit=lit, cls=cls, late=late)
+
+
+def tail_linear(A, seeds=(1, 2)):
+    """P4.3: the build replaces the chunk-1 tail by acc += BRDF output x radiance, i.e. it assumes the tail is LINEAR in
+    each BRDF output (x_tail_map probes with one output = 1). True when, for random positive outputs (light-pure tail
+    reads = 1, colour (1, 2, 4), as x_tail_map), halving one output halves its contribution to every lane the colour /
+    accumulator instructions write, for every output. 2057's tail (log / exp of sat(R.V) before the specular colour
+    mad) is not -> tail_move."""
+    xprog, B = A['xprog'], A['B']; N = 16
+    rcol = next(r for r, j in A['LX'].items() if j == 16)
+    instrs = [B[k] for k in A['tail']]
+    out_l = sorted({l for k in A['tail'] if A['cls'][k] == 'tail' for l in writes(B[k])})
+    if not out_l: return True
+    tex = lambda s, c, m: np.ones((c.shape[0], 4), np.float32)
+    for seed in seeds:
+        rng = np.random.RandomState(seed)
+        # material / engine constants random (x_tail_map's zeros hide a pow: exp(0 x log x) = 1), lights as x_tail_map
+        consts = {r: rng.uniform(0.05, 1.5, 4).astype(np.float32) for r in range(256)}
+        for r, j in A['LX'].items(): consts[r] = np.float32([0.5, 0.5, 0.5, 1.0])
+        consts[rcol] = np.float32([1, 2, 4, 8])
+        base = {}
+        regs = {r for r, c in A['DS']} | {r for r, c in A['tail_pure']} | {r for r, c in out_l}
+        for r in regs: base[(0, r)] = np.zeros((N, 4), np.float32)
+        for (r, c) in A['tail_pure']: base[(0, r)][:, c] = 1.0
+        for (r, c) in A['DS']: base[(0, r)][:, c] = rng.uniform(0.2, 1.0, N).astype(np.float32)
+        def run(st):
+            reg, _ = F9.run_state(xprog, instrs, st, consts, tex, N, F9.ALLB)
+            return np.stack([reg[(0, r)][:, c] if (0, r) in reg else np.zeros(N, np.float32) for r, c in out_l], 1)
+        for ds in A['DS']:
+            outs = []
+            for f in (1.0, 0.5, 0.0):
+                s2 = {k: v.copy() for k, v in base.items()}; s2[(0, ds[0])][:, ds[1]] *= f
+                outs.append(run(s2))
+            d1, dh = outs[0] - outs[2], outs[1] - outs[2]
+            if not (np.isfinite(d1).all() and np.isfinite(dh).all() and np.allclose(dh, 0.5 * d1, rtol=1e-4, atol=1e-6)):
+                return False
+    return True
+
+
+def x_vis_lane(A, r, c, k):
+    """P4.3 (14.11., Xbox 2057 DLC 1 dungeon water 20262): is light-pure lane (r, c), first read by the chunk-1 BRDF at
+    k, a scalar light visibility (attenuation x cone) and not L? 2057 computes the attenuation into r0.z (`cmp r0.z,
+    r16, c223.x, c222.x` cone test, `texld r16, .., s15` falloff, `cmp r0.z, -r0.z_abs, r1.x, c219.x`) and multiplies
+    it INSIDE the BRDF (`mul r1.w, sat(N.L), r0.z`, specular `mul r1.w, r0.z, pow`) - other libs multiply it into the
+    colour in the tail, where tail_pure lanes are already probed as visibility 1. Proof (VM, Xbox-lit reference light of
+    tools/perlight_xref.py, seeds 5 / 11): (a) it is the only light-pure BRDF lane of its register (L takes 3 lanes);
+    (b) it is a real light term: non-zero on some samples, finite everywhere; (c) the rest of chunk 1 is LINEAR in it -
+    every lane chunk 1 writes from k on changes by exactly half when the lane is halved (out(v/2) - out(0) =
+    (out(v) - out(0)) / 2) and at least one changes. Then setting it to 1 and letting the PC radiance (= PC visibility x
+    colour) carry it is exact; the build's Xbox-lit reference (>= 0.999) checks the whole shader afterwards."""
+    import perlight_xref as PX
+    B = A['B']; xprog = A['xprog']
+    if sum(1 for (r_, c_) in A['Lx'] if r_ == r) != 1: return False
+    LXi = {j: r_ for r_, j in A['LX'].items()}
+    span = B[k:A['c1e']]
+    wl = sorted({l for i in span for l in writes(i)})
+    moved = False
+    for seed in (5, 11):
+        env = F9.Env(seed); L = PX.light(np.random.RandomState(seed + 100), -100.0)
+        cons = dict(env.consts); PX.set_x(cons, LXi, L)
+        for j in range(13):                       # the reference light also on Xbox light 1 (= chunk 1, the template)
+            if j in LXi and 13 + j in LXi: cons[LXi[13 + j]] = cons[LXi[j]]
+        reg, _ = F9.run_state(xprog, B[:k], env.state0(xprog), cons, env.tex, env.N, F9.ALLB)
+        v = reg.get((0, r))
+        if v is None or not np.isfinite(v[:, c]).all(): return False
+        outs = []
+        for f in (1.0, 0.5, 0.0):
+            s2 = {kk: vv.copy() for kk, vv in reg.items()}; s2[(0, r)][:, c] = v[:, c] * f
+            o, _ = F9.run_state(xprog, span, s2, cons, env.tex, env.N, F9.ALLB)
+            outs.append(np.stack([o[(0, rr)][:, cc] for rr, cc in wl], 1))
+        d1, dh = outs[0] - outs[2], outs[1] - outs[2]
+        fin = np.isfinite(d1) & np.isfinite(dh) & np.isfinite(outs[2])          # per lane value (log(0) lanes drop out)
+        if fin.mean() < 0.5 or not np.allclose(dh[fin], 0.5 * d1[fin], rtol=1e-4, atol=1e-5): return False
+        moved |= bool((np.abs(d1[fin]) > 1e-6).any())
+    return moved
 
 
 def x_L_world(A, seed=4):
-    """which world component of L = normalize(p_Lights[13].xyz - pos) each X L lane holds (VM)"""
+    """which world component of L = normalize(p_Lights[13].xyz - pos) each X L lane holds (VM).
+    -> ({lane: world component}, [visibility lanes]) - P4.3: a light-pure BRDF lane that is no L component and passes
+    x_vis_lane is a scalar visibility (set to 1: the PC radiance carries the PC visibility); otherwise refused as before"""
     xprog, B = A['xprog'], A['B']
     env = F9.Env(seed)
     rpos = next(r for r, j in A['LX'].items() if j == 13)
     P_ = np.broadcast_to(env.consts[rpos], (env.N, 4))[:, :3]
     pos = env.vals[(5, 5)][:, :3]
     d = P_ - pos; Lw = d / np.linalg.norm(d, axis=1, keepdims=True)
-    out = {}; cache = {}
+    out = {}; cache = {}; vis = []
     for (r, c) in A['Lx']:
         k = A['Lfirst'][(r, c)]
         if k not in cache: cache[k] = env.run(xprog, B[:k], env.state0(xprog), F9.ALLB)[0]
         reg = cache[k]
         v = reg.get((0, r)); v = None if v is None else v[:, c]
         hit = [w for w in range(3) if v is not None and np.allclose(v, Lw[:, w], rtol=1e-3, atol=1e-4)]
+        if not hit and VIS_RULE and x_vis_lane(A, r, c, k):
+            vis.append((r, c)); continue
         if len(hit) != 1:
             dist = np.linalg.norm(d, axis=1)
             raise Fail('X L lane r%d.%s (read at %d) is not one world component of L: mean %.3f, L %s, dist %.3f'
                        % (r, 'xyzw'[c], k, float(np.mean(v)) if v is not None else 0, np.round(Lw.mean(0), 3), float(dist.mean())))
         out[(r, c)] = hit[0]
-    return out
+    return out, vis
+
+
+VIS_RULE = os.environ.get('TRUDLC_PERLIGHT_VIS', 'on') != 'off'      # P4.3 switches (2026-11-14)
+RAD_RULE = os.environ.get('TRUDLC_PERLIGHT_RAD', 'on') != 'off'
+TAIL_RULE = os.environ.get('TRUDLC_PERLIGHT_TAIL', 'on') != 'off'
 
 
 def x_tail_map(A, acc):
@@ -276,6 +396,31 @@ def l_norm_track(i, sub):
         for a, b in ((s[0], s[1]), (s[1], s[0])):
             if T_(a) and T_(b) and b.swz in (0x00, 0x55, 0xAA, 0xFF) and rs.get((b.num, b.swz & 3)) == (a.num, a.swz & 0x3f):
                 sub['Lc'] = (len(sub['body']), d.num); break
+
+
+def rad_track(i, sub, flag, gconst, lastw, constl=frozenset()):
+    """P4.3 (14.11., donor 975 for Xbox 2057 dungeon water): the PC compiler can fold the visibility into the BRDF
+    products instead of forming radiance = visibility x colour (975 slot 0 b0: `cmp_pp r0.x, ..` visibility, then
+    `mul_pp r0.x, r0.x, r0.y` (x N.L), `mul_pp r0.z, r0.x, r1.w` (x specular), `mul_pp r2.yzw, r0.x, c182.xxyz` (x
+    colour); slot 2 adds the shadow factor `lrp_pp r2.y, shadow, c2.z, 1 - c108.w` the same way) -> 'radiance None'.
+    Records, for an impure mul / mad: every light-pure SCALAR temp lane multiplied with a non-light value (a visibility
+    factor; keyed by its writer, saved where it is first read: sub['Vf'] = {(reg, lane, writer): insert index}) and the
+    light-colour constant read as 3 lanes (sub['Cs']). emit_insert builds radiance = product of the factors x colour only
+    when no radiance was found, the colour is unique and there are 1..4 factors (else refused as before); proof: the
+    Xbox-lit VM reference of the build and, for the shadow sub-blocks, work/p43_1411/rad_fold_proof.py."""
+    if i.op not in ('mul', 'mad') or len(i.ops) < 3: return
+    dl = [c for c in range(4) if i.ops[0].wm >> c & 1]
+    a, b = i.ops[1], i.ops[2]
+    for x, y in ((a, b), (b, a)):
+        sw = [(x.swz >> (2 * l)) & 3 for l in range(4)]
+        if x.rtype == sm3asm.RT_TEMP and x.smod == 0 and not x.rel and len({sw[l] for l in dl}) == 1 and \
+                flag.get((x.num, sw[dl[0]]), {'S'}) <= {'G'} and (x.num, sw[dl[0]]) not in constl and y.rtype == sm3asm.RT_TEMP and \
+                any(not flag.get((y.num, (y.swz >> (2 * l)) & 3), {'S'}) <= {'G'} for l in dl):
+            key = (x.num, sw[dl[0]], lastw.get((x.num, sw[dl[0]])))
+            sub.setdefault('Vf', {}).setdefault(key, len(sub['body']))
+        if x.rtype == sm3asm.RT_CONST and x.num in gconst and x.smod == 0 and not x.rel and len(dl) == 3 and \
+                len({sw[l] for l in dl}) == 3:
+            sub.setdefault('Cs', set()).add('c%d.%s' % (x.num, ''.join('xyzw'[sw[l]] for l in dl)))
 
 
 def narrow_hoisted(i, lanes):
@@ -332,7 +477,12 @@ def build(xblob, pdblob, names, log):
     preg = {n: ri for n, rs, ri, rc in pct if rs == 3}
     K = F9.Consts(pct)
     samp = F9.xsamp(xblob, names if names is not None else ('globali', preg))
-    A = xbox_analysis(xblob, K, samp, log)
+    lg0 = []
+    A = xbox_analysis(xblob, K, samp, lg0)
+    if TAIL_RULE and A['late'] and not tail_linear(A):          # P4.3: old tail split not linear -> move the slice
+        lg0 = ['P4.3 chunk-1 tail not linear in the BRDF outputs (tail_linear)']
+        A = xbox_analysis(xblob, K, samp, lg0, tail_move=True)
+    log.extend(lg0)
     B, i0, i1 = A['B'], A['i0'], A['i1']
     Hk, ndrop = hoist_select(A)
     log.append('hoist: %d light-free instructions before the block, %d after chunk 1 dropped (not needed outside the light chain)' % (len(Hk), ndrop))
@@ -344,7 +494,8 @@ def build(xblob, pdblob, names, log):
     xin, xout = F9.live_in_out(xprog2, j0, j1)
     acc = sorted(l for l in xout if l in A['lit'])
     log.append('X block outputs: acc %s, hoisted %d' % (acc, len(xout) - len(acc)))
-    Lmap = x_L_world(A)
+    Lmap, Vis = x_L_world(A)
+    if Vis: log.append('P4.3 visibility lanes of the Xbox BRDF set to 1 (PC radiance carries the visibility): %s' % ['r%d.%s' % (r, 'xyzw'[c]) for r, c in Vis])
     tmap_x = x_tail_map(A, acc)
     log.append('X tail: %s' % {('r%d.%s' % (a[0], 'xyzw'[a[1]])): ('r%d.%s' % (d[0], 'xyzw'[d[1]]), 'rgb'[c]) for a, (d, c) in tmap_x.items()})
     BP = F9.body(pprog); p0, p1 = F9.pc_light_block(pprog)
@@ -373,7 +524,7 @@ def build(xblob, pdblob, names, log):
     for r in accregs:
         m = ''.join('xyzw'[c] for rr, c in acc if rr == r)
         newB.append(P('mov r%d.%s, c%d.x' % (am[r], m, cz)))
-    flag = {}; skip_else = None; nsub = 0; stack = []
+    flag = {}; skip_else = None; nsub = 0; stack = []; lastw = {}; constl = set()
     # PC pre-block: lanes computed from def literals only (e.g. mov r3.zw, c2) are light-pure; those instructions are
     # copied to the start of the new block (T does not contain the PC pre-block)
     for i in BP[:p0]:
@@ -392,9 +543,27 @@ def build(xblob, pdblob, names, log):
         if L is None and sub.get('Lc'):          # P4a: L normalised as rsq + mul (no nrm), fallback only
             idx, r = sub['Lc']
             sub['body'].insert(idx, P('mov r%d.xyz, r%d.xyz' % (lsave, r))); L = sub['L'] = ['r%d.%s' % (lsave, w) for w in 'xyz']
+            sub['Lc_used'] = idx
+        if rad is None and L is not None and RAD_RULE and not sub.get('Vf') and len(sub.get('Cs', ())) == 1:
+            # P4.3: no visibility factor at all (sun without shadow): radiance = the light colour
+            creg, clanes = next(iter(sub['Cs'])).split('.')
+            rad = sub['rad'] = ['%s.%s' % (creg, w) for w in clanes]
+            log.append('P4.3 PC sub-block b%d: radiance = %s (no visibility factor)' % (sub['b'], next(iter(sub['Cs']))))
+        if rad is None and L is not None and RAD_RULE and 1 <= len(sub.get('Vf', {})) <= 4 and len(sub.get('Cs', ())) == 1:
+            # P4.3: radiance = product of the folded visibility factors x colour, fallback only (rad_track)
+            fs = sorted(sub['Vf'].items(), key=lambda t: t[1]); col_ = next(iter(sub['Cs']))
+            for j, ((vr, vc, _), idx) in reversed(list(enumerate(fs))):
+                if sub.get('Lc_used') is not None and sub['Lc_used'] <= idx: idx += 1
+                sub['body'].insert(idx, P('mov r%d.%s, r%d.%s' % (lsave + 1, 'xyzw'[j], vr, 'xyzw'[vc])))
+            sub['body'].append(P('mul r%d.xyz, r%d.x, %s' % (lsave + 2, lsave + 1, col_)))
+            for j in range(1, len(fs)): sub['body'].append(P('mul r%d.xyz, r%d.xyz, r%d.%s' % (lsave + 2, lsave + 2, lsave + 1, 'xyzw'[j])))
+            rad = sub['rad'] = ['r%d.%s' % (lsave + 2, w) for w in 'xyz']
+            log.append('P4.3 PC sub-block b%d: radiance = %s x %s (folded visibility)' % (
+                sub['b'], ' x '.join('r%d.%s' % (vr, 'xyzw'[vc]) for (vr, vc, _), _ in fs), col_))
         if L is None or rad is None: raise Fail('PC sub-block b%d: L %s radiance %s' % (sub['b'], L, rad))
         newB.extend(sub['body'])
         for (r, c), w in Lmap.items(): newB.append(P('mov r%d.%s, %s' % (xm[r], 'xyzw'[c], L[w])))
+        for (r, c) in Vis: newB.append(P('mov r%d.%s, c%d.w' % (xm[r], 'xyzw'[c], cz)))      # P4.3: visibility := 1
         newB.extend(clone(B[k], xm) for k in A['brdf'])
         for (r, c), (ds, lane) in sorted(tmap_x.items()):
             newB.append(P('mad r%d.%s, r%d.%s, %s, r%d.%s' % (am[r], 'xyzw'[c], xm[ds[0]], 'xyzw'[ds[1]], rad[lane], am[r], 'xyzw'[c])))
@@ -440,11 +609,17 @@ def build(xblob, pdblob, names, log):
             return F_ if F_ else {'G'}
         newfl = {l: pcF(rdl) for l, rdl in ((w_, lane_reads(i, pst)[w_[1]]) for w_ in writes(i))}
         if pure: flag.update(newfl)
+        # P4.3: lanes made of plain constants only (no light constant / input / sampler), e.g. 975 sun `mov r6.x, c2.x`
+        for l_ in writes(i):
+            if pure and all(t == 'c' and n not in gconst or (t == 't' and all((n, c) in constl for c in ls))
+                            for t, n, ls in lane_reads(i, pst)[l_[1]]): constl.add(l_)
+            else: constl.discard(l_)
         if pure:
             sub['body'].append(i)
             if i.op == 'nrm':
                 sub['body'].append(P('mov r%d.xyz, r%d.xyz' % (lsave, i.ops[0].num))); sub['L'] = ['r%d.%s' % (lsave, w) for w in 'xyz']
             else: l_norm_track(i, sub)
+            lastw.update({l: k for l in writes(i)})
             continue
         if i.op in ('mad', 'mul') and len(i.ops) >= 3:
             dl = [c for c in range(4) if i.ops[0].wm >> c & 1]
@@ -452,15 +627,19 @@ def build(xblob, pdblob, names, log):
                 if o.rtype != sm3asm.RT_TEMP or len(dl) != 3 or o.smod != 0: continue
                 sw = [(o.swz >> (2 * l)) & 3 for l in range(4)]
                 if all(flag.get((o.num, sw[l]), {'S'}) <= {'G'} for l in dl):
+                    # P4.3: a constants-only operand is no radiance (975 / 1657 sun: `mad r5.xyz, r5, r6.x, c209`
+                    # with r6.x = c2.x = 2 was taken for the sun colour c212 -> sun term wrong, unseen by the b3 reference)
+                    if RAD_RULE and all((o.num, sw[l]) in constl for l in dl): continue
                     sub['rad'] = ['r%d.%s' % (o.num, 'xyzw'[sw[l]]) for l in dl]
-        flag.update(newfl)
+        rad_track(i, sub, flag, gconst, lastw, constl)
+        flag.update(newfl); lastw.update({l: k for l in writes(i)})
         if sub["L"] is None and i.op == "dp3":
             for o in i.ops[1:]:
                 if o.rtype == sm3asm.RT_CONST and o.num in gconst and o.smod == 1 and o.swz == 0xE4:
                     sub['L'] = ['-c%d.%s' % (o.num, w) for w in 'xyz']
     if stack: raise Fail('unbalanced PC block')
     log.append('PC donor block [%d,%d): %d light sub-blocks -> %d instructions' % (p0, p1, nsub, len(newB)))
-    hdr = F9.header(pprog) + [P('def c%d, 0, 0, 0, 0' % cz)]
+    hdr = F9.header(pprog) + [P('def c%d, 0, 0, 0, %d' % (cz, 1 if Vis else 0))]      # w = 1 only for P4.3 builds
     pprog2 = sm3asm.Program(pprog.kind, pprog.major, pprog.minor, hdr + BP[:p0] + newB + BP[p1:])
     q0, q1 = p0, p0 + len(newB)
     in_moves = [((xm[r], c), (r, c)) for (r, c) in A['din'] if r not in ro]

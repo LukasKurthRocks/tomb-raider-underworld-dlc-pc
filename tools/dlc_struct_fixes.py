@@ -100,7 +100,7 @@ layout proven on the base Xbox / PC pairs by its own tool and changes only the w
   odtwin     tools/typed_family_fix.py      thrall object data COPIES (record-shaped DTPs that are not object +8 data of
              their DRM: viking_thrall_tutorial_dlc2_ 24424, yeti_thrall_armored_dlc2_ 24575) by the difflib-aligned
              base enemy object data (17l align_twin; base proof viking vs yeti 4165 / 4165 agree)
-  fpkeys     tools/typed_family_fix.py      dtp_audit structure keys with >= 100 unanimous base samples (17l fp100);
+  fpkeys     tools/typed_family_fix.py      dtp_audit structure keys with >= 20 (P4.4 K-1; was 100) unanimous base samples;
              not the unit DTP (introtyped), the lv90 DTP, table-record DTPs or base-content DTPs; DLC 1 / DLC 2 packs
              only (costume packs: never played, left to the owner); held-out proof pinned
              The three typed_family_fix rules prove themselves like the other typed rules; idpair / fxrelayout run
@@ -372,6 +372,14 @@ class Steps:
         for oid, s in MR.model_dtps(PD, 'le'):
             m = MR.model_list(s, 'le')
             if m is not None and MR.stride(*m) == MR.XS: todo.append(s.id)
+        # P4.4 K-3 (2026-11-14): second model copies that no object +8 reaches (DLC 2 DTP 24392 in doppelganger_casual,
+        # the 4 thralls, the clone dlc_doppel_costume_a) are found by their head (model_list: +0x34 count, +0x38 list)
+        # with the Xbox stride 36; base: 26 lists 36 -> 40, 0 kept at 36 (work/p43_1411/k3_proof.py)
+        if MR.SHAPE_ALL:
+            for s in PD.sections:
+                if s.type != 7 or s.id in todo: continue
+                m = MR.model_list(s, 'le')
+                if m is not None and MR.stride(*m) == MR.XS: todo.append(s.id)
         if not todo: return None, None
         raw = cur; notes = []
         for sid in todo:
@@ -629,12 +637,15 @@ class Steps:
         (tools/costume_dtp_fix.fix_drm, P4a 2026-11-07, docs Befund-P4a-Kostueme-0711.md); the Xbox source is the
         tool's own (costume_dtp_fix.XORDER)"""
         import costume_dtp_fix as CD
-        if not CD.is_costume(rel): return None, None
+        # P4.4 K-2 (2026-11-14): LISTCOUNT on every DRM (20213 +0x10 in doppelganger_casual / lara_doppelganger),
+        # MESH16 stays costume-only (costume_dtp_fix.LISTCOUNT_ALL)
+        if not CD.is_costume(rel) and not CD.LISTCOUNT_ALL: return None, None
         try:
             new, changes, rep, src = CD.fix_drm(cur, rel)
         except AssertionError as e:
             return None, 'costumedtp %s: proof failed (%s) - nothing changed' % (rel, e)
         except SystemExit as e:
+            if not CD.is_costume(rel): return None, None
             return None, 'costumedtp %s: NOT PAIRED (no Xbox source: %s) - nothing changed' % (rel, e)
         kept = [l for l in rep if 'kept' in l or 'not provable' in l]
         tail = ('; %d word(s) kept / not provable: %s' % (len(kept), self._wlist(kept, 3))) if kept else ''
@@ -814,7 +825,7 @@ class Steps:
         return self._typed('odtwin', rel, XD, cur)
 
     def s_fpkeys(self, rel, xf, XD, cur):
-        """dtp_audit structure keys with >= 100 unanimous base samples (17l fp100, typed_family_fix)"""
+        """dtp_audit structure keys with >= typed_family_fix.FP_MIN (20 since P4.4 K-1) unanimous base samples"""
         return self._typed('fpkeys', rel, XD, cur)
 
     # ---- Q32 (2026-11-11): unit-DTP curve records

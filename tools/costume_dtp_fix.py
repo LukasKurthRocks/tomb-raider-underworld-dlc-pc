@@ -24,6 +24,7 @@ headers + relocation blobs identical, a second plan on the output plans 0 words.
 
 Usage (from the repository root):
   ../bin/pyt -t 1800 tools/costume_dtp_fix.py prove [NAME ...]          (default: the base Lara costume DRMs)
+  ../bin/pyt -t 1800 tools/costume_dtp_fix.py prove-listcount           (P4.4: LISTCOUNT over every base DTP pair)
   ../bin/pyt -t 1800 tools/costume_dtp_fix.py scan DIR[,DIR..] [--his HIS_MODS] [-v]
   ../bin/pyt -t 1800 tools/costume_dtp_fix.py fix DIR[,DIR..] OUT_MODS [--check] [--his HIS_MODS]
       DIR[,DIR..] = overlay (later folder wins); every dlc_costume_*.drm found is handled; OUT_MODS gets only changed DRMs
@@ -42,6 +43,12 @@ BASE_NAMES = ['lara', 'lara_bikini', 'lara_casual', 'lara_jungle_a', 'lara_jungl
               'lara_snow_heavy', 'lara_snow_light', 'lara_wetsuit_cold', 'lara_wetsuit_warm', 'lara_doppelganger',
               'lara_mom_thrall']
 XORDER = ('pack10', 'pack11', 'pack1', 'pack2', 'pack20', 'tu', 'xbase2', 'xbase')
+# P4.4 K-2 (2026-11-14, docs Befund-P43-P44-Pipeline-1411.md): LISTCOUNT is a pure struct rule - on EVERY DRM, not only
+# the costume DRMs (doppelganger_casual / lara_doppelganger / dlc_doppel_costume_a DTP 20213 +0x10: Xbox 18, converter
+# 17 = remapped like a DTP id, kits 18). Base proof over all base DTP pairs (work/p43_1411/k2_proof.py): 134 struct
+# pairs (Lara, weapons, enemies, level units), PC = s32 of Xbox in 134, 0 against. MESH16 stays costume-only.
+# Switch TRUDLC_LISTCOUNT_ALL=off.
+LISTCOUNT_ALL = os.environ.get('TRUDLC_LISTCOUNT_ALL', 'on') != 'off'
 
 
 def internal(reloc, endian):
@@ -75,13 +82,13 @@ def listcount(xd, it):
     return n
 
 
-def plan_section(xd, xreloc, pd, slots_le=None):
-    """{offset: (old, new, rule, note)} and [report lines] for one paired type-7 section"""
+def plan_section(xd, xreloc, pd, slots_le=None, lc_only=False):
+    """{offset: (old, new, rule, note)} and [report lines] for one paired type-7 section (lc_only: LISTCOUNT only)"""
     it = internal(xreloc, 'be')
     xr = R.parse(xreloc, 'be')
     slots = set(xr.pointer_offsets()) | set(xr.id_offsets())
     ch, rep = {}, []
-    if xd[:4] == MODEL_MAGIC:
+    if xd[:4] == MODEL_MAGIC and not lc_only:
         sp, why = u16_spans(xd, it)
         if sp is None:
             rep.append('MESH16 not provable: ' + why)
@@ -133,13 +140,13 @@ def load_xbox(rel):
     return TA.load_x(rel.replace('/', chr(92)))
 
 
-def plan_file(xs, D, his=None):
+def plan_file(xs, D, his=None, lc_only=False):
     ch, rep = {}, []
     hp = {}
     if his is not None:
         for x, k in pair_sections(xs, his): hp[x['id'], len(x['data'])] = his.sections[k].data
     for x, k in pair_sections(xs, D):
-        c, r = plan_section(x['data'], x['reloc'], D.sections[k].data)
+        c, r = plan_section(x['data'], x['reloc'], D.sections[k].data, lc_only=lc_only)
         hd = hp.get((x['id'], len(x['data'])))
         for o, (old, new, rule, note) in c.items():
             hw = hd[o:o + 4] if hd is not None and o + 4 <= len(hd) else None
@@ -154,7 +161,7 @@ def is_costume(rel):
     return b.startswith('dlc_costume_') and b.endswith('.drm')
 
 
-def prove_write(orig, raw, ch, xs):
+def prove_write(orig, raw, ch, xs, lc_only=False):
     """the proofs of `fix` on a written DRM: decoded DRM differs from the input only in the planned bytes, same section
     count, section headers + relocation blobs identical, a second plan finds 0 words -> number of differing bytes"""
     D0 = DW.read(orig, 'le'); dec0 = DW.cdrm_decode(orig, 'le'); dec1 = DW.cdrm_decode(raw, 'le')
@@ -168,7 +175,7 @@ def prove_write(orig, raw, ch, xs):
     planned = {bases[k] + o + j for (k, o), v in ch.items() for j in range(4) if v[0][j] != v[1][j]}
     diff = {i for i in range(len(dec0)) if dec0[i] != dec1[i]}
     assert diff == planned, 'byte diff %d != planned %d' % (len(diff), len(planned))
-    again, _ = plan_file(xs, D1)
+    again, _ = plan_file(xs, D1, lc_only=lc_only)
     assert not again, 're-plan not empty: %d' % len(again)
     return len(diff)
 
@@ -178,21 +185,22 @@ def fix_drm(raw, rel):
     (new raw or None, changes [(section index, offset, old, new, PC section id, rule)], report lines, Xbox source).
     The Xbox source is looked up as in `scan` / `fix` (XORDER, lower-case file name); the written bytes are proven
     (prove_write: an AssertionError leaves the caller's DRM unchanged). Not a costume DRM -> (None, [], [], None)."""
-    if not is_costume(rel): return None, [], [], None
+    lc_only = not is_costume(rel)
+    if lc_only and not LISTCOUNT_ALL: return None, [], [], None
     order = TA.ORDER
     try:
         xs, src = load_xbox(os.path.basename(rel.replace(chr(92), '/')).lower())
     finally:
         TA.ORDER = order
     D = DW.read(raw, 'le')
-    ch, rep = plan_file(xs, D)
+    ch, rep = plan_file(xs, D, lc_only=lc_only)
     if not ch: return None, [], rep, src
     ids = {k: D.sections[k].id for k, o in ch}
     for (k, o), (old, new, _, _) in ch.items():
         s = D.sections[k]; d = bytearray(s.data); d[o:o + 4] = new; s.data = bytes(d)
     out = D.write('le')
     if raw[:4] == b'CDRM': out = DW.cdrm_encode(out, 'le')
-    prove_write(raw, out, ch, xs)
+    prove_write(raw, out, ch, xs, lc_only)
     changes = [(k, o, old, new, ids[k], rule) for (k, o), (old, new, rule, _) in sorted(ch.items())]
     return out, changes, rep, src
 
@@ -316,8 +324,26 @@ def cmd_fix(dirs, out, check, his_dir):
     return 0
 
 
+LC_EXPECT = {'ok': 134}           # P4.4 K-2 (2026-11-14): pinned base count of prove-listcount
+
+
+def cmd_prove_listcount():
+    """LISTCOUNT over every base Xbox / PC DTP pair (dtp_audit.base_pairs): PC count = s32 of the Xbox count wherever
+    the Xbox bytes have the struct; exit 1 on a contradiction or when the count differs from LC_EXPECT"""
+    import dtp_audit as DA
+    cnt = collections.Counter()
+    for x, p, xb, pc, xr in DA.base_pairs():
+        if listcount(xb['data'], dict(xr.internal)) is None: continue
+        ok = pc['data'][0x10:0x14] == xb['data'][0x10:0x14][::-1]
+        cnt['ok' if ok else 'contra'] += 1
+        if not ok: print('CONTRA %s DTP %s / %s' % (xb['src'], x, p))
+    print('prove-listcount: %s (expected %s)' % (dict(cnt), LC_EXPECT))
+    return 0 if dict(cnt) == LC_EXPECT else 1
+
+
 def main(a):
     if not a: sys.exit(__doc__)
+    if a[0] == 'prove-listcount': return cmd_prove_listcount()
     verbose = '-v' in a; check = '--check' in a
     a = [x for x in a if x not in ('-v', '--check')]
     his = None

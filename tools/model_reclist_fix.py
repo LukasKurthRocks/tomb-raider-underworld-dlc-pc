@@ -20,6 +20,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import drm_write as DW, drm_reloc as R
 
 XS, PS = 36, 40
+# P4.4 K-3 (2026-11-14): the step reclist also takes model lists found by their head shape alone (not via object +8);
+# base (work/p43_1411/k3_proof.py over work/generic/pairs.pkl, type-7 order pairing): 26 lists Xbox 36 -> PC 40
+# (25 via +8, 1 by shape only), none kept at 36. Switch TRUDLC_RECLIST_SHAPE=off.
+SHAPE_ALL = os.environ.get('TRUDLC_RECLIST_SHAPE', 'on') != 'off'
 
 
 def a16(v): return (v + 15) & ~15
