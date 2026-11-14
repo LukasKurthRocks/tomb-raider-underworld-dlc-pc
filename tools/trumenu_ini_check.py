@@ -4344,9 +4344,11 @@ def check_02236(ini_path, switches_path):
 
 P5_CHECKS_02237 = os.path.join(ROOT, 'work', 'p5_menu_1311', 'precheck_02237.txt')
 P5_ROOMS_02237 = os.path.join(ROOT, 'work', 'b_nav_1211', 'q105_room_names.txt')
+# 0.22.42 (W3, owner wish 13.11.): DistMetres default 1, its switches row says "TruMenu 0.22.42" (P5_SINCE_02237)
 P5_KEYS_02237 = {'KeyItems': '0', 'StyleCollect': 'both', 'StyleKeyItems': 'both', 'StyleNames': 'both',
-                 'StyleCheckpoints': 'both', 'StylePortals': 'both', 'LabelRoom': '1', 'DistMetres': '0',
+                 'StyleCheckpoints': 'both', 'StylePortals': 'both', 'LabelRoom': '1', 'DistMetres': '1',
                  'DrawDistance': '0', 'Occlusion': '1', 'HideCo': '1', 'HideFx': '1', 'RoomOnly': '0'}
+P5_SINCE_02237 = {'DistMetres': 'TruMenu 0.22.42'}
 P5_ITEMS_02237 = (('dbg.keyitems', 'bool', 'ValDvKeyItems', 'RunDvKeyItems'),
                   ('dbg.labelstyle', 'action', 'ValDvLabelStyle', 'RunDvLabelStyle'),
                   ('dbg.room', 'bool', 'ValDvRoom', 'RunDvRoom'), ('dbg.metres', 'bool', 'ValDvMetres', 'RunDvMetres'),
@@ -4480,12 +4482,12 @@ def check_02237(ini_path, switches_path):
         problems.append('TruMenu.cpp: bar row Schluesselgegenstaende (dbg.keyitems, page Level data) missing')
     if 'P5MenuControls(o, sizeof(o));' not in src: problems.append('TruMenu.cpp: menu controls (page Debug view) missing')
     sw = [l.rstrip('\r\n').split(' | ') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Debug | ')]
-    got = {f[2]: f for f in sw if len(f) >= 10 and f[9] == 'TruMenu 0.22.37'}
+    got = {f[2]: f for f in sw if len(f) >= 10 and f[9] == P5_SINCE_02237.get(f[2], 'TruMenu 0.22.37')}
     for k, d in P5_KEYS_02237.items():
         f = got.get(k)
         if not f or f[6] != 'restart' or f[7] != d:
-            problems.append('%s: row TruMenu | Debug | %s | ... | restart | %s | ... | TruMenu 0.22.37 missing'
-                            % (os.path.basename(switches_path), k, d))
+            problems.append('%s: row TruMenu | Debug | %s | ... | restart | %s | ... | %s missing'
+                            % (os.path.basename(switches_path), k, d, P5_SINCE_02237.get(k, 'TruMenu 0.22.37')))
     readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
     if '\n## 0.22.37 - ' not in readme or '\n### TO TEST 0.22.37' not in readme:
         problems.append('README.md: section "## 0.22.37 - ..." with "### TO TEST 0.22.37" missing')
@@ -4676,7 +4678,8 @@ def check_02239(ini_path, switches_path):
     for want in ('const float alarm = g_naAlarm;', 'if (!g_naClock || !g_ntClock || !(alarm > 0.0f)) return -1.0f;',
                  'float e = held ? g_ntShadow : g_ntReal;', 'g_naRepeat ? fmodf(e, alarm)'):
         if want not in fr: problems.append('TruMenu.cpp: AtFraction must hold %s' % want)
-    if 'bool AtWantsDraw() { return g_atWant != 0 && NaFrontEnd(); }' not in src:
+    # 0.22.42 (W3): && W3AtMainMenu() appended (main menu only, not in the credits) - check_02242 tests that part
+    if 'bool AtWantsDraw() { return g_atWant != 0 && NaFrontEnd()' not in src:
         problems.append('TruMenu.cpp: AtWantsDraw must be g_atWant && NaFrontEnd (front end only)')
     rnd = fn_body(src, 'void Render(')
     i_nt, i_ai2 = rnd.find('if (ntDraw) DrawNt();'), rnd.find('if (atDraw) DrawAt(ntDraw);')
@@ -4890,8 +4893,8 @@ def check_02241(ini_path, switches_path):
     problems = []
     src = read_cpp()
     raw = open(CPP, 'r', encoding='utf-8').read()
-    if '"TruMenu 0.22.41 (Q126c compact attract styles' not in src[:src.find('\n', src.find('kVersion = '))]:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.41 (Q126c compact attract styles"')
+    if '0.22.41 (Q126c compact attract styles' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.42: a part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.41 part "0.22.41 (Q126c compact attract styles"')
     if 'const int kAtStyleN = 17, kAtStyleDefault = 7;' not in src:
         problems.append('TruMenu.cpp: kAtStyleN 17 / kAtStyleDefault 7 missing')
     em = re.search(r'enum AtTextAt \{(.*?)\};', src, re.S)
@@ -4984,6 +4987,161 @@ def check_02241(ini_path, switches_path):
     if AT_HASH_02240 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.40 build hash (work/asi/menu0263) is missing')
     return problems, ('compact attract styles (Q126c): [Menu] AttractIcon 0 .. 16 = 7 live, 17 styles, 8 .. 16 without '
                       'a box (small circle + counter / terse text), no time next to a circle, one or two digits')
+
+
+W3_CHECKS_02242 = os.path.join(ROOT, 'work', 'w3_1411', 'precheck_02242.txt')
+W3_KEYS_02242 = (('RoomNear', '3000'), ('OcclNear', '600'), ('HideEmptyPots', '1'), ('LabelStack', '3'),
+                 ('LabelCellMax', '5'))
+W3_ITEMS_02242 = (('dbg.roomnear', 'action', 'ValDvRoomNear', 'RunDvRoomNear'),
+                  ('dbg.occlnear', 'action', 'ValDvOcclNear', 'RunDvOcclNear'),
+                  ('dbg.emptypots', 'bool', 'ValDvEmptyPots', 'RunDvEmptyPots'))
+W3_HASH_02241 = '35f834c671333ef62065bd1e5044e5c1f411e09ace27fa4add3b4bbd2aecaed9'   # work/asi/menu0264
+
+
+def check_02242(ini_path, switches_path):
+    """0.22.42 (W3, owner live notes of the test evening 13.11.; workspace docs/Befund-W3-Debugansicht-1411.md):
+    RoomOnly - P5RoomOnlyDrops asks W3RoomDrops only for an instance of another intro unit; W3RoomDrops keeps it when its
+    own stream unit +0xe0 (g_rkOk) equals Lara's (kUnitId) or it lies within [Debug] RoomNear, logs every verdict through
+    W3RoomLog (once per instance and Lara unit, at most 20 lines per 10 s; object, intro unit, +0xe0 unit, Lara's unit,
+    distance); DistMetres default 1 (check_02237); P5OcclFactor asks W3OcclNear before it queues a probe (Lara herself and
+    [Debug] OcclNear never fade), names / uber labels test 1 m above the origin (kW3OcclLift 100); de-clutter - one rect
+    list per ImGui frame (W3LabFrame resets g_dvRectN, DrawDebugView no longer does), the uber labels drawn after the debug
+    view through W3UberDraw (merge into another layer's label of the same instance, the same object id within 50 units =
+    one label x n), names / collectibles / key items through W3LabFind + W3LabPlace + W3LabAdd ([Debug] LabelStack,
+    LabelCellMax); W3EmptyPot in UberCollect, DvDrawNames and M20Draw (reward pots); the teaser icon only in the main menu
+    (W3AtMainMenu: front-end state 3 and no one-shot Bink movie, kW3AtChecks = precheck_02242.txt, fallback = shown);
+    W3 functions read only; 5 keys (kOpts, INI, switches rows restart 0.22.42), 3 items, bar + help row; README 0.22.42
+    with TO TEST; Set-TruMenu knows the 0.22.41 hash"""
+    problems = []
+    src = read_cpp()
+    if '"TruMenu 0.22.42 (W3 debug view' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.42 (W3 debug view"')
+    # byte checks of the teaser icon = the offline list
+    offline = []
+    if os.path.exists(W3_CHECKS_02242):
+        for line in open(W3_CHECKS_02242, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/w3_1411/precheck_02242.txt (the offline byte list) is missing')
+    rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kW3AtChecks')]
+    if rows != offline or len(rows) != 3:
+        problems.append('TruMenu.cpp: kW3AtChecks (%d rows) must be the 3 rows of precheck_02242.txt in order' % len(rows))
+    if 'g_w3AtOk = DvChecks(kW3AtChecks,' not in fn_body(src, 'void W3Check('):
+        problems.append('TruMenu.cpp: W3Check must set g_w3AtOk from DvChecks(kW3AtChecks, ...)')
+    # 1. room rule
+    rod = fn_body(src, 'bool P5RoomOnlyDrops(')
+    if 'return unit[0] && !DvIsLaraUnit(unit) && W3RoomDrops(inst, unit);' not in rod:
+        problems.append('TruMenu.cpp: P5RoomOnlyDrops must ask W3RoomDrops only for another known intro unit')
+    rd = fn_body(src, 'bool W3RoomDrops(')
+    for need in ('g_rkOk && ReadDword(inst + 0xe0, &sid)', 'ReadDword(kUnitId, &laraSid) && sid == laraSid',
+                 'g_w3RoomNear > 0.0f && dist >= 0.0f && dist <= g_w3RoomNear', 'const int verdict = sameSid ? 1 : nearLara ? 2 : 0;',
+                 'W3RoomLog(inst, unit, haveSid, sid, dist, verdict);', 'return verdict == 0;'):
+        if need not in rd: problems.append('TruMenu.cpp: W3RoomDrops lacks %s' % need)
+    rl = fn_body(src, 'void W3RoomLog(')
+    for need in ('if (g_w3Seen[i].verdict == verdict) return;', 'now - g_w3LogWindow > 10000', 'if (g_w3LogLines >= 20)',
+                 'intro unit %s, own stream unit (+0xe0) %s, Lara\'s unit %s', 'RkUnitEntry(sid)'):
+        if need not in rl: problems.append('TruMenu.cpp: W3RoomLog lacks %s' % need)
+    # 3. near labels, test point
+    of = fn_body(src, 'float P5OcclFactor(')
+    if not (0 <= of.find('if (W3OcclNear(key, p)) return 1.0f;') < of.find('g_p5Pending[g_p5PendingN++]')):
+        problems.append('TruMenu.cpp: P5OcclFactor must ask W3OcclNear before it queues a probe')
+    on = fn_body(src, 'bool W3OcclNear(')
+    if 'if (key == player) { ++g_w3NearKept; return true; }' not in on or 'g_w3OcclNear * g_w3OcclNear' not in on:
+        problems.append('TruMenu.cpp: W3OcclNear must keep Lara and everything within OcclNear unfaded')
+    if 'const float kW3OcclLift = 100.0f;' not in src:
+        problems.append('TruMenu.cpp: kW3OcclLift must be 100.0f (1 m above the origin)')
+    for fn, var in (('void DvDrawNames(', 'd.pos[2] + kW3OcclLift'), ('void DrawUberLabels(', 'c.pos[2] + kW3OcclLift')):
+        body = fn_body(src, fn)
+        if var not in body or '+ 60.0f};' in body:
+            problems.append('TruMenu.cpp: %s must test occlusion at %s (not +60)' % (fn.strip('('), var))
+    # 4. de-clutter
+    lf = fn_body(src, 'bool W3LabFrame(')
+    for need in ('ImGui::GetFrameCount()', 'g_dvRectN = 0;', 'g_w3LabN = 0;', 'memset(g_w3Cell, 0, sizeof(g_w3Cell));'):
+        if need not in lf: problems.append('TruMenu.cpp: W3LabFrame lacks %s' % need)
+    dv = fn_body(src, 'void DrawDebugView(')
+    if 'W3LabFrame();' not in dv or 'g_dvRectN = 0' in dv:
+        problems.append('TruMenu.cpp: DrawDebugView must start the frame with W3LabFrame (and not reset g_dvRectN itself)')
+    render = fn_body(src, 'void Render(')
+    if not (0 <= render.find('if (DvAnyOn()) DrawDebugView();') < render.find('if (g_ubOn) DrawUberLabels();')):
+        problems.append('TruMenu.cpp: Render must draw the uber labels after the debug view')
+    ub = fn_body(src, 'void DrawUberLabels(')
+    for need in ('W3LabFrame();', 'dx * dx + dy * dy + dz * dz <= 2500.0f', 'W3UberDraw(dl, at, line1, line2,',
+                 'if (dupOf[i] >= 0) { ++dupes; continue; }'):
+        if need not in ub: problems.append('TruMenu.cpp: DrawUberLabels lacks %s' % need)
+    if 'LabelDraw(dl, at, line1, line2' in ub: problems.append('TruMenu.cpp: DrawUberLabels must not use LabelDraw (no overlap test)')
+    wu = fn_body(src, 'int W3UberDraw(')
+    for need in ('const int had = W3LabFind(inst);', 'if (!state || !line2[0]) return 1;', 'if (!W3LabPlace(&r, at, h + 3.0f)) return 2;',
+                 'W3LabAdd(inst, r);'):
+        if need not in wu: problems.append('TruMenu.cpp: W3UberDraw lacks %s' % need)
+    pl = fn_body(src, 'bool W3LabPlace(')
+    for need in ('g_w3Cell[cy][cx] >= g_w3CellMax', 'for (int k = 0; k <= g_w3Stack; ++k) {', 'if (!DvRectFree(t)) continue;'):
+        if need not in pl: problems.append('TruMenu.cpp: W3LabPlace lacks %s' % need)
+    for fn, need in (('void DvDrawNames(', ('W3LabFind(d.inst) >= 0', 'W3LabPlace(&r, at,', 'W3LabAdd(d.inst, r);')),
+                     ('bool M20Label(', ('W3LabFind(m.inst) >= 0 || !W3LabPlace(&r, at, h + 4.0f)', 'W3LabAdd(m.inst, r);'))):
+        body = fn_body(src, fn)
+        for x in need:
+            if x not in body: problems.append('TruMenu.cpp: %s lacks %s' % (fn.strip('('), x))
+    # 5. empty pots
+    for fn, need in (('int UberCollect(', 'if (take && W3EmptyPot(inst)) take = false;'),
+                     ('void DvDrawNames(', 'if (hit && W3EmptyPot(inst)) { ++pots; hit = false; }'),
+                     ('void M20Draw(', 'if (ck == kCoPot && W3EmptyPot(inst)) {')):
+        if need not in fn_body(src, fn): problems.append('TruMenu.cpp: %s lacks %s' % (fn.strip('('), need))
+    ep = fn_body(src, 'bool W3EmptyPot(')
+    for need in ('if (!g_w3EmptyPots) return false;', 'CoKindOf(id) == kCoPot', 'strstr(low, "weightbreak")',
+                 'k == 1 || !CoRewardIndex(inst, &script) || P5Collected(inst)'):
+        if need not in ep: problems.append('TruMenu.cpp: W3EmptyPot lacks %s' % need)
+    # 6. teaser icon
+    if 'bool AtWantsDraw() { return g_atWant != 0 && NaFrontEnd() && W3AtMainMenu(); }' not in src:
+        problems.append('TruMenu.cpp: AtWantsDraw must add W3AtMainMenu()')
+    am = fn_body(src, 'bool W3AtMainMenu(')
+    for need in ('if (!g_w3AtOk) return true;', 'const bool movie = handle && !loop;', 'const int why = fe != 3 ? 1 : movie ? 2 : 0;',
+                 'return why == 0;'):
+        if need not in am: problems.append('TruMenu.cpp: W3AtMainMenu lacks %s' % need)
+    if 'kW3FeState = 0x00fae8da, kW3BinkHandle = 0x00a039bc, kW3BinkLoop = 0x00a039dc;' not in src:
+        problems.append('TruMenu.cpp: kW3FeState / kW3BinkHandle / kW3BinkLoop must be 0xfae8da / 0xa039bc / 0xa039dc')
+    # read only
+    for fn in ('bool W3RoomDrops(', 'void W3RoomLog(', 'bool W3OcclNear(', 'bool W3LabFrame(', 'bool W3LabPlace(',
+               'int W3UberDraw(', 'bool W3EmptyPot(', 'bool W3AtMainMenu('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('(')); continue
+        if any(w in body for w in ('WriteByte(', 'WriteBytes(', 'WriteDword(', 'reinterpret_cast<volatile', 'Fn>(', 'LcPatch(')):
+            problems.append('TruMenu.cpp: %s must not write game memory or call the game' % fn.strip('('))
+    # keys, items, bar, switches, options, load, menu
+    header, opt_rows = table(src)
+    keys = {(s, k): d for s, k, d, _ in opt_rows}
+    ini = open(ini_path, encoding='utf-8').read().replace('\r\n', '\n')
+    sw = [l.rstrip('\r\n').split(' | ') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Debug | ')]
+    got = {f[2]: f for f in sw if len(f) >= 10 and f[9] == 'TruMenu 0.22.42'}
+    for k, d in W3_KEYS_02242 + (('DistMetres', '1'),):
+        if keys.get(('Debug', k)) != d: problems.append('TruMenu.cpp: kOpts [Debug] %s must default to %s' % (k, d))
+        if '\n%s=%s\n' % (k, d) not in ini: problems.append('%s: [Debug] %s=%s missing' % (os.path.basename(ini_path), k, d))
+        f = got.get(k)
+        if not f or f[6] != 'restart' or f[7] != d:
+            problems.append('%s: row TruMenu | Debug | %s | ... | restart | %s | ... | TruMenu 0.22.42 missing'
+                            % (os.path.basename(switches_path), k, d))
+    if 'int g_p5Room = 1, g_p5Metres = 1,' not in src:
+        problems.append('TruMenu.cpp: g_p5Metres must start at 1 (code default = kOpts)')
+    for item, typ, val, run in W3_ITEMS_02242:
+        if not re.search(r'\{"%s", "%s", .*?,\s+false,\s+%s,\s+%s\}' % (re.escape(item), typ, val, run), src, re.S):
+            problems.append('TruMenu.cpp: item %s (%s, %s / %s) missing' % (item, typ, val, run))
+    if '"dbg.emptypots", "", kQbBool, -1, kQcNone, 0, kQbWhite, 0}' not in src or \
+            not re.search(r'\{"dbg\.emptypots", "", "', src):
+        problems.append('TruMenu.cpp: bar row + help row dbg.emptypots missing')
+    if 'W3ReadOptions(ini);' not in src or not re.search(r'\n    PdCheck\(\);[^\n]*\n    W3Check\(\);', src):
+        problems.append('TruMenu.cpp: ReadOptions must call W3ReadOptions and the load W3Check after PdCheck')
+    if 'W3MenuControls(o, sizeof(o));' not in src: problems.append('TruMenu.cpp: menu controls 0.22.42 missing')
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.42 - ' not in readme or '\n### TO TEST 0.22.42' not in readme:
+        problems.append('README.md: section "## 0.22.42 - ..." with "### TO TEST 0.22.42" missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if W3_HASH_02241 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.41 build hash (work/asi/menu0264) is missing')
+    return problems, ('W3 debug view (RoomOnly + own stream unit / RoomNear with a reason log; DistMetres 1; OcclNear + '
+                      'test point +1 m; one label per instance and frame, uber labels after the debug view, LabelStack / '
+                      'LabelCellMax; HideEmptyPots; teaser icon main menu only, %d byte checks = precheck_02242; %d keys, '
+                      '%d items)' % (len(rows), len(W3_KEYS_02242) + 1, len(W3_ITEMS_02242)))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -5585,6 +5743,10 @@ def main(argv):
     for p in cproblems41: print('Q02241 %s' % p)
     if not cproblems41: print('ok: 0.22.41 %s' % csummary41)
     problems += cproblems41
+    cproblems42, csummary42 = check_02242(ini_path, opt.get('--switches', SWITCHES))   # 0.22.42 (W3 debug view)
+    for p in cproblems42: print('Q02242 %s' % p)
+    if not cproblems42: print('ok: 0.22.42 %s' % csummary42)
+    problems += cproblems42
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

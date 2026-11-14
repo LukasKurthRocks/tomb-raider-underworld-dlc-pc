@@ -1,0 +1,30 @@
+004828f0  8b4c2404             mov     ecx, dword ptr [esp + 4]
+004828f4  8b048da82ba000       mov     eax, dword ptr [ecx*4 + 0xa02ba8]
+004828fb  8bd0                 mov     edx, eax
+004828fd  83e2fd               and     edx, 0xfffffffd
+00482900  89148da82ba000       mov     dword ptr [ecx*4 + 0xa02ba8], edx
+00482907  c3                   ret     
+00482908  cc                   int3    
+00482909  cc                   int3    
+0048290a  cc                   int3    
+0048290b  cc                   int3    
+0048290c  cc                   int3    
+0048290d  cc                   int3    
+0048290e  cc                   int3    
+0048290f  cc                   int3    
+00482910  8b442408             mov     eax, dword ptr [esp + 8]
+00482914  8b4c2404             mov     ecx, dword ptr [esp + 4]
+00482918  89048da82ba000       mov     dword ptr [ecx*4 + 0xa02ba8], eax
+0048291f  c3                   ret     
+00482920  51                   push    ecx
+00482921  d9ee                 fldz    
+00482923  d91dc42ba000         fstp    dword ptr [0xa02bc4]
+00482929  d905c82ba000         fld     dword ptr [0xa02bc8]
+0048292f  d9e8                 fld1    
+00482931  e8e4223900           call    0x814c1a
+00482936  d91c24               fstp    dword ptr [esp]
+00482939  d90424               fld     dword ptr [esp]
+0048293c  d9                   .byte   0xd9
+0048293d  1d                   .byte   0x1d
+0048293e  c8                   .byte   0xc8
+0048293f  2b                   .byte   0x2b

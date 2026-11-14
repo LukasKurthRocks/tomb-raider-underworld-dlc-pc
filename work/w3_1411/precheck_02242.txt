@@ -1,0 +1,7 @@
+# TruMenu 0.22.42 (W3 debug view): kW3AtChecks = the front-end state getter and the video player's loop byte / Bink
+# handle the teaser icon reads (main menu only, not while a one-shot movie such as the credits plays), in the order of
+# the table in TruMenu.cpp
+# (checked offline: ../bin/pyt -t 120 tools/pe_bytes_check.py <Steam tru.exe> --file work/w3_1411/precheck_02242.txt)
+0x0077bbe0 a0dae8fa00 c3
+0x004a12c6 a2dc39a000
+0x004a0aea 8b0dbc39a000 8b510c 3b5108

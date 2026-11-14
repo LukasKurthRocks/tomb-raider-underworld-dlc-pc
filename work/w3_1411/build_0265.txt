@@ -1,0 +1,5 @@
+Built work\asi\menu0265\TruMenu.asi (2103808 bytes, x86 DLL, sha256 c415a6c42b146f1051a017b921ce7c3542476dae6f989be2f0013224e46f140e) - TruMenu 0.22.42
+  warnings: 2 (both imgui_demo.cpp), 0 in TruMenu.cpp; imports / exports = 0.22.41 (tools/pe_import_export_diff.py: 151 functions, same 6 exports, no new DLL)
+  INI / switches / radial / tour in the build folder = source (cmp)
+Byte checks: tools/pe_bytes_check.py <Steam tru.exe> --file work/w3_1411/precheck_02242.txt -> 3 checks, 0 mismatches (precheck_02242_result.txt)
+trumenu_ini_check: exit 0, 52 ok lines, 0 other (ini_check_final.txt); negative tests 55 / 55 as expected (w3_negative_tests.txt)

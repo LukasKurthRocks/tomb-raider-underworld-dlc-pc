@@ -1,0 +1,56 @@
+ok   0 unchanged sources                           problems   0 
+ok   1 kVersion not 0.22.42                        problems   1 - TruMenu.cpp: kVersion must start with "TruMenu 0.22.42 (W3 debug view"
+ok   2 byte check loop byte changed                problems   1 - TruMenu.cpp: kW3AtChecks (3 rows) must be the 3 rows of precheck_02242.txt in order
+ok   3 byte check row dropped                      problems   1 - TruMenu.cpp: kW3AtChecks (2 rows) must be the 3 rows of precheck_02242.txt in order
+ok   4 RoomOnly without the W3 rule                problems   1 - TruMenu.cpp: P5RoomOnlyDrops must ask W3RoomDrops only for another known intro unit
+ok   5 own stream unit ignored                     problems   1 - TruMenu.cpp: W3RoomDrops lacks const int verdict = sameSid ? 1 : nearLara ? 2 : 0;
+ok   6 RoomNear ignored                            problems   1 - TruMenu.cpp: W3RoomDrops lacks g_w3RoomNear > 0.0f && dist >= 0.0f && dist <= g_w3RoomNear
+ok   7 drop without a log line                     problems   1 - TruMenu.cpp: W3RoomDrops lacks W3RoomLog(inst, unit, haveSid, sid, dist, verdict);
+ok   8 log without rate limit                      problems   1 - TruMenu.cpp: W3RoomLog lacks if (g_w3LogLines >= 20)
+ok   9 log every frame (no once)                   problems   1 - TruMenu.cpp: W3RoomLog lacks if (g_w3Seen[i].verdict == verdict) return;
+ok   10 log without the +0xe0 unit                 problems   1 - TruMenu.cpp: W3RoomLog lacks intro unit %s, own stream unit (+0xe0) %s, Lara's unit %s
+ok   11 occlusion without the near rule            problems   1 - TruMenu.cpp: P5OcclFactor must ask W3OcclNear before it queues a probe
+ok   12 Lara fades again                           problems   1 - TruMenu.cpp: W3OcclNear must keep Lara and everything within OcclNear unfaded
+ok   13 names test point back at +60               problems   1 - TruMenu.cpp: void DvDrawNames must test occlusion at d.pos[2] + kW3OcclLift (not +60)
+ok   14 uber test point back at +60                problems   1 - TruMenu.cpp: void DrawUberLabels must test occlusion at c.pos[2] + kW3OcclLift (not +60)
+ok   15 lift 0.6 m                                 problems   1 - TruMenu.cpp: kW3OcclLift must be 100.0f (1 m above the origin)
+ok   16 DrawDebugView resets the rects             problems   1 - TruMenu.cpp: DrawDebugView must start the frame with W3LabFrame (and not reset g_dvRectN itself)
+ok   17 uber labels before the debug view          problems   1 - TruMenu.cpp: Render must draw the uber labels after the debug view
+ok   18 uber labels with LabelDraw                 problems   2 - TruMenu.cpp: DrawUberLabels lacks W3UberDraw(dl, at, line1, line2,
+ok   19 no same-object merge                       problems   1 - TruMenu.cpp: DrawUberLabels lacks dx * dx + dy * dy + dz * dz <= 2500.0f
+ok   20 uber never joins a label                   problems   1 - TruMenu.cpp: W3UberDraw lacks const int had = W3LabFind(inst);
+ok   21 no stacking                                problems   1 - TruMenu.cpp: W3LabPlace lacks for (int k = 0; k <= g_w3Stack; ++k) {
+ok   22 no cell cap                                problems   1 - TruMenu.cpp: W3LabPlace lacks g_w3Cell[cy][cx] >= g_w3CellMax
+ok   23 frame without rect reset                   problems   1 - TruMenu.cpp: W3LabFrame lacks g_dvRectN = 0;
+ok   24 names label twice                          problems   1 - TruMenu.cpp: void DvDrawNames lacks W3LabFind(d.inst) >= 0
+ok   25 M20Label old nudge                         problems   1 - TruMenu.cpp: bool M20Label lacks W3LabFind(m.inst) >= 0 || !W3LabPlace(&r, at, h + 4.0f)
+ok   26 uber takes empty jars                      problems   1 - TruMenu.cpp: int UberCollect lacks if (take && W3EmptyPot(inst)) take = false;
+ok   27 names take empty jars                      problems   1 - TruMenu.cpp: void DvDrawNames lacks if (hit && W3EmptyPot(inst)) { ++pots; hit = false; }
+ok   28 collect layer takes empty pots             problems   1 - TruMenu.cpp: void M20Draw lacks if (ck == kCoPot && W3EmptyPot(inst)) {
+ok   29 collected reward jar kept                  problems   1 - TruMenu.cpp: W3EmptyPot lacks k == 1 || !CoRewardIndex(inst, &script) || P5Collected(inst)
+ok   30 teaser icon in the credits again           problems   1 - TruMenu.cpp: AtWantsDraw must add W3AtMainMenu()
+ok   31 movie test off                             problems   1 - TruMenu.cpp: W3AtMainMenu lacks const bool movie = handle && !loop;
+ok   32 fallback hides the icon                    problems   1 - TruMenu.cpp: W3AtMainMenu lacks if (!g_w3AtOk) return true;
+ok   33 W3AtMainMenu writes the game               problems   1 - TruMenu.cpp: bool W3AtMainMenu must not write game memory or call the game
+ok   34 front-end address changed                  problems   1 - TruMenu.cpp: kW3FeState / kW3BinkHandle / kW3BinkLoop must be 0xfae8da / 0xa039bc / 0xa039dc
+ok   35 code default metres 0                      problems   1 - TruMenu.cpp: g_p5Metres must start at 1 (code default = kOpts)
+ok   36 kOpts DistMetres 0                         problems   2 - TruMenu.cpp: kOpts [Debug] DistMetres must default to 1
+ok   37 kOpts RoomNear 2000                        problems   1 - TruMenu.cpp: kOpts [Debug] RoomNear must default to 3000
+ok   38 item dbg.emptypots renamed                 problems   1 - TruMenu.cpp: item dbg.emptypots (bool, ValDvEmptyPots / RunDvEmptyPots) missing
+ok   39 bar row empty jars gone                    problems   1 - TruMenu.cpp: bar row + help row dbg.emptypots missing
+ok   40 W3Check not called                         problems   1 - TruMenu.cpp: ReadOptions must call W3ReadOptions and the load W3Check after PdCheck
+ok   41 W3ReadOptions not called                   problems   1 - TruMenu.cpp: ReadOptions must call W3ReadOptions and the load W3Check after PdCheck
+ok   42 menu controls gone                         problems   1 - TruMenu.cpp: menu controls 0.22.42 missing
+ok   43 INI DistMetres=0                           problems   2 - TruMenu_neg.ini: [Debug] DistMetres=1 missing
+ok   44 INI HideEmptyPots=0                        problems   1 - TruMenu_neg.ini: [Debug] HideEmptyPots=1 missing
+ok   45 INI without OcclNear                       problems   1 - TruMenu_neg.ini: [Debug] OcclNear=600 missing
+ok   46 switches RoomNear live                     problems   2 - TruMenu_neg.switches.txt: row TruMenu | Debug | RoomNear | ... | restart | 3000 | ... | TruMenu 0.22.42 missin
+ok   47 switches HideEmptyPots default 0           problems   2 - TruMenu_neg.switches.txt: row TruMenu | Debug | HideEmptyPots | ... | restart | 1 | ... | TruMenu 0.22.42 miss
+ok   48 switches DistMetres default 0              problems   3 - TruMenu_neg.switches.txt: row TruMenu | Debug | DistMetres | ... | restart | 1 | ... | TruMenu 0.22.42 missing
+ok   49 switches DistMetres since 0.22.37          problems   2 - TruMenu_neg.switches.txt: row TruMenu | Debug | DistMetres | ... | restart | 1 | ... | TruMenu 0.22.42 missing
+ok   50 switches LabelCellMax renamed              problems   2 - TruMenu_neg.switches.txt: row TruMenu | Debug | LabelCellMax | ... | restart | 5 | ... | TruMenu 0.22.42 missi
+ok   51 switches OcclNear since 0.22.41            problems   1 - TruMenu_neg.switches.txt: row TruMenu | Debug | OcclNear | ... | restart | 600 | ... | TruMenu 0.22.42 missing
+ok   52 README without TO TEST 0.22.42             problems   1 - README.md: section "## 0.22.42 - ..." with "### TO TEST 0.22.42" missing
+ok   53 Set-TruMenu without the 0.22.41 hash       problems   1 - Set-TruMenu.ps1: the 0.22.41 build hash (work/asi/menu0264) is missing
+ok   54 precheck list with another byte            problems   1 - TruMenu.cpp: kW3AtChecks (3 rows) must be the 3 rows of precheck_02242.txt in order
+55 cases, 55 as expected, 0 not

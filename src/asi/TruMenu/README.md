@@ -2928,6 +2928,87 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.42 - W3: debug view after the test evening - room rule, near labels, de-clutter, empty jars, teaser icon (2026-11-14)
+
+Built into `work\asi\menu0265`, not installed, no live test (finding in the workspace
+`docs\Befund-W3-Debugansicht-1411.md`; owner live notes of 13.11., package D of `docs\Testabend-1311-Warteschlange.md`).
+Section "0.22.42 W3 debug view" in `TruMenu.cpp`; render thread, read only - nothing is written into tru.exe memory.
+
+- **"Nur aktueller Raum" (`dbg.roomonly`) - why the bridge markers vanished** (21:15, `dlc_caverns`, Lara ~30 m before
+  the portal to `dlc_caverns_hall`): the room was the unit whose intro array holds the instance's intro record, nothing
+  else. The unit data show that this is too narrow: `dlc_level1_start`, loaded together with `dlc_caverns`, holds
+  **copies of the bridge objects at the very same place** - `adrenaline_tracker` 9920 = caverns 9865 and intro 9921 =
+  caverns 9864 (same position to 0.1 unit after the origin shift), trigger planes 9922 / 9923 / 9925 with the extents of
+  9871 / 9867 / 9870 (`work/w3_1411/intros_caverns.txt`, `tools/manor_gate_scan.py intros`). Those instances counted as
+  "another room" and were dropped although they stand on the bridge. **New rule:** an instance of another intro unit stays
+  when its **own stream unit `+0xe0`** (INSTANCE_SetCurrentStreamUnitID 0x5b3a56, the 0.21.1 `kRkChecks`) is Lara's
+  stream unit, or when it is within **`[Debug] RoomNear`** (default 3000 = 30 m, `dbg.roomnear <0 .. 20000>|off`, 0 = the
+  unit alone). Every verdict is logged **once per instance and Lara unit** (at most 20 lines per 10 s, held-back lines
+  are counted in the next one):
+  `dbg.roomonly: dlc1_uo_... 9921 (0x........) dropped - another unit, farther than RoomNear - intro unit
+  dlc_level1_start, own stream unit (+0xe0) dlc_level1_start, Lara's unit dlc_caverns, 34.2 m from Lara, RoomNear 30.0 m`
+  (or `kept - its own stream unit is Lara's` / `kept - within RoomNear`). The `dbg.roomonly` / `dbg.roomnear` values
+  count the verdicts since Lara entered her unit.
+- **Distance in metres by default:** `[Debug] DistMetres` default **1** (code, example INI, switches row); an installed
+  INI keeps its own value.
+- **Near labels never pale** (21:17: the medipack 5.4 m in front of Lara and Lara's own label were faded): within
+  **`[Debug] OcclNear`** (default 600 = 6 m, `dbg.occlnear <0 .. 5000>|off`) of Lara no label fades, Lara's own label never
+  does (its test point lies inside her model), and the occlusion test point of object names and uber labels is
+  **1 m above the origin** (was 0.6 m; the origin of a floor object lies on / under the floor).
+- **De-clutter** (23:30 three or four labels on top of each other at Lara's feet, 23:32 / 23:51 the same jar or switch
+  labelled twice): the 0.16 tags, collectibles, key items, object names and the uber labels share **one rect list per
+  frame**; the uber labels are drawn **after** the debug view now. An instance another layer labelled this frame gets no
+  second label - the uber layer adds only its **state line** right under that label. The same object id within 50 units
+  = **one** uber label with `x n`. A covered box moves up at most **`[Debug] LabelStack`** box heights (default 3; the
+  0.20 labels moved once, names never), and at most **`[Debug] LabelCellMax`** labels (default 5) are drawn per cell of an
+  8 x 6 screen grid (the nearest first; 0 = no cap). The uber state line and `dbg.names` / `dbg.collect` counts name
+  how many labels were joined / stacked / left out.
+- **Empty jars hidden** (`[Debug] HideEmptyPots` default 1, `dbg.emptypots`, bar Level data "Leere Kruege
+  ausblenden"): no label at plain breakable jars (`*weightbreak*` without the reward kind, e.g. `ar_pt_weightbreak_b`) and
+  at reward containers (0.20 kind "pot") **without a reward index** (intro data +0x30) or **with the game's reward bit
+  set** - in the collectibles, object names and uber layers (with RoomOnly the uber layer took every `_pt_` object).
+- **Teaser icon only in the main menu** (it showed during the DLC 1 credits): drawn only while the front-end state byte
+  `0xfae8da` is **3 (MainMenu)** and **no one-shot Bink movie** plays (handle `0xa039bc` set with the loop byte `0xa039dc`
+  = 0; the main menu itself runs inside the looping `medsea_loop`, PlayMovie passes loop 0) - 3 byte checks
+  `kW3AtChecks`; a difference = shown as in 0.22.41. One log line per change: `menu.attracticon: hidden - a movie plays
+  (no loop: credits / teaser) (front-end state ..., Bink handle 0x..., loop 0)` - the live proof which state the
+  credits have. **Click and credits:** the click that ends the credits is the **game's own Bink skip** (0x4a1492 ..:
+  actions 9 / 13 / 87 or the latch `[0xa02ba8]` bit 1 read and cleared by 0x4828f0; no skip test in front-end state 3, or
+  2 with 0x4c5300) - TruMenu passes clicks unchanged while its menu is closed and injects none.
+- New INI keys 5 (283), switches rows 5 + 1 changed (DistMetres default 1, since 0.22.42), items 3, bar rows 1, help rows
+  1, menu page Debug view: sliders room distance / never faded, checkbox empty jars. Check: `trumenu_ini_check`
+  `check_02242` (`check_02237` takes DistMetres 1, `check_02239` / `check_02241` take the appended parts). Build: 0
+  warnings in TruMenu.cpp.
+
+```text
+0.22.42 W3: RoomNear 3000 (+ own stream unit +0xe0: ok), OcclNear 600 (test point +100), HideEmptyPots 1, LabelStack 3, LabelCellMax 5, DistMetres 1; teaser icon main menu only (front-end state 3, no one-shot movie): ok (3 checks)
+dbg.roomonly: adrenaline_tracker 9920 (0x........) kept - within RoomNear - intro unit dlc_level1_start, own stream unit (+0xe0) dlc_level1_start, Lara's unit dlc_caverns, 20.4 m from Lara, RoomNear 30.0 m
+menu.attracticon: hidden - a movie plays (no loop: credits / teaser) (front-end state 3, Bink handle 0x........, loop 0)
+```
+
+### TO TEST 0.22.42
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | start | start, `TruMenu.log` | `0.22.42 W3: RoomNear 3000 (+ own stream unit +0xe0: ok), OcclNear 600 ... (3 checks)` |
+| 2 | bridge | DLC 1 `dlc_caverns` at the bridge before the portal to `dlc_caverns_hall` (claude.mark 21:14 place), `dbg.uber 1` + `dbg.keyitems 1` + names, "Nur aktueller Raum" on / off | the bridge markers stay with RoomOnly on; log `dbg.roomonly: ... kept - within RoomNear` / `kept - its own stream unit is Lara's` for the `dlc_level1_start` copies, `dropped` only for far objects of other units |
+| 3 | room distance | same place, `dbg.roomnear off` | the strict 0.22.37 rule: the copies of `dlc_level1_start` are dropped, log lines `dropped - another unit ...` (the reason per object); `dbg.roomnear 3000` = back |
+| 4 | room log | walk through the portal into `dlc_caverns_hall` | new verdict lines for the new Lara unit (once each); never more than 20 lines per 10 s |
+| 5 | metres | any label, fresh INI (or `DistMetres` removed) | `5.4m ^1.2m` instead of `540u`; `dbg.metres 0` = game units |
+| 6 | near not pale | the 21:17 place (medipack on the floor in front of Lara), Occlusion faded | medipack label and Lara's label full colour; walk away > 6 m behind a wall - faded; `dbg.occlnear off` = the 0.22.37 look |
+| 7 | overlap 1 | Mediterranean, the 23:30 place (big cogs, thick pillar), `dbg.uber 1` | no labels on top of each other: stacked up to 3 steps, the rest left out; the uber state line counts `joined / without a free place` |
+| 8 | overlap 2 | kraken room, the jar room of 23:51, names + collectibles + `dbg.uber 1` | `ar_pt_weightbreak_reward ... enthaelt Artefakt #1` once, with the uber state line under it; `ms_ei_switch_oneway_wall 30` once |
+| 9 | same object | a place with two instances of one object at one spot (DLC 1 bridge) | one uber label with ` x2` |
+| 10 | empty jars | jar room 23:51, collectibles + names, RoomOnly on | the plain `ar_pt_weightbreak_b` jars have no label; the reward jar has; after its artifact is picked up it has none; bar Level data "Leere Kruege ausblenden" off = all jars again |
+| 11 | cell cap | look at a crowded place, `LabelCellMax=1` in the INI (game closed) | at most one label per screen cell (8 x 6) |
+| 12 | teaser icon | main menu, style 7 | icon as in 0.22.41; log `menu.attracticon: shown - main menu (front-end state 3, ...)` |
+| 13 | credits | finish DLC 1 (or the end jump) and let the credits run | **no** teaser icon during the credits; log `menu.attracticon: hidden - ...` names front-end state, handle, loop - report that line; after the credits the main menu shows the icon again |
+| 14 | credits click | during the credits one mouse click | the credits end (game's own skip); TruMenu log has no line of its own for it |
+| 15 | negative: room off | `dbg.roomonly 0` | no `dbg.roomonly:` log lines at all, every room labelled as before |
+| 16 | negative: values | `dbg.roomnear 20001`, `dbg.roomnear -1`, `dbg.occlnear 5001`, `dbg.occlnear abc` | usage line each, value unchanged |
+| 17 | negative: jars off | `dbg.emptypots 0` | every jar labelled as in 0.22.41 (plain jars, collected reward jars grey with LabelCollected 1) |
+| 18 | negative: level | in a level the teaser icon never shows (front end only, unchanged) | no icon |
+
 ## 0.22.41 - Q126c: compact attract styles without a box (2026-11-14)
 
 Built into `work\asi\menu0264`, not installed, no live test (finding in the workspace
