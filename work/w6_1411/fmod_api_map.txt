@@ -1,0 +1,81 @@
+== validate 0x007bac01: 26 wrappers
+  0x007b95ff args  0  inner 0x7c1368                     callers   1  0x00587071
+  0x007b9620 args  1  inner 0x7bbc23                     callers   1  0x00586ea1
+  0x007b9644 args  1  inner 0x7bbd04                     callers   1  0x005826fc
+  0x007b9668 args  1  inner 0x7bbd8b                     callers   1  0x00586e79
+  0x007b968c args  4  inner 0x7bbe10                     callers   1  0x00586f18
+  0x007b96b9 args  5  inner 0x7bbecb                     callers   1  0x00586ec1
+  0x007b96e9 args  1  inner 0x7bc10b                     callers   1  0x00586e68
+  0x007b970d args  5  inner 0x7bbd1e                     callers   1  0x00586f5a
+  0x007b973d args  6  inner 0x7b9525                     callers   1  0x00586fb7
+  0x007b9770 args  2  inner 0x7bc12d                     callers   1  0x00586eff
+  0x007b9797 args  2  inner 0x7bc162                     callers   2  0x00582747 0x0059169b
+  0x007b97be args  1  inner 0x7bc191                     callers   1  0x00586e5a
+  0x007b97e2 args  1  inner 0x7bc3ea                     callers   1  0x00586e41
+  0x007b9806 args  1  inner 0x7bd88b                     callers   2  0x00586ed2 0x00586f85
+  0x007b982a args  3  inner 0x7c13c6                     callers   2  0x00586f72 0x00586f9c
+  0x007b9854 args  0  inner 0x7c09f0                     callers   2  0x00591ed1 0x00595659
+  0x007b9875 args  1  inner 0x7bc62c                     callers   1  0x00586e10
+  0x007b9899 args  1  inner 0x7bc644                     callers   1  0x00582712
+  0x007b98bd args  4  inner 0x7c0c24                     callers   2  0x00586aa5 0x00586c15
+  0x007b98ea args  2  inner 0x7bdd9f                     callers   3  0x005839f3 0x00586fda 0x005876df
+  0x007b9911 args  2  inner 0x7bde85                     callers   2  0x00583286 0x0058daf2
+  0x007b9938 args  4  inner 0x7bdffb                     callers   1  0x0058c007
+  0x007b9965 args  4  inner 0x7bc7e2                     callers   1  0x00583a12
+  0x007b9992 args  2  inner 0x7bc8a3                     callers   0  
+  0x007b99b9 args  1  inner 0x7bc8da                     callers   4  0x0058221d 0x00586fc8 0x0058742f
+  0x007b99dd args  2  inner 0x7bcb91                     callers   2  0x00582732 0x00591686
+== validate 0x007c4757: 5 wrappers
+  0x007b946f args  0  inner 0x7c4c23                     callers   1  0x0058d967
+  0x007b9490 args  1  inner 0x7c4875                     callers   2  0x00587442 0x0058748b
+  0x007b94b6 args  1  inner 0x7c4a30                     callers   3  0x00583299 0x0058da71 0x0058db05
+  0x007b94da args  1  inner 0x7c4926                     callers   2  0x0058222c 0x0058afd4
+  0x007b94fe args  2  inner 0x7c493d                     callers   3  0x0058daaa 0x0058db87 0x0058dd61
+== validate 0x007c4cd3: 21 wrappers
+  0x007b9294 args  0  inner dword ptr [eax + 0x14]       callers   5  0x00587056 0x00589aca 0x0058da4e
+  0x007b92b7 args  1  inner dword ptr [eax + 0x18]       callers   1  0x0058220e
+  0x007b92db args  2  inner dword ptr [eax + 0x1c]       callers   2  0x0058223b 0x00584188
+  0x007b9302 args  1  inner 0x7c3623                     callers   1  0x00584162
+  0x007b9326 args  2  inner 0x7c36cb                     callers   1  0x0058704e
+  0x007b934d args  0  inner dword ptr [eax + 0x20]       callers   4  0x00589ac1 0x0058da48 0x0058dc5a
+  0x007b936e args  1  inner 0x7c385e                     callers   2  0x0058affa 0x0058b081
+  0x007b9394 args  3  inner 0x7c3d58                     callers   1  0x0058b020
+  0x007b93c0 args  3  inner 0x7c3df6                     callers   1  0x00583a25
+  0x007b93ec args  1  inner None                         callers   1  0x00582259
+  0x007b9420 args  2  inner dword ptr [eax + 0x28]       callers  56  0x0058224f 0x00582283 0x00582294
+  0x007b944b args  1  inner dword ptr [eax + 0x40]       callers   2  0x0058afe7 0x0058b037
+  0x007b9a04 args  0  inner dword ptr [eax + 0xc]        callers   5  0x0058264a 0x0058c1bf 0x0058e5b9
+  0x007b9a27 args  4  inner dword ptr [eax + 0x1c]       callers   3  0x00582628 0x00588da0 0x00588ee1
+  0x007b9a6f args  4  inner dword ptr [eax + 0x20]       callers   4  0x005825fb 0x00588d78 0x00588eb9
+  0x007b9aa9 args  2  inner dword ptr [eax + 0x2c]       callers   2  0x00586b27 0x00586c30
+  0x007b9ae6 args  2  inner dword ptr [eax + 0x48]       callers   1  0x00586ae5
+  0x007b9b1a args  1  inner dword ptr [eax + 0x90]       callers   2  0x005825d6 0x00586c46
+  0x007b9b4e args  1  inner dword ptr [eax + 0x98]       callers   1  0x00586b0f
+  0x007b9b82 args  4  inner dword ptr [eax + 0xa0]       callers   1  0x00586b03
+  0x007b9ff3 args  1  inner 0x7cca59                     callers   3  0x005841bf 0x00587d72 0x00591591
+== validate 0x007c7e5a: 24 wrappers
+  0x007b9bbf args  0  inner 0x7cb380                     callers   1  0x00591451
+  0x007b9be0 args  1  inner 0x7c9beb                     callers   5  0x00583a40 0x0058403b 0x00584046
+  0x007b9c04 args  1  inner 0x7c8b4f                     callers   2  0x00583fff 0x0059156e
+  0x007b9c34 args  1  inner 0x7c8b73                     callers   1  0x00591502
+  0x007b9c5d args  1  inner 0x7c8c48                     callers   1  0x005841a1
+  0x007b9c8e args  1  inner 0x7c9c9f                     callers   1  0x00591528
+  0x007b9cb6 args  1  inner 0x7c8c90                     callers   3  0x0058617c 0x00586585 0x0058e3a3
+  0x007b9ce0 args  3  inner 0x7c8d6b                     callers   2  0x00584030 0x005916e6
+  0x007b9d0a args  8  inner 0x7c8e14                     callers   4  0x00584100 0x00589d9c 0x0058e3fe
+  0x007b9d67 args  1  inner 0x7cb5ac                     callers   1  0x005861e3
+  0x007b9d8b args  1  inner 0x7c9362                     callers   2  0x0058c103 0x00591560
+  0x007b9dbb args  2  inner 0x7c9738                     callers   2  0x005841ec 0x00589b4a
+  0x007b9dee args  1  inner 0x7c9fc6                     callers   2  0x00583242 0x00583a34
+  0x007b9e12 args  3  inner 0x7c96c3                     callers   2  0x0058c095 0x0058c0a7
+  0x007b9e3c args  2  inner 0x7c9379                     callers   2  0x0058e2ae 0x0058e33b
+  0x007b9e63 args  2  inner 0x7cbae9                     callers   1  0x0058c0d5
+  0x007b9e93 args  1  inner 0x7cbbf1                     callers   1  0x0058e17a
+  0x007b9ebb args  1  inner 0x7c9757                     callers   1  0x00584140
+  0x007b9eeb args  1  inner 0x7c94ef                     callers   3  0x00591492 0x00592991 0x005933fd
+  0x007b9f1b args  1  inner 0x7c95b4                     callers   1  0x00591552
+  0x007b9f4b args  1  inner 0x7cbc5f                     callers   6  0x00584075 0x0058e1aa 0x0058e375
+  0x007b9f6f args  1  inner 0x7c9863                     callers   6  0x00584060 0x0058e195 0x0058e360
+  0x007b9f9f args  1  inner 0x7c5994                     callers   1  0x0058c084
+  0x007b9fc3 args  1  inner 0x7c59a0                     callers   0  
+total wrappers 76, with outside callers 74

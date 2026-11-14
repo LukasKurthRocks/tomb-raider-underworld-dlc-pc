@@ -5259,8 +5259,8 @@ def check_02244(switches_path):
     item; README 0.22.44 with TO TEST; Set-TruMenu knows the 0.22.43 hash"""
     problems = []
     src = read_cpp()
-    if '"TruMenu 0.22.44 (W2 order' not in src[:src.find('\n', src.find('kVersion = '))]:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.44 (W2 order"')
+    if '0.22.44 (W2 order' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.45: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.44 part "0.22.44 (W2 order"')
     tests = src[src.find('const QbRow kQbTests[] = {'):]
     tests = tests[:tests.find('\n};')]
     a, b = tests.find('// ---- TG 1411 begin'), tests.find('// ---- TG 1411 end')
@@ -5401,7 +5401,9 @@ def check_02244(switches_path):
     if not ok: problems.append('TruMenu.cpp: page Spiel-Einstellungen group set_ctl lacks the switch row DeviceGlyphs')
     if 'TruMenu:Input:DeviceGlyphs' not in sw_keys: problems.append('switches: TruMenu | Input | DeviceGlyphs missing')
     header, opt_rows = table(src)
-    if len(opt_rows) != 283: problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.44 adds no INI key (283)' % len(opt_rows))
+    if len(opt_rows) != 283 + len(W6_KEYS_02245):   # 0.22.44 added none, 0.22.45 the three [Sound] wave log keys
+        problems.append('TruMenu.cpp: kOpts has %d keys - 0.22.44 adds no INI key (283), 0.22.45 adds %d' %
+                        (len(opt_rows), len(W6_KEYS_02245)))
     readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
     if '\n## 0.22.44 - ' not in readme or '\n### TO TEST 0.22.44' not in readme:
         problems.append('README.md: section "## 0.22.44 - ..." with "### TO TEST 0.22.44" missing')
@@ -5413,6 +5415,143 @@ def check_02244(switches_path):
                       'window off; DeviceGlyphs on Spiel-Einstellungen; kQbViewMax 256)' %
                       (len(rows), n['kQbGroup'], n['kQbCheck'], n['kQbSwitch'], n['kQbNote'],
                        ' '.join(p.upper() for p in order), ' '.join(W2_ARCHIVED)))
+
+
+W6_CHECKS_02245 = os.path.join(ROOT, 'work', 'w6_1411', 'precheck_02245.txt')
+W6_HASH_02244 = 'c9d397f7849fe79e1ba891cde0067047fd118d0b98d1bf39857f63ca1a785164'
+W6_KEYS_02245 = (('WaveLog', '1'), ('WaveIds', '10'), ('WaveLogMax', '500'))   # [Sound]
+# item, type, game thread (queued)
+W6_ITEMS_02245 = (('snd.mute', 'action', 'true'), ('snd.solo', 'action', 'true'), ('snd.mutes', 'info', 'false'),
+                  ('snd.ambmute', 'bool', 'true'), ('snd.now', 'action', 'true'), ('snd.wavelog', 'action', 'true'),
+                  ('music.stop', 'action', 'true'), ('music.next', 'action', 'true'), ('music.mute', 'bool', 'false'))
+# the rows of the bar: (item, argument) in Paket B (tg_b) and in the group ton_einzeln of page Spiel-Einstellungen
+W6_TGB_02245 = (('snd.ambmute', ''), ('music.mute', ''), ('snd.now', ''), ('snd.mute', '10'), ('snd.solo', '10'),
+                ('snd.mute', 'all 0'), ('snd.mutes', ''), ('test.mark', 'tgB.wave10log'))
+W6_SET_02245 = (('snd.ambmute', ''), ('music.mute', ''), ('music.stop', ''), ('music.next', ''), ('snd.now', ''),
+                ('snd.mute', '10'), ('snd.solo', '10'), ('snd.mute', 'all 0'), ('snd.mutes', ''))
+
+
+def check_02245(switches_path):
+    """0.22.45 (W6 hearing tests, owner live notes of the test evening 13.11.; workspace docs/Befund-W6-Toene-1411.md):
+    kW6Checks = precheck_02245.txt (15 rows: ChannelI validate 0x7c7e5a, wrapper pattern 0x7b9be0, ChannelI::setMute
+    0x7c92b5 + its ret 4, getMute 0x7c9346, emitter vtable / section id / walker arguments, wave node params -> voice
+    +0x1c, instance sound list); W6Check after SgCheck (needs g_snOk and g_smOk), W6ReadOptions after SgReadOptions,
+    W6Tick from SnTick before the snd.list gate; per channel only through validate + ChannelI::setMute, unmute only the
+    channels TruMenu muted (a channel muted by someone else is skipped); groups through SmSetMute with the SmMuted guard
+    (never undo a foreign mute), ambience = group 15 + the '_amb_' beds; tracks through SndStopSlot, the way back only
+    where MusicPlace allows; emitter = params - 0x14 with vtable 0x851240, owner from [inst+0x248] (+0xc slots * 0xc,
+    +0x10 dynamic, end [0xcd3bb8]); wave log one line per new (voice, sample, channel), WaveLogMax; nothing written into
+    game memory by the W6 functions; 9 items, 3 [Sound] keys, 2 switch rows, Paket B + group ton_einzeln rows; README
+    0.22.45 with TO TEST; Set-TruMenu knows the 0.22.44 hash"""
+    problems = []
+    src = read_cpp()
+    if '"TruMenu 0.22.45 (W6 sound switches' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.45 (W6 sound switches"')
+    offline = []
+    if os.path.exists(W6_CHECKS_02245):
+        for line in open(W6_CHECKS_02245, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/w6_1411/precheck_02245.txt (the offline byte list) is missing')
+    rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kW6Checks')]
+    if rows != offline or len(rows) != 15:
+        problems.append('TruMenu.cpp: kW6Checks (%d rows) must be the 15 rows of precheck_02245.txt in order' % len(rows))
+    ck = fn_body(src, 'void W6Check(')
+    if 'g_w6Ok = g_snOk && g_smOk && DvChecks(kW6Checks,' not in ck:
+        problems.append('TruMenu.cpp: W6Check must set g_w6Ok = g_snOk && g_smOk && DvChecks(kW6Checks, ...)')
+    if not re.search(r'\n    SgCheck\(\);[^\n]*\n    W6Check\(\);', src):
+        problems.append('TruMenu.cpp: the load must call W6Check right after SgCheck')
+    if not re.search(r'\n    SgReadOptions\(ini\);[^\n]*\n    W6ReadOptions\(ini\);', src):
+        problems.append('TruMenu.cpp: ReadOptions must call W6ReadOptions(ini) right after SgReadOptions(ini)')
+    st = re.sub(r'//[^\n]*', '', fn_body(src, 'void SnTick('))
+    if not 0 <= st.find('W6Tick();') < st.find('if (!g_snOk || !g_snOn) return;'):
+        problems.append('TruMenu.cpp: SnTick must call W6Tick() before the snd.list gate')
+    for need in ('kW6ChValidate = 0x007c7e5a', 'kW6ChSetMute = 0x007c92b5', 'kW6ChGetMute = 0x007c9346',
+                 'kW6EmitterVtbl = 0x00851240', 'kW6ListEnd = 0x00cd3bb8', 'const int kW6AmbGroup = 15;'):
+        if need not in src: problems.append('TruMenu.cpp: constant %s missing' % need)
+    cm = fn_body(src, 'bool W6ChMute(')
+    i_v, i_m = cm.find('reinterpret_cast<W6ValidateFn>(kW6ChValidate)(handle, &chan) != 0 || !chan) return false;'), \
+        cm.find('reinterpret_cast<W6ChMuteFn>(kW6ChSetMute)(chan, nullptr, mute ? 1 : 0);')
+    if not 0 <= i_v < i_m: problems.append('TruMenu.cpp: W6ChMute must validate the handle before ChannelI::setMute')
+    if '__except' not in cm: problems.append('TruMenu.cpp: W6ChMute must run under __try / __except')
+    em = fn_body(src, 'DWORD W6Emitter(')
+    if 'ReadDword(params - 0x14, &vt) || vt != kW6EmitterVtbl) return 0;' not in em or 'return params - 0x14;' not in em:
+        problems.append('TruMenu.cpp: W6Emitter must be params - 0x14 only with the vtable 0x851240')
+    ow = fn_body(src, 'bool W6EmitterOwner(')
+    for need in ('ReadDword(x.addr + 0x248, &list)', 'ReadDword(list + 0xc, &slots)', 'ReadDword(slots + i * 0xc, &handle)',
+                 'ReadDword(list + 0x10, &node)', 'node != listEnd', 'ReadDword(node + 4, &handle)'):
+        if need not in ow: problems.append('TruMenu.cpp: W6EmitterOwner lacks %s' % need)
+    vt = fn_body(src, 'void W6VoiceTick(')
+    for need in ('if (W6ChMuted(v.channel, &already) && already) continue;', 'g_w6Chan[g_w6ChanN++] = {v.voice, v.channel, true};',
+                 'g_w6Seen[i].channel == v.channel', 'if (!old) W6WaveLine(v);'):
+        if need not in vt: problems.append('TruMenu.cpp: W6VoiceTick lacks %s' % need)
+    if vt.count('W6ChMute(') != 3 or vt.count('W6ChMute(v.channel, false);') != 1 or \
+            vt.count('W6ChMute(g_w6Chan[i].channel, false);') != 1:
+        problems.append('TruMenu.cpp: W6VoiceTick may unmute only the channels of g_w6Chan (3 W6ChMute calls)')
+    cg = fn_body(src, 'void W6CgTick(')
+    for need in ('if (SmMuted(cg)) {', 'c.ours = false; }', 'if (c.ours) {', 'SmMuted(cg) && SmSetMute(cg, false)',
+                 'want[wn++] = kW6AmbGroup;'):
+        if need not in cg: problems.append('TruMenu.cpp: W6CgTick lacks %s' % need)
+    if 'const bool ok = SndStopSlot(s);' not in fn_body(src, 'void W6TrackTick('):
+        problems.append('TruMenu.cpp: W6TrackTick must stop through SndStopSlot (the game\'s stop path)')
+    tb = fn_body(src, 'void W6TrackBack(')
+    if not 0 <= tb.find('if (!MusicPlace(why, sizeof(why))) {') < tb.find('reinterpret_cast<MusicLoadFn>(kMusicLoad)(s, g_w6Back[s],'):
+        problems.append('TruMenu.cpp: W6TrackBack must ask MusicPlace before LoadMusic')
+    if 'SndAmbName(name)' not in fn_body(src, 'bool W6TrackRuled('):
+        problems.append('TruMenu.cpp: W6TrackRuled: ambience must name the \'_amb_\' beds (SndAmbName)')
+    wl = fn_body(src, 'void W6WaveLine(')
+    for need in ('g_w6WaveMax > 0 && g_w6WaveLines >= g_w6WaveMax', 'CurrentUnit(unit, sizeof(unit));',
+                 'W6EmitterOwner(v.emitter, &owner, where, sizeof(where))', '"snd.wave %d START #%ld: unit %s;'):
+        if need not in wl: problems.append('TruMenu.cpp: W6WaveLine lacks %s' % need)
+    if 'if (GetCurrentThreadId() != g_snGameThread) {' not in fn_body(src, 'bool RunW6Now('):
+        problems.append('TruMenu.cpp: snd.now must run on the game thread only (FMOD queries, as snd.dump)')
+    if 'if (GetCurrentThreadId() == g_snGameThread) W6Tick();' not in fn_body(src, 'void W6Apply('):
+        problems.append('TruMenu.cpp: W6Apply may call W6Tick on the game thread only')
+    for fn in ('bool W6ChMute(', 'bool W6ChMuted(', 'DWORD W6Emitter(', 'bool W6EmitterOwner(', 'void W6WaveLine(',
+               'void W6CgTick(', 'void W6TrackTick(', 'void W6TrackBack(', 'void W6VoiceTick(', 'void W6Tick(',
+               'bool W6Parse(', 'bool RunW6Mute(', 'bool RunW6Solo(', 'bool RunW6Now(', 'bool RunW6MusicStop(',
+               'bool RunW6MusicNext(', 'void W6Check('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('(')); continue
+        if any(w in body for w in ('WriteByte(', 'WriteBytes(', 'WriteDword(', 'reinterpret_cast<volatile', 'LcPatch(')):
+            problems.append('TruMenu.cpp: %s must not write game memory' % fn.strip('('))
+    for item, typ, gt in W6_ITEMS_02245:
+        if not re.search(r'\{"%s", "%s", "0\.22\.45[^}]*?,\s+%s,\s+[A-Za-z0-9_<>]+,\s+[A-Za-z0-9_<>]+\},' %
+                         (re.escape(item), typ, gt), src, re.S):
+            problems.append('TruMenu.cpp: item %s (%s, game thread %s) missing in kItems' % (item, typ, gt))
+    header, opt_rows = table(src)
+    keys = {(s, k): d for s, k, d, _ in opt_rows}
+    for key, default in W6_KEYS_02245:
+        if keys.get(('Sound', key)) != default: problems.append('TruMenu.cpp: kOpts [Sound] %s=%s missing' % (key, default))
+    sw = open(switches_path, encoding='utf-8').read()
+    for row in ('TruMenu | Sound | WaveLog | bool |', 'TruMenu | Sound | WaveLogMax | int:0..5000:50 |'):
+        if row not in sw: problems.append('switches: row "%s" missing' % row)
+    tg, grp = set(), None
+    for r in qb_rows(src):
+        if r[0] == 'kQbTests' and r[4] == 'kQbGroup': grp = r[3]
+        elif r[0] == 'kQbTests' and grp == 'tg_b': tg.add((r[2], r[3]))
+    for it in W6_TGB_02245:
+        if it not in tg: problems.append('TruMenu.cpp: Paket B (tg_b) lacks the row %s %s' % it)
+    se, grp = set(), None
+    for r in qb_rows(src):
+        if r[0] == 'kQbSettings' and r[4] == 'kQbGroup': grp = r[3]
+        elif r[0] == 'kQbSettings' and grp == 'ton_einzeln': se.add((r[2], r[3]))
+    for it in W6_SET_02245:
+        if it not in se: problems.append('TruMenu.cpp: page Spiel-Einstellungen group ton_einzeln lacks %s %s' % it)
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.45 - ' not in readme or '\n### TO TEST 0.22.45' not in readme:
+        problems.append('README.md: section "## 0.22.45 - ..." with "### TO TEST 0.22.45" missing')
+    for key, _ in W6_KEYS_02245:
+        if '`[Sound] %s`' % key not in readme: problems.append('README.md: options row `[Sound] %s` missing' % key)
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if W6_HASH_02244 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.44 build hash (work/asi/menu0267) is missing')
+    return problems, ('W6 sound switches (%d byte checks = precheck_02245; per channel ChannelI::setMute behind the '
+                      'validate, groups / ambience ChannelGroupI::setMute, tracks srmusic stop; wave log; %d items, %d '
+                      'keys, Paket B %d rows, ton_einzeln %d rows)' % (len(rows), len(W6_ITEMS_02245), len(W6_KEYS_02245),
+                                                                     len(W6_TGB_02245), len(W6_SET_02245)))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -6030,6 +6169,10 @@ def main(argv):
     for p in cproblems44: print('Q02244 %s' % p)
     if not cproblems44: print('ok: 0.22.44 %s' % csummary44)
     problems += cproblems44
+    cproblems45, csummary45 = check_02245(opt.get('--switches', SWITCHES))   # 0.22.45 (W6 sound switches)
+    for p in cproblems45: print('Q02245 %s' % p)
+    if not cproblems45: print('ok: 0.22.45 %s' % csummary45)
+    problems += cproblems45
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

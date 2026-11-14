@@ -1,0 +1,28 @@
+# TruMenu 0.22.45 (W6 sound switches): kW6Checks = the code the per-voice mute, the emitter link and the wave log
+# copy, in the order of the table in TruMenu.cpp. Disassembly: work/w6_1411/dis_*.txt (tools/pe_dis.py), FMOD wrapper
+# map work/w6_1411/fmod_api_map.txt (tools/pe_fmod_api_map.py).
+# FMOD Ex (linked into tru.exe): ChannelI::validate(handle, &ChannelI) cdecl (handle >> 16 & 0xfff = index, low word =
+# reuse count - a stale handle answers 0x24 / 0x25), the public wrapper pattern (Channel::setPaused 0x7b9be0: validate,
+# then the ChannelI method thiscall), ChannelI::setMute (thiscall bool, ret 4: +0x74 bit 1, effective mute bit 3 with
+# the group chain +0x8c / +0x1c / +0x58), its end, ChannelI::getMute (+0x74 bit 1, ret 4)
+007c7e5a 55 8bec 53 8b5d0c 56 8b7508 c1ee10 81e6ff0f0000 85db 57 0fb77d08 7505 6a25 58
+007b9be0 55 8bec 8d4508 50 ff7508 e86be20000 85c0 59 59 750b ff750c 8b4d08 e8ebff0000 5d c20800
+007c92b5 55 8bec 51 53 56 8bf1 57 33db 8d7e30 391f 895dfc 7505 6a24 58 eb70 385d08 7406 834e7402 eb04 836674fd
+007c933f 5f 5e 5b c9 c20400
+007c9346 8b442404 85c0 7505 6a25 58 eb0c 8a4974 d0e9 80e101 8808 33c0 c20400
+# emitter (0xb0 B, ctor 0x590860): vtable 0x851240 at +0, +0x14 = 1.0 (the params block the walker gets); create
+# 0x5935d0: +0xc = the SoundPlex section id ([data+8]), walker 0x5920b0(data, &emitter+0x14, &emitter+0x50, emitter)
+0059086e c70040128500 d95014
+00593659 8b4f08 dfe0 894e0c
+00593693 56 8d5650 52 8d4614 50 57 8bcb e80ceaffff
+# walker case Wave -> wave node ctor 0x591220(leaf, params, group params, emitter); the ctor keeps params at +8 and the
+# voice gets voice +0x1c = node +8 (so voice +0x1c - 0x14 is the emitter when the wave sits directly under it)
+005922a1 53 51 52 57 8bc8 e874efffff
+00591220 8b442408 53 55 8b6c2414 56 8bf1 57 8b7c2420 894608
+00591361 8a4e04 8b560c 8b5e08 80e1e2 80c902 884e04 8b4e18 895020 8b5004 83c150 52 89581c
+# instance sound list [inst+0x248] (TruTrace 0.3 facts): +0xc slot table, 0xc bytes per slot ([slot] = handle, [handle]
+# = emitter); dynamic list +0x10, node +0 next / +4 handle, end node [0xcd3bb8]
+005b69f4 8b4c2404 8b8948020000 85c9
+00593d50 55 8bec 83e4f0 83ec14 53 56 57 8bf9 8b4f0c 85c9 751d
+00593d82 8b4508 8d1440 8d3491
+0058d85b 8b3e 3b3db83bcd00

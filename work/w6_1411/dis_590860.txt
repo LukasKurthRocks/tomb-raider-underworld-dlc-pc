@@ -1,0 +1,40 @@
+00590860  8bc1                 mov     eax, ecx
+00590862  d9e8                 fld1    
+00590864  33c9                 xor     ecx, ecx
+00590866  66894804             mov     word ptr [eax + 4], cx
+0059086a  66894806             mov     word ptr [eax + 6], cx
+0059086e  c70040128500         mov     dword ptr [eax], 0x851240
+00590874  d95014               fst     dword ptr [eax + 0x14]
+00590877  d9ee                 fldz    
+00590879  894824               mov     dword ptr [eax + 0x24], ecx
+0059087c  d95818               fstp    dword ptr [eax + 0x18]
+0059087f  ba02000000           mov     edx, 2
+00590884  0f57c0               xorps   xmm0, xmm0
+00590887  d9501c               fst     dword ptr [eax + 0x1c]
+0059088a  d95820               fstp    dword ptr [eax + 0x20]
+0059088d  894828               mov     dword ptr [eax + 0x28], ecx
+00590890  d90530118400         fld     dword ptr [0x841130]
+00590896  89482c               mov     dword ptr [eax + 0x2c], ecx
+00590899  894830               mov     dword ptr [eax + 0x30], ecx
+0059089c  894834               mov     dword ptr [eax + 0x34], ecx
+0059089f  894838               mov     dword ptr [eax + 0x38], ecx
+005908a2  89483c               mov     dword ptr [eax + 0x3c], ecx
+005908a5  894840               mov     dword ptr [eax + 0x40], ecx
+005908a8  66894844             mov     word ptr [eax + 0x44], cx
+005908ac  816044ffff00ff       and     dword ptr [eax + 0x44], 0xff00ffff
+005908b3  d95050               fst     dword ptr [eax + 0x50]
+005908b6  d95054               fst     dword ptr [eax + 0x54]
+005908b9  884868               mov     byte ptr [eax + 0x68], cl
+005908bc  66816068fffe         and     word ptr [eax + 0x68], 0xfeff
+005908c2  d95058               fst     dword ptr [eax + 0x58]
+005908c5  d9505c               fst     dword ptr [eax + 0x5c]
+005908c8  0f294070             movaps  xmmword ptr [eax + 0x70], xmm0
+005908cc  d95860               fstp    dword ptr [eax + 0x60]
+005908cf  c74064ffffffff       mov     dword ptr [eax + 0x64], 0xffffffff
+005908d6  898880000000         mov     dword ptr [eax + 0x80], ecx
+005908dc  898884000000         mov     dword ptr [eax + 0x84], ecx
+005908e2  899088000000         mov     dword ptr [eax + 0x88], edx
+005908e8  89888c000000         mov     dword ptr [eax + 0x8c], ecx
+005908ee  898890000000         mov     dword ptr [eax + 0x90], ecx
+005908f4  899094000000         mov     dword ptr [eax + 0x94], edx
+005908fa  898898000000         mov     dword ptr [eax + 0x98], ecx

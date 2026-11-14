@@ -1,0 +1,41 @@
+007c92ff  395e2c               cmp     dword ptr [esi + 0x2c], ebx
+007c9302  7e38                 jle     0x7c933c
+007c9304  8b0f                 mov     ecx, dword ptr [edi]
+007c9306  d9ee                 fldz    
+007c9308  8b01                 mov     eax, dword ptr [ecx]
+007c930a  51                   push    ecx
+007c930b  d91c24               fstp    dword ptr [esp]
+007c930e  ff503c               call    dword ptr [eax + 0x3c]
+007c9311  837dfc00             cmp     dword ptr [ebp - 4], 0
+007c9315  7503                 jne     0x7c931a
+007c9317  8945fc               mov     dword ptr [ebp - 4], eax
+007c931a  43                   inc     ebx
+007c931b  83c704               add     edi, 4
+007c931e  3b5e2c               cmp     ebx, dword ptr [esi + 0x2c]
+007c9321  7ce1                 jl      0x7c9304
+007c9323  eb17                 jmp     0x7c933c
+007c9325  d986b8000000         fld     dword ptr [esi + 0xb8]
+007c932b  836674f7             and     dword ptr [esi + 0x74], 0xfffffff7
+007c932f  53                   push    ebx
+007c9330  51                   push    ecx
+007c9331  d91c24               fstp    dword ptr [esp]
+007c9334  e83af8ffff           call    0x7c8b73
+007c9339  8945fc               mov     dword ptr [ebp - 4], eax
+007c933c  8b45fc               mov     eax, dword ptr [ebp - 4]
+007c933f  5f                   pop     edi
+007c9340  5e                   pop     esi
+007c9341  5b                   pop     ebx
+007c9342  c9                   leave   
+007c9343  c20400               ret     4
+007c9346  8b442404             mov     eax, dword ptr [esp + 4]
+007c934a  85c0                 test    eax, eax
+007c934c  7505                 jne     0x7c9353
+007c934e  6a25                 push    0x25
+007c9350  58                   pop     eax
+007c9351  eb0c                 jmp     0x7c935f
+007c9353  8a4974               mov     cl, byte ptr [ecx + 0x74]
+007c9356  d0e9                 shr     cl, 1
+007c9358  80e101               and     cl, 1
+007c935b  8808                 mov     byte ptr [eax], cl
+007c935d  33c0                 xor     eax, eax
+007c935f  c20400               ret     4

@@ -1,0 +1,45 @@
+00591220  8b442408             mov     eax, dword ptr [esp + 8]
+00591224  53                   push    ebx
+00591225  55                   push    ebp
+00591226  8b6c2414             mov     ebp, dword ptr [esp + 0x14]
+0059122a  56                   push    esi
+0059122b  8bf1                 mov     esi, ecx
+0059122d  57                   push    edi
+0059122e  8b7c2420             mov     edi, dword ptr [esp + 0x20]
+00591232  894608               mov     dword ptr [esi + 8], eax
+00591235  8b442414             mov     eax, dword ptr [esp + 0x14]
+00591239  896e0c               mov     dword ptr [esi + 0xc], ebp
+0059123c  897e10               mov     dword ptr [esi + 0x10], edi
+0059123f  c70614148500         mov     dword ptr [esi], 0x851414
+00591245  8b0de06fc500         mov     ecx, dword ptr [0xc56fe0]
+0059124b  8b11                 mov     edx, dword ptr [ecx]
+0059124d  8b00                 mov     eax, dword ptr [eax]
+0059124f  8b5264               mov     edx, dword ptr [edx + 0x64]
+00591252  50                   push    eax
+00591253  ffd2                 call    edx
+00591255  8bd8                 mov     ebx, eax
+00591257  33d2                 xor     edx, edx
+00591259  3bda                 cmp     ebx, edx
+0059125b  0f846d010000         je      0x5913ce
+00591261  395304               cmp     dword ptr [ebx + 4], edx
+00591264  0f8464010000         je      0x5913ce
+0059126a  8b4514               mov     eax, dword ptr [ebp + 0x14]
+0059126d  83f8ff               cmp     eax, -1
+00591270  7404                 je      0x591276
+00591272  3bc2                 cmp     eax, edx
+00591274  750b                 jne     0x591281
+00591276  a1a0decc00           mov     eax, dword ptr [0xccdea0]
+0059127b  8b4824               mov     ecx, dword ptr [eax + 0x24]
+0059127e  8b4110               mov     eax, dword ptr [ecx + 0x10]
+00591281  8b0ddc808a00         mov     ecx, dword ptr [0x8a80dc]
+00591287  3bc1                 cmp     eax, ecx
+00591289  720a                 jb      0x591295
+0059128b  51                   push    ecx
+0059128c  50                   push    eax
+0059128d  e80e450b00           call    0x6457a0
+00591292  83c408               add     esp, 8
+00591295  69c084000000         imul    eax, eax, 0x84
+0059129b  0305d8808a00         add     eax, dword ptr [0x8a80d8]
+005912a1  8be8                 mov     ebp, eax
+005912a3  8b                   .byte   0x8b
+005912a4  45                   inc     ebp

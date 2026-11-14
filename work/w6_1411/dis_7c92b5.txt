@@ -1,0 +1,32 @@
+007c92b5  55                   push    ebp
+007c92b6  8bec                 mov     ebp, esp
+007c92b8  51                   push    ecx
+007c92b9  53                   push    ebx
+007c92ba  56                   push    esi
+007c92bb  8bf1                 mov     esi, ecx
+007c92bd  57                   push    edi
+007c92be  33db                 xor     ebx, ebx
+007c92c0  8d7e30               lea     edi, [esi + 0x30]
+007c92c3  391f                 cmp     dword ptr [edi], ebx
+007c92c5  895dfc               mov     dword ptr [ebp - 4], ebx
+007c92c8  7505                 jne     0x7c92cf
+007c92ca  6a24                 push    0x24
+007c92cc  58                   pop     eax
+007c92cd  eb70                 jmp     0x7c933f
+007c92cf  385d08               cmp     byte ptr [ebp + 8], bl
+007c92d2  7406                 je      0x7c92da
+007c92d4  834e7402             or      dword ptr [esi + 0x74], 2
+007c92d8  eb04                 jmp     0x7c92de
+007c92da  836674fd             and     dword ptr [esi + 0x74], 0xfffffffd
+007c92de  8b868c000000         mov     eax, dword ptr [esi + 0x8c]
+007c92e4  385858               cmp     byte ptr [eax + 0x58], bl
+007c92e7  7509                 jne     0x7c92f2
+007c92e9  8b401c               mov     eax, dword ptr [eax + 0x1c]
+007c92ec  3bc3                 cmp     eax, ebx
+007c92ee  75f4                 jne     0x7c92e4
+007c92f0  eb04                 jmp     0x7c92f6
+007c92f2  c6450801             mov     byte ptr [ebp + 8], 1
+007c92f6  385d08               cmp     byte ptr [ebp + 8], bl
+007c92f9  742a                 je      0x7c9325
+007c92fb  834e7408             or      dword ptr [esi + 0x74], 8
+007c92ff  39                   .byte   0x39

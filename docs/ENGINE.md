@@ -1277,6 +1277,16 @@ file must not be copied over it (31 type-9 libs incl. 2943 / 2944 and 25 materia
   0x594350 -> emitter **0x5935d0**, which tests the data for 0 (`*out = 0`, return); 0x594350 skips a 0 handle. So
   "not found" (0) is safe on these paths; an id >= 0x8000 in the original lookup reads beyond the table and faults
   (TruDataGuard 0.2.2 answers 0 for every caller). ✅ static (dump 13.11.)
+* **Voice -> emitter -> object** (2026-11-14, W6, static; `work/w6_1411/dis_*.txt`, byte checks `precheck_02245.txt`):
+  the emitter (0xb0 B, ctor 0x590860: vtable 0x851240, +0x14 = 1.0 = its params block) is made by 0x5935d0, which sets
+  +0xc = the SoundPlex section id (`[data+8]`, 0x593659) and starts the walker **0x5920b0(data, &emitter+0x14,
+  &emitter+0x50, emitter)** (0x593693). The walker's Wave case builds the wave node 0x591220(leaf, params, group params,
+  emitter) (0x5922a1); the node keeps params at +8 and VoicePool::Play's voice gets **voice +0x1c = node +8**
+  (0x591367 / 0x591380). So a voice of a wave directly under its emitter has emitter = voice +0x1c - 0x14 (test: vtable
+  0x851240); a wave under an inner node with its own params has no such back link. The owning object: the instance whose
+  sound list `[inst+0x248]` (+0xc slot table, 0xc B per slot, [slot] = handle, [handle] = emitter; +0x10 dynamic list,
+  node +0 next / +4 handle, end node `[0xcd3bb8]`) holds the emitter; an emitter in no list was released at once by its
+  starter. TruMenu 0.22.45 `snd.wave` / `snd.now` / `snd.mute s<id>` use this. ✅ static / ⬜ live
 * Anim event kind 2 -> 0x5b9fd8 -> 0x5b69c0 (type table 0x5b6b30) -> slot object 0x593d50(slot, mode, p3, p4); instance
   sound object 0x58d6a0: count `[obj+0xa8]`, table `[obj+0xac]` (8 B per slot). TU passes a 5th argument (0x8226de00) - not
   ported ⬜. ✅
@@ -1311,6 +1321,14 @@ death list 70 / 76, pause list 6 / 25 / 3 / 9 / 79 (handler 0x5874b0), category 
 7, [3] srmusic 10, [4] default 14, [5] cinstream 25, [6] 53 (reader ⬜). Entry 0x84 B: +0 f32 volume (sliders 0x587171,
 SetVolume 0x587770), +0x10 flags (bit 0 paused), +0x68 parent; R+0x6c = FMOD ChannelGroupI. `SOUND_ResetGroups` 0x5895f0.
 Mute `ChannelGroupI::setMute` 0x7c48cd (TruMenu `media.mutemusic`). ✅ Tool `tools/sound_groups.py`.
+**Single channel mute** (2026-11-14, W6, static; `work/w6_1411/fmod_api_map.txt`): the game never mutes one channel -
+none of the 24 linked Channel wrappers (validate 0x7c7e5a) reaches `ChannelI::setMute` 0x7c92b5 (callers only inside
+FMOD: group mute 0x7c4913, setChannelGroup 0x7c9eac, 0x7cb0ad / 0x7cb26d). Every game Channel call is validate(handle,
+&ChannelI) (cdecl; handle >> 16 & 0xfff = slot, low word = reuse count, a stale handle answers 0x24 / 0x25) + the
+ChannelI method (thiscall), e.g. Channel::setPaused 0x7b9be0. `ChannelI::setMute(bool)` (ret 4): +0x74 bit 1 = own mute,
+effective mute bit 3 when it or a group of the chain (+0x8c, parent +0x1c, flag +0x58) is muted - then every
+sub-channel volume 0, else the channel volume +0xb8 put back; `getMute` 0x7c9346 = bit 1. TruMenu 0.22.45 `snd.mute`
+/ `snd.solo` call it the same way. ✅ static / ⬜ live (audible effect)
 **Group DSP effect** (2026-11-10): entry +0x7c is a **u16** DSP kind and +0x80 points to its parameter block in the
 DTP (16 or 32 B of floats). The loop 0x58de50 over all groups tests `word ptr [entry+0x7c]` and, when non-zero (and
 the group's wrapper +0x5c is 0), calls 0x58dad0 -> 0x587620: `movzx` kind 1..11 -> jump table 0x5876fc -> FMOD DSP

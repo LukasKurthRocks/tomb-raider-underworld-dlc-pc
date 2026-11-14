@@ -1,0 +1,75 @@
+005912c0  198956148956         sbb     dword ptr [ecx + 0x56891456], ecx
+005912c6  188a460424f5         sbb     byte ptr [edx - 0xadbfbba], cl
+005912cc  0c05                 or      al, 5
+005912ce  5f                   pop     edi
+005912cf  884604               mov     byte ptr [esi + 4], al
+005912d2  8bc6                 mov     eax, esi
+005912d4  5e                   pop     esi
+005912d5  5d                   pop     ebp
+005912d6  5b                   pop     ebx
+005912d7  c21000               ret     0x10
+005912da  83c050               add     eax, 0x50
+005912dd  81c780000000         add     edi, 0x80
+005912e3  50                   push    eax
+005912e4  8bcf                 mov     ecx, edi
+005912e6  e8c5c6ffff           call    0x58d9b0
+005912eb  8b0dac9ccd00         mov     ecx, dword ptr [0xcd9cac]
+005912f1  8b4948               mov     ecx, dword ptr [ecx + 0x48]
+005912f4  8b11                 mov     edx, dword ptr [ecx]
+005912f6  8b4234               mov     eax, dword ptr [edx + 0x34]
+005912f9  6a00                 push    0
+005912fb  6890000000           push    0x90
+00591300  ffd0                 call    eax
+00591302  85c0                 test    eax, eax
+00591304  741c                 je      0x591322
+00591306  8b5564               mov     edx, dword ptr [ebp + 0x64]
+00591309  57                   push    edi
+0059130a  8d4a20               lea     ecx, [edx + 0x20]
+0059130d  51                   push    ecx
+0059130e  8b4c2420             mov     ecx, dword ptr [esp + 0x20]
+00591312  52                   push    edx
+00591313  8b542428             mov     edx, dword ptr [esp + 0x28]
+00591317  52                   push    edx
+00591318  51                   push    ecx
+00591319  8bc8                 mov     ecx, eax
+0059131b  e8c0f3ffff           call    0x5906e0
+00591320  eb02                 jmp     0x591324
+00591322  33c0                 xor     eax, eax
+00591324  8d5020               lea     edx, [eax + 0x20]
+00591327  8bc8                 mov     ecx, eax
+00591329  894618               mov     dword ptr [esi + 0x18], eax
+0059132c  894608               mov     dword ptr [esi + 8], eax
+0059132f  89560c               mov     dword ptr [esi + 0xc], edx
+00591332  e829e8feff           call    0x57fb60
+00591337  8b7c2414             mov     edi, dword ptr [esp + 0x14]
+0059133b  0fb64704             movzx   eax, byte ptr [edi + 4]
+0059133f  8b4b04               mov     ecx, dword ptr [ebx + 4]
+00591342  50                   push    eax
+00591343  e89812ffff           call    0x5825e0
+00591348  8b5b04               mov     ebx, dword ptr [ebx + 4]
+0059134b  53                   push    ebx
+0059134c  b908818a00           mov     ecx, 0x8a8108
+00591351  e86aacffff           call    0x58bfc0
+00591356  85c0                 test    eax, eax
+00591358  894614               mov     dword ptr [esi + 0x14], eax
+0059135b  0f8466ffffff         je      0x5912c7
+00591361  8a4e04               mov     cl, byte ptr [esi + 4]
+00591364  8b560c               mov     edx, dword ptr [esi + 0xc]
+00591367  8b5e08               mov     ebx, dword ptr [esi + 8]
+0059136a  80e1e2               and     cl, 0xe2
+0059136d  80c902               or      cl, 2
+00591370  884e04               mov     byte ptr [esi + 4], cl
+00591373  8b4e18               mov     ecx, dword ptr [esi + 0x18]
+00591376  895020               mov     dword ptr [eax + 0x20], edx
+00591379  8b5004               mov     edx, dword ptr [eax + 4]
+0059137c  83c150               add     ecx, 0x50
+0059137f  52                   push    edx
+00591380  89581c               mov     dword ptr [eax + 0x1c], ebx
+00591383  e8881effff           call    0x583210
+00591388  8b460c               mov     eax, dword ptr [esi + 0xc]
+0059138b  80781806             cmp     byte ptr [eax + 0x18], 6
+0059138f  7508                 jne     0x591399
+00591391  8b4e14               mov     ecx, dword ptr [esi + 0x14]
+00591394  e8572cffff           call    0x583ff0
+00591399  66837f0600           cmp     word ptr [edi + 6], 0
+0059139e  7440                 je      0x5913e0

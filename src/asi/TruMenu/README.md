@@ -2928,6 +2928,70 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.45 - W6: hearing tests faster - single sounds / tracks off, ambience off, wave 10 log line (2026-11-14)
+
+Built into `work\asi\menu0268`, not installed, no live test (finding in the workspace `docs\Befund-W6-Toene-1411.md`;
+owner live notes of 13.11., package W6 of `docs\Testabend-1311-Warteschlange.md`). 15 byte checks
+(`work\w6_1411\precheck_02245.txt`, `0.22.45 W6 sound switches: checks ok (15 rows)` at the start), no hook, no patch.
+
+- **`snd.mute <target> [1|0]`** (TruLink / command bar; no value = toggle; at most 16 rules, for this game start):
+
+  | Target | What is muted | How (the game's / FMOD's own path) |
+  |---|---|---|
+  | `w<id>` or `<id>` | every voice of that wave (wave table index, `Welle 1234` in `snd.list`) | FMOD's `ChannelI::setMute` 0x7c92b5 per channel, behind the game's handle check 0x7c7e5a (as every Channel call of the game, e.g. `Channel::setPaused` 0x7b9be0); the game has no single-channel mute of its own |
+  | `s<id>` | every voice whose emitter plays that SoundPlex section | same, per channel |
+  | `e<hex>` | every voice of one emitter (address from `snd.now`) | same, per channel |
+  | `g<n>` | a whole sound group with its children | `ChannelGroupI::setMute` on the group's FMOD channel group (as `media.mutemusic`), again after a level load |
+  | `ambience` | group 15 (16 .. 24: ambient events, loops, animals, fire, wind / foliage / thunder, water, underwater) and the `_amb_` srmusic beds (DLC 2) - effects, voices, music stay | group mute + the srmusic stop below |
+  | `music` | = `music.mute` (`media.mutemusic`) | |
+  | a track name | that srmusic track (`TruMenu.media.txt` or a slot now) | the game's stop `SRMUSIC_LoadMusic(slot, NULL, fade, 0)` whenever it starts; `0` again = `LoadMusic(slot, name)` where `media.music.play` may run (main menu, a level with `[Media] MusicInLevels=1`), else the unit starts it again |
+  | `all 0` | every rule and the solo off | everything TruMenu muted is unmuted |
+
+  Only channels / groups TruMenu muted are ever unmuted; a channel or group muted by someone else is left alone. No
+  volume of the game and no option slider is written.
+- **`snd.solo <target> | off`**: every voice but the target's muted per channel (targets as above, no track: the
+  srmusic stream voices cannot be told apart); the same target again = off.
+- **`snd.now`** (game thread): one `snd.now` line per voice in `TruMenu.log` (the `snd.list` text + voice / channel +
+  emitter and SoundPlex section), the audible ones as the answer: `w10/s23469/g22 0.32; ... music [..]`.
+- **`snd.mutes`** (info): rules, solo, channels / groups muted now, stopped tracks, wave log counters. **`snd.ambmute`**
+  (bool) = `snd.mute ambience` for the bar. **`music.stop [slot|all]`** (default all; also in a level, as
+  `media.muteambient`), **`music.next`** (the next music row of `TruMenu.media.txt` after slot 0's track, through
+  `media.music.play` and its gates), **`music.mute`** = `media.mutemusic`.
+- **Wave 10 log line** (`[Sound] WaveLog=1`, `WaveIds=10`, `WaveLogMax=500`; `snd.wavelog on|off|<ids>`): whenever a
+  voice of a watched wave starts, one line `snd.wave 10 START #n: unit <unit>; voice .. ch .., SFX g<n>, vol ..,
+  3D / 2D, ...; emitter 0x.. sound s<id> (SoundPlex section); object <name> (object <id>, intro <id>, inst 0x.., fixed
+  slot n / dynamic list of [inst+0x248]) | in no instance sound list (...); wave entry ...` - so the owner's hearing test
+  can be matched (6:10 = `ui_drop_04` of the generalbank and the DLC 2 reuse, Befund-Gruppe-J J-2). The emitter is
+  voice +0x1c - 0x14 (vtable 0x851240) only when the wave sits directly under it; else `emitter ?` (inner SoundPlex
+  node). The wave table entry (6 dwords) is logged raw for the comparison of the two wave versions.
+- Bar: page Spiel-Einstellungen / Ton, sub-group **"Ton einzeln (Hörtest)"** (ambience off, music off / stop / next,
+  `snd.now`, wave 10 mute / solo, every switch back, state); page Tests / Paket B: the same rows + check `tgB.wave10log`.
+  Switch rows `[Sound] WaveLog` / `WaveLogMax` in group `Diagnose (TruMenu)` (read at the start).
+- Checks: `trumenu_ini_check` `check_02245`; `check_02244` (version part, key count 283 + 3) adapted; negative cases
+  `work\w6_1411\w6_negative_tests.py`.
+
+### TO TEST 0.22.45
+
+1. Start, `TruMenu.log`: `0.22.45 W6 sound switches: checks ok (15 rows); [Sound] WaveLog 1, WaveIds 10, WaveLogMax 500`.
+2. Main menu: move through the menu - every click that plays wave 10 gives one `snd.wave 10 START #n: unit ...` line
+   (main menu: `ui_drop_04`, 2D, no object); note how many lines per click (expected 1).
+3. DLC 2 (`dlc_level2_start` / `dlc2_ceremony_room`): play on with the log open; each `snd.wave 10 START` line names the
+   unit, the emitter + `sound s<id>` and the object (or `in no instance sound list`) - say what you heard at that time
+   (menu click or another sound).
+4. Bar Paket B: "Umgebung aus (DLC-2-Ambience)" on - wind / foliage / thunder / water and the `_amb_` bed go, steps,
+   voices, music stay; log `snd.mute: group 15 muted ...` and `srmusic slot n '..._amb_...' stopped`. Off again: group
+   unmuted; the bed comes back only with `[Media] MusicInLevels=1` (else at the next unit start - log says which).
+5. "Was spielt gerade? (snd.now)": the answer lists `w<id>/s<id>/g<n> volume`; `TruMenu.log` one `snd.now` line per voice.
+6. "Welle 10 stumm / an", then trigger wave 10: no sound, `snd.mutes` shows `w10` and `channels muted now 1` while it
+   plays; again = on.
+7. "Nur Welle 10 (Solo an / aus)": everything else silent (music too); again = everything back.
+8. TruLink: `menu snd.mute s<id>` with an id from `snd.now` - that emitter's sounds go; `menu snd.mute all 0` - all back.
+9. `menu music.stop` in a level - the level music fades out (log `music.stop: slot 0 '...' stopped`); `menu music.next`
+   in the main menu - the next track plays (in a level only with `MusicInLevels=1`).
+10. Negative: `snd.mute w9999` (wave table 5120), `snd.mute g0` (root), `snd.mute g999`, `snd.mute s0`, `snd.mute e1234`
+    (no emitter), `snd.mute nosuchtrack`, `snd.mute 10 2`, `snd.mute all 1`, `snd.solo <track>`, `snd.wavelog 99999`
+    - each refused with its reason, nothing muted (`snd.mutes`).
+
 ## 0.22.44 - W2: TruMenu order - page Tests by the test guide, accessibility rows, big window, DeviceGlyphs row (2026-11-14)
 
 Built into `work\asi\menu0267`, not installed, no live test (finding in the workspace
@@ -5546,6 +5610,9 @@ default or comment only in the table, then copy `--print` into `TruMenu.ini`.
 | `[Shot] Hotkey` | 0 | 0.10.5: virtual key (e.g. `0x7A` = F11) = `claude.mark now`; the game still gets it; 0 = off |
 | `[Shot] MaxPerMinute` | 30 | 0.10.5: shots (and, separately, marks) per minute, 1 .. 120; 0 = no limit |
 | `[Rescue] FallNet` | 0 | 0.22.24: 1 = fall net - Lara more than 3 s in the fall record 1068 and more than 3000 units below the newest safe-ground sample of her unit (the `player.unstuck` ring) is put back on that sample (at most 3 times per fall, never with the menu / ring open, in a cinematic, without player control); 0 = off, one "would" line per fall. Live: TruMenu reads the key about once a second (switch row in group `Rettung (TruMenu)`). The `fall watch:` log lines come at LogLevel 1 either way |
+| `[Sound] WaveLog` | 1 | 0.22.45 (W6): one `snd.wave <id> START` line in `TruMenu.log` per start of a wave in `WaveIds` - unit, voice, group, volume, emitter + SoundPlex section, the object whose sound list holds the emitter, the wave table entry; `snd.wavelog on / off` switches it for this game start (switch row in group `Diagnose (TruMenu)`, read at the start) |
+| `[Sound] WaveIds` | 10 | 0.22.45 (W6): the waves of `WaveLog`, decimal 0 .. 5119, at most 8 (space or comma between); 10 = `ui_drop_04` / the DLC 2 reuse of 6:10 (`docs\Befund-Gruppe-J-1211.md`); `snd.wavelog <ids>` for this game start |
+| `[Sound] WaveLogMax` | 500 | 0.22.45 (W6): at most n `snd.wave` lines per game start (0 = no limit); later starts are only counted (`snd.mutes`) |
 
 ## Build, install, test (Windows)
 
