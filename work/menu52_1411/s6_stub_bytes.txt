@@ -1,0 +1,8 @@
+S5FogStub: 1 match(es)
+  je go -> 0xb165d (want 0xb165d)
+S5UnitStub (0.22.52): 1 match(es)
+  file offset 0xb2790: 95 bytes
+  je draw -> 0xb27aa / 0xb27aa (want 0xb27aa), je plain -> 0xb27e9 / 0xb27e9 (want 0xb27e9); S5ColourFor at 0xb14d0, first ret 4 (want 4)
+W9SendStub: 1 match(es)
+  je keep -> 0xd9b54 (want 0xd9b54); W9VoiceMuted first ret 4 (want 4)
+stubs ok

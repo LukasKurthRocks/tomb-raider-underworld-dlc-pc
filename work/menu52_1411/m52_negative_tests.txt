@@ -1,0 +1,27 @@
+positive (unchanged sources): 0 problem(s) ok
+case version           : 1 problem(s) ok - TruMenu.cpp: kVersion must start with "TruMenu 0.22.52 (reverb mark + DSP graph ..."
+case S6 row changed    : 1 problem(s) ok - TruMenu.cpp: kS6Checks (6 rows) must be the first 6 rows of precheck_02252.txt in order
+case S6 row dropped    : 1 problem(s) ok - TruMenu.cpp: kS6Checks (5 rows) must be the first 6 rows of precheck_02252.txt in order
+case S6 check order    : 1 problem(s) ok - TruMenu.cpp: the load must call S6Check right after W9Check
+case S6 after return   : 1 problem(s) ok - TruMenu.cpp: S5Apply must call S6Apply(why) before its early return
+case S6 no shutdown    : 1 problem(s) ok - TruMenu.cpp: S5Shutdown must call S6Shutdown
+case S6 offsets        : 1 problem(s) ok - TruMenu.cpp: const DWORD kS6Off[3] = {0x8c, 0x9c, 0xa0}; missing
+case S6 any count      : 1 problem(s) ok - TruMenu.cpp: S6Params must check the vtable 0x849018 and 11 PS MaterialParams
+case S6 over foreign   : 1 problem(s) ok - TruMenu.cpp: S6Apply lacks if (cur != m.game[k] && cur != m.ours[k])
+case S6 back always    : 1 problem(s) ok - TruMenu.cpp: S6Back must put back only over our own value
+case S6 falloff kept   : 1 problem(s) ok - TruMenu.cpp: S6Apply lacks v[2] = 1.0f;
+case S6 dword write    : 2 problem(s) ok - TruMenu.cpp: the S6 section must not call WriteDword(
+case W10 tick missing  : 1 problem(s) ok - TruMenu.cpp: PadHook must call W10Tick() right after W9Tick()
+case W10 one loop      : 1 problem(s) ok - TruMenu.cpp: DrawSoundLog must draw the reverb mark in both line loops
+case W10 no bar mark   : 1 problem(s) ok - TruMenu.cpp: the bar must draw QbView.rev in front of the state
+case W10 sweep all     : 1 problem(s) ok - TruMenu.cpp: W10Sweep must zero only FMOD-muted voices (bit 3) through W9SetMix while R1 / R2 are ours
+case W10 sweep idle    : 1 problem(s) ok - TruMenu.cpp: W10Sweep must zero only FMOD-muted voices (bit 3) through W9SetMix while R1 / R2 are ours
+case W10 no TO TEST    : 1 problem(s) ok - TruMenu.cpp: TO TEST row tgB2.dspgraph missing
+case tint clamp        : 1 problem(s) ok - TruMenu.cpp: LONG S5TintClamp(LONG v) { return v <= 0 ? 0 : v >= 2 ? 2 : 1; } missing
+case tint palette      : 1 problem(s) ok - TruMenu.cpp: const int kS5PalN = 8; missing
+case tint bool row     : 1 problem(s) ok - TruMenu.cpp: two value rows "Sonar: Bereichsfarben" (settings + Paket G)
+case j motion driven   : 1 problem(s) ok - TruMenu.cpp: PzRefresh lacks const bool usable = !motion && a < z && !(loOpen && hiOpen);
+case j no limit cut    : 1 problem(s) ok - TruMenu.cpp: PzRefresh lacks if (z > lr1) z = lr1;
+case j lock kept       : 1 problem(s) ok - TruMenu.cpp: JtTick must take our lock back after a node change when it still stands
+case tint bool         : 1 problem(s) ok - switches: TintOthers must be int:0..2
+25 cases + 1 positive, 0 failed

@@ -1,0 +1,18 @@
+Built work\asi\menu0275\TruMenu.asi (2307584 bytes, x86 DLL, sha256 7f467c3a2b659fd021d9f9364b09546d1b9c6a465416dfda6659f417d322af51) - TruMenu 0.22.52
+  Build-TruAsi.ps1 -Name TruMenu -OutDir work/asi/menu0275 from Git Bash (the raw outputs are in _archiv\, not in the
+  repo - they hold local paths); a first build of the same day (2308608 bytes, 96e850c1...) was before the kVersion /
+  help / Paket B2 row fixes and is overwritten
+  warnings: 2 (both imgui_demo.cpp), 0 in TruMenu.cpp; imports / exports = 0.22.51 (tools/pe_import_export_diff.py: 151
+  functions, same 6 exports, no new DLL - imports_exports_0274_0275.txt)
+  INI / switches in the build folder = source (cmp)
+Byte checks: tools/pe_bytes_check.py --file work/menu52_1411/precheck_02252.txt -> 8 checks (6 = kS6Checks + 2 evidence
+  rows), 0 mismatches on data\pc\tru.exe; the installed exe has the same SHA256 (6905b046...)
+Stubs: work/menu52_1411/s6_stub_bytes.py on the build: S5FogStub / S5UnitStub (0.22.52: S5ColourFor, ret 4) / W9SendStub
+  one match each, jumps on their labels (s6_stub_bytes.txt)
+trumenu_ini_check: exit 0, 62 ok lines, 0 others (ini_check_final.txt; new check_02252; adapted check_02251 version /
+  fog / tint / switches rows, check_02240 enum, the value-row list); negative cases m52_negative_tests.py: 25 cases + 1
+  positive, 0 failed (m52_negative_tests.txt)
+trumenu_quick_check: exit 1 - only the old "menupages: 28 page keys" FAIL (as 0.22.45 .. 0.22.51)
+trumenu_readability_check: exit 0
+Note: work/menu51_1411/m51_negative_tests.py (old) finds 7 of its 0.22.51 patterns no more (changed on purpose:
+  version, unit stub, tint, fog, sonar.tint type, switch rows) - check_02252 covers the new form

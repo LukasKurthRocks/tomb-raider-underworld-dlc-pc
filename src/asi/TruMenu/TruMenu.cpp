@@ -63,7 +63,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 namespace {
 
-const char *const kVersion = "TruMenu 0.22.51 (sonar view + base PDA + X default + DLC start from a level + reverb follows mute, owner wishes 2026-11-14 evening: the game's SFX reverb (holder [0xccde98]) gets a send from every pool voice that FMOD's mute never reaches - 'Hall folgt Stumm' [Sound] ReverbFollowsMute = call redirects 0x591591 / 0x5841bf -> W9SendStub (a muted voice sends 0), 'Hall aus' [Sound] ReverbOff = reverb -> master setMix 0 (old level back on off), audible = not paused and (dry > 0 or send > 0 with the reverb out > 0) in box / monitor, a reverb row, 11 more byte checks; 'Sonar: Abblenden Ferne' [Sonar] FadeFar = the sonar view's fog (0 game: near = far = 65536, n m = fog n/2 .. n, -1 aus; call redirects 0x6e4d94 / 0x6e4bf9 -> S5FogStub); 'Bereich anzeigen' = one unit of the sonar's own list drawn (0x6e42ac -> S5UnitStub, no load, no camera move); 'andere Bereiche einfaerben' [Sonar] TintOthers = units but Lara's drawn with an amber draw colour [0xee03bc] for their call; sonar.why + the open line log the view centre / axis and per unit the cut plane of 0x6dfa60 ((v0 - centre) . axis < -4000); 'Shadow-PDA durch Basis-PDA ersetzen' [PDA] ShadowPdaAsBasePda = g_pda script 3347 f1 word 04000001 -> 04000000 (ScriptSection hash map 0x8a6ed0, only the DLC g_pda, only while the PDA is closed); X on a value row = its default, footer 'X: Standard'; Kapitel DLC rows in a level = the pause menu's DLC start (RegisterAcceptChanges case 8 as the title update: f27(unit, rule, 0, 1), f7, f19); command line: level.start suggests every unit, level.load in the main menu suggests level.start; 22 byte checks) - 0.22.50 (sound log readable + FMOD channels + source hooks, chapters from the main menu, owner wishes 2026-11-14: the bottom-right sound box per line with an on / off box from FMOD's own mute bit (ChannelI +0x74 bit 3), the group as text, the source, a loop mark (FMOD mode 0x2 / 0x4), repetitions collapsed (same wave + source = one line xn, newest on top), a 'laeuft gerade' block of the looping channels; filters per kind (Lara, enemies, world, objects, PDA / UI, speech, music), only audible, collapse, max distance ([Sound] Log*, live); quick hearing per kind mute / solo (snd.catmute / snd.catsolo = snd.mute / snd.solo cat:<kind>: whole groups + per channel + the FMOD channels outside the pool), newest sound solo, everything back; two code redirects V1 0x591351 (the wave node's Play call: voice -> emitter of the node) and E1 0x5b99fc (6 bytes after the untouched create call of the anim event, TruTrace keys on it: emitter -> instance), [Sound] SourceHooks; the owner list walk at most once a second and only while shown, W6EmitterOwner gone; the monitor counts every used FMOD channel (SystemI +0x150), shows FMOD's mute / pause, 'Fremdkanal (DSP)' rows and the music slots; ONE 'Ambient aus' (media.muteambient = snd.ambmute: groups 15 .. 24 + the '_amb_' beds, kept) and ONE 'Musik aus'; page Kapitel from the main menu = the game's mission start (level.start, DLC starts as the DLC menu), the DLC start rows refused in a level (level.load keeps Lara's costume), cp.jump from the main menu; 27 byte checks) - 0.22.49 (sonar all floors + map info, adrenaline options, owner wishes 2026-11-14:[Sonar] AllFloors with FullMap = the frame 0x6e4130 also draws the map units of other floors the sonar loaded itself (0x6e429b je -> nop nop; the game's open path loads the floor's units and their direct portal neighbours - no load added), item sonar.allfloors 'Alle verbundenen Bereiche'; info row sonar.unitmap 'Karte dieser Unit' (real N faces / placeholder only / no file, read from the sonar's unit list while it is open) and one log line per sonar open (floor, radius, view distance, every map unit with mask / state / faces); [Sonar] TriangleCap with FullMap (default 300000; the imm32 of 0x6dfa69 = the per-frame budget 93572 - only a counter: the triangles are flushed in batches of 2000 into the device's growing vertex pool); 3 more byte checks (16); adren.keep renamed 'Nach Einsatz auffuellen' (it refills only outside the mode), adren.stayfull 'Adrenalin bleibt voll' = TruShadowCombat [Adrenaline] DrainPercent / DrainModePercent 0 (old values kept in TruMenu.ini, back when off); ModeWithoutTarget / StrikeWithoutButton options (no '(Test)'), AssistPointer 'Zielhilfe Kreis', a DLC 2 note; snd.sonar log line printed the wave list's address as SonarMute) - 0.22.48 (adrenaline at Lara + sonar full map, owner wishes 2026-11-14: page Figur group Adrenalin (Lara) owns adren.meter / adren.fill / adren.keep and the TruShadowCombat [Adrenaline] switches (FillPercent, DrainPercent, DrainModePercent, StrikeWithoutFullMeter, AssistPointer, ModeWithoutTarget, StrikeWithoutButton, Log), page Tests keeps copies; the switches rows ModeWithoutTarget / StrikeWithoutButton live (TruShadowCombat M15ReadSwitches, once a second); teaser display default 12 (small circle + count badge); page Kapitel without '(debug)', the unused slots named readable; Sonar komplett [Sonar] FullMap = every vertex counts as revealed in the draw 0x6e3a00 (0x6e3b25 / 0x6e3b59 / 0x6e3ba2, display only, no save data), HidePlaceholder = call stub at 0x6e3ab0 skips the 100-face / 56-vertex MAP mesh, FloorMarkers = 0x6e40c6, all live, the game's bytes when off, one line when the triangle cap [0xee03ec] is hit; 12 byte checks kSoChecks) - 0.22.47 (sound monitor, owner wishes 2026-11-14: the wave id of a voice from the wave entry +4 (0x591348 - 0.20.1 .. 0.22.46 read every voice as 'Stream') and the emitter through the node's params object +0x74 (0x5906e0); bar group Ton-Monitor (live) and Paket B: every voice playing / paused with name, wave / section, group name, volume, 2D / 3D, distance, state and source (object #intro / UI / music / stream), the last [Sound] HistoryMax starts, the active rules, right = mute w<id> / e<hex>; snd.monitor / snd.history to the log; the bottom-right box as a log ([Sound] OverlayStyle 1: newest on top, colour + ImGui-drawn icon per kind, fading); Sonar-Ton aus [Sound] SonarMute 1 = waves 914 / 915 / 916 of g_pda.drm per channel (2 = the whole group 57 incl. Lara's hints in child group 70), kept in TruMenu.ini; the list / switches also run from the Present hook while the game polls no pad (main menu); 6 byte checks) - 0.22.46 (arena from the main menu,owner live 2026-11-14 12:07 'arena.go 1a refused: level change pending (GameTracker+0xb9 = 1)': in the front end +0xb9 = 1 is a request nobody serves - only main state 1 serves one (0x5e0050 -> 0x5dab40), the next level start clears it (0x5de864), here TruMenu's own level.load of the unit.go step; LevelChangePending ignores it in main state 10, level.load is refused in the front end (main state 6 / 10), arena.go from the main menu starts the unit through the game's mission start (level.start <unit> 0 = uigamedata f22, f27(unit, 0, 0, 1), stdscreenmgr f19 + f7; new game data, fresh player tracker = main-game mode), waits for it, places Lara, cheat.onehitkill 0, arena.mode <spot> with unit + one-hit kill byte; refused outside the main menu itself (front-end state 0xfae8da != 3), during a one-shot movie or a cutscene, without a level; level.start [0|1] = f27's selection argument; 'level up' log line of the shortcut runner; 10 byte checks kFeChecks) - 0.22.45 (W6 sound switches,owner live notes 2026-11-13: snd.mute <target> [1|0] - single waves / SoundPlex sections / emitters per channel through FMOD's own ChannelI::setMute 0x7c92b5 behind the game's handle validate 0x7c7e5a, sound groups and ambience (group 15 + the '_amb_' srmusic beds) through ChannelGroupI::setMute, music tracks by name through the game's srmusic stop; snd.solo, snd.mutes, snd.ambmute, snd.now (voices with emitter + SoundPlex section), music.stop / music.next / music.mute; one 'snd.wave <id> START' log line per start of a watched wave ([Sound] WaveLog / WaveIds 10 / WaveLogMax) with unit, emitter (params - 0x14, vtable 0x851240), SoundPlex section and the object whose sound list [inst+0x248] holds it; 15 byte checks) - 0.22.44 (W2 order, owner live notes 2026-11-13: page Tests by the test guide packages A - F of 14.11. (group tg_1411, sub-groups tg_a .. tg_f with the items each package needs, checks tg<A-F>.<name>), the 11.11. Q90 packages, test spots, light / depth diagnosis and hall02 rows in the closed group Archiv / Alt (nothing deleted); Barrierefreiheit: no leading spaces, Arachnophobie in its own sub-group, the planned rows (no item) in the closed group Geplant; planned rows without the 3-space prefix; an INI without [Menu] Load (written before 0.22.18) reads Enabled the old way = Load, the big window stays off; row DeviceGlyphs on page Spiel-Einstellungen / Steuerung; kQbViewMax 256) - 0.22.43 (W5 markup, owner live notes 2026-11-13:draw.markup puts object markup (box +0xc owner) through the owner's bone matrix like the engine (0x5be360 / 0x49ba20, only with owner +0x2d8) - before every object ledge was drawn around the world origin (the dungeon 'coil' 21:53 = dlc1_uo_pillar_of_doom ledges); boxes the engine's markup query skips (record +0x32, disabled bit 31, owner flags, stream unit +5) are not drawn; label 'type #id' (DE / EN) within 15 m of Lara, nearest 24, one colour per type; dbg.roomonly and the occlusion fading apply to markup too; bar rows Markup / Nur Kanten first in their group; 6 byte checks) - 0.22.42 (W3 debug view, owner live notes 2026-11-13: RoomOnly keeps an object of another unit when its own stream unit +0xe0 is Lara's or it is within [Debug] RoomNear 3000 (dlc_level1_start holds copies of the dlc_caverns bridge objects), each drop / keep logged once; DistMetres default 1; labels within [Debug] OcclNear 600 and Lara's own never fade, test point 1 m above the origin; labels de-cluttered - one label per instance and frame (uber labels join it with their state line), same object x n, LabelStack 3, LabelCellMax 5 per screen cell; [Debug] HideEmptyPots 1 - no labels at plain / empty jars; teaser icon only in the main menu (front-end state 3, no one-shot Bink movie - not in the credits)) - 0.22.41 (Q126c compact attract styles, owner 2026-11-14 after trying 0.22.40: [Menu] AttractIcon 8 .. 16 appended, all without a box - 8 / 9 small circle without / with the red strike, 10 / 11 / 12 small circle + only the counter beside / below / as a badge on its edge, 13 terse 12s . 3, 14 terse 12/40 . x3, 15 / 16 only the counter as a word / with a skip arrow; no time next to a circle; blink at the limit for all; 0 .. 7 unchanged, default 7) - 0.22.40 (Q126b attract display styles, owner 2026-11-13: one cycle switch [Menu] AttractIcon 0 .. 7 (menu.attracticon, bar row Teaser-Anzeige with the style name) instead of AttractIcon 0 / 1 + AttractIconText - 0 off, 1 text only, 2 circle, 3 circle + red strike, 4 text inside the circle, 5 text below, 6 = 4 + strike, 7 the 0.22.39 look (default); a 0.22.39 INI is mapped once (1 + 1 -> 7, 1 + 0 -> 3) and AttractIconText removed; blink at the limit for all) - 0.22.39 (Q126 attract icon,owner idea 2026-11-13: [Menu] AttractIcon default 1 (menu.attracticon): top right in the main menu a circle that fills with the game's AttractTimer clock toward its limit (elapsed +0x10 / alarm +0x14 of the captured clock, NoAttract holding: the shadow count modulo the alarm), a play icon in the middle (crossed out while NoAttract holds), [Menu] AttractIconText seconds + counter skipped / teaser started, 3 orange blinks at each limit; read only through the 0.22.20 update slot, live re-read of both keys) - 0.22.38 (PD, owner decisions 2026-11-13: [Input] DeviceGlyphs default 1 (pad / keyboard prompts by the last used device); the co_ / fx_ filter also takes dlc_ / dlc1_ / dlc2_ in front (dlc_fx_*, dlc1_fx_*; exceptions co_rock*, *_grab_prompt kept); trigger edges with occlusion on are drawn whole and faded instead of cut by the depth test (one occlusion query pair per edge / circle, Occlusion 2 drops hidden edges), [Debug] TriggerNearest (dbg.trignear: only triggers with Lara + the n nearest) and TriggerCornerId (dbg.trigcorner: the intro id at one box corner)) - 0.22.37 (debug view P5, Paket R / Q119:labels as name / symbol / both per layer ([Debug] Style*, dbg.labelstyle; ImGui symbols + legend), room always + readable (kRoomNames, LabelRoom) and metres (DistMetres), key items layer dbg.keyitems (parts, switches, doors, grapple points, P1 part -> target lines, state from link parent +0x228 / uber node), the game's reward bit +0x3ed90 as 'collected' (LabelCollected semantics), DrawDistance + TruMenu.debugview.txt per unit, labels behind walls faded / hidden by D3D9 occlusion queries in the depth pass (Occlusion), co_ / fx_ hidden (HideCo / HideFx), live wishes: uber labels + key items of Lara's room only (RoomOnly, dbg.roomonly; then every _uo_ / _ei_ / _pt_ object of the room, readable name + node 'Kanaltor, verschlossen'), uber labels fade behind walls, readable names (kP5Readable: 'Wandschalter (einmalig)'), grey 'versteckt' for hidden non-collectibles, kChapOrder after Paket R (CP 76 return visit, 160 / 42, going_in / going_out, 7 return rows), arena.load references released at a level change; 6 byte checks) - 0.22.36 (label filter, live 2026-11-12: the name labels dbg.labels / dbg.names ask the 0.21 collected / hidden check LfNotDrawn as the collectibles layer - [Debug] LabelCollected 0 none / 1 grey 'eingesammelt'; Lara's own gear by game data (parent +0x54 = player from BirthObject, weapon-manager slots + gear list) - [Debug] LabelLaraGear 0 none / 1 shown; both live, items dbg.labelcollected / dbg.labelgear, 11 byte checks) - 0.22.35 (level chain, Q113: base-game checkpoints of the Kapitel page in walking order, loop directions + l4_temple side trip as headings) - 0.22.34 (achievements, photo.pose, group M; Q20 / I-2: [Achievements] Enabled=1 (default, read at the start) bends the 16 push immediates of the achievement binder 0x7abb80 (script 66, all bound to the empty 0x796620) to TruMenu's stubs before the generalbank binds them - 'achievement <id> <name> unlocked' once per profile (= the save folder) in TruMenu.log and TruMenu.achievements.txt, names / gamerscore of the Xbox ids f0 1 .. f15 18 (f12 - f15 unsure), repeats counted; ach.list / ach.status, page Figur group Erfolge, big window page Achievements; F2: photo.pose 1..7|next|off = Lara's screen_capture_0n (anim table 1605 - n, section checked, resident) through the game's anim request 0x444ba0 mode 0 (the uber / script play-anim path) - photo mode only; off / photo.off = the slot noted from processor +0x44 again in mode 1; J-5: chapter 1.2 heading before l1_kraken_entrance (title card from intro 696); K follow-up: ai.spawn warns when a resident kind's children are not loaded; 36 byte checks); " "0.22.33 (photo mode, arena.load, glyphs.status, group K; F1 / Q78: photo.on = the game's own FreeCamera (camera manager mode 5 through its switch 0x5edd70(mgr, 5, 0) - CAMERA_SetMode knows only 6 / 11 / 12; its own stick / mouse input and generalbank DTP 16 values) + the world pause bit 0x1000 (the camera update still runs) + the UI byte 0xcdc9a0 (the game's screenshot task hides the HUD the same way); photo.off / leaving by itself on a level change, a new player / unit, main state != 1, a cutscene, the game's pause menu or a camera the game took = mode, Lara's control, pause bit and HUD as before; refused in cutscenes / loading / pause / flight / cine.pause / another camera layer; photo.shot = shot.save clean photo_<n>; Q83: arena.load <kind> requests one of the 26 enemy kinds with the game's object request with reference 0x5c1760 (checks tracker 204 / anim pool 3000 / 3D navgraph / DRMs, at most 2 kinds), ready = object + children at status 2 and anim slots resolved (log line), ai.spawn refuses it before; arena.unload <kind>|all = STREAM_DumpObject 0x5c1790 once for its own requests; arena.enemies lists the states; Q95: glyphs.status = DeviceGlyphs, device now (pad / keyboard / mouse), last switch time, prompt counters; 37 byte checks, no new INI key); " "0.22.32 (arena, group A; Q86: ai.spawn names the LP each spawned enemy got from the game's enemy init (brain+0x2c64; tune health record by the EnemyHP step [[0xc59264]+0x3ef98]), the EnemyHP step and warns while one-hit kill [0xe91ffd] is on - the 2026-11-11 21:02 thrall 'LP 0' was that cheat, its AI ran; no name / an inexact or unloaded name = the list of the loaded AI enemy kinds with the reason; Q100: arena.mode [spot] = player object, doppelganger byte [[0xfadb58]+0x1244] and TruDlc2Player flag, fits / WARNING per spot, logged; arena.go reads the mode first - a main-game spot with the flag set loads with level.load (new game tracker clears it), a DLC 2 spot without it warns - and ends with arena.mode <spot>; Q98: spots 1d l5_valgrind CP 7329, 1e l2_puzzleroom CP 2074, 1f l4_traprooms CP 5722 - the largest open navmesh floors with a resident enemy kind; read only, no new INI key, no hook); " "0.22.31 (level navigation + puzzles, group B; Q105: the 15 unit names in no PC archive (q105_units.tsv: three base units of the level list, six container / costume / cine names, the six known DLC slots) grey and refused by level.load / level.start / unit.go / cp.jump unless a mods\\<unit>.drm exists, one 'units:' log line; page Kapitel base game in play order from the stream portals with chapter headings (callers of generalbank script 72 SetChapterUIData) and the checkpoint intros per unit - right 2x = backup + load, a checkpoint row = cp.jump <unit> <cp> force (new optional third word: cheat.flight 1;player.goto <cp> force); Q106: uber.dump prints every joint-range transition (condition 14 / 15) with the joint's live value (the engine's getter 0x4e1ef0 / 0x4e1ea0), joint.set <intro> <joint> <value>|stop drives a hinge / rail joint with the engine's limit setters 0x4d9fc0 / 0x4d9f50 / 0x4da0c0 + wake 0x4d8fd0 until the uber leaves its node or 6 s (game thread, a cheat), page Kapitel group 'Raetsel in der Naehe' lists the uber objects with their current node and joint targets, 'solve' rows run joint.set; 27 byte checks); " "0.22.30 (log dates, device glyphs, drawn guards; Q107: every TruMenu.log line starts with 'YYYY-MM-DD HH:MM:SS.mmm' and the first line of a process is the session header '=== <date time> TruMenu <version> session start (pid n) ===' (src/asi/TruLog.h, shared with the other plugins); the log page / overlay take a stamp with or without the date and show the time; Q95: [Input] DeviceGlyphs=1 (default 0) - the last used device (pad: a button, a trigger or a stick past its dead zone in the game's poll; keyboard / mouse: a key, a click, the wheel, a mouse move away from the client centre) decides the button prompts of UIText: 23 bytes of 0x5a7c20 at 0x5a7d75 call GlName - pad = the symbol of the first XInput binding (Start / Back U+1810 / U+1811 too), keyboard / mouse = the name of the first other binding, else the game's own name; 12 byte checks, 'glyphs:' log lines; Q103 rest: the quick bar's presses and every widget of the big menu (ImGuiItemFlags_Disabled) act only after 3 drawn frames since the open, else 'quick: buttons 0x.... ignored - not drawn (n frames)' / 'menu: input ignored - not drawn (n frames)'); " "0.22.29 (radial lock, Q103:[Radial] Enabled=0 also closes a ring that is still open (settings.reset) and drops its pending release / open / close requests; a release, confirm, A / click or R3 runs a ring entry only when DrawRadial drew the ring in at least 3 frames since the open, else 'radial: <what> ignored - not drawn (n frames)'; the close line names the drawn frames; no new INI key); " "0.22.28 (test packages, Q90: page Tests group 'Testpakete 11.11. (Q90)' with one closed sub-group per package A, 1 .. 9 of docs\\Testpakete-1111.md - a hint line, jump / load rows of existing items (level.start, level.load, arena.go), the existing switch rows of TruMenu.switches.txt the package toggles (kQbSwitch = the page Fixes row: TruShadowPower ShakeTuTimeStep / [Player] TuTimeStep / DoppelgangerSettings / CameraTuTimeStep, TruQoL [FrameLimit] Enabled / MaxFps, TruRockVein JumpTarget / LedgeProbe, TruMenu [Log] Save), probe rows (save.inv / save.find 5240 / 5695 / save.pending / save.waiting, adren.meter / adren.fill, phys.status, log.script / log.scriptfile) and TO TEST checks (kQbCheck tp<package>.<name>: right ok, left fail, X skip, again = open; added with test.add at the first mark, TruMenu.log 'tests: test.mark <id> <state>'); every row flagged kQfTp (test-package content: a real row of its page or deleted after the tests); no new INI key, no hook); " "0.22.27 (save probe, Q79:save.pending / save.inv / save.waiting / save.find read the save arenas - live [0xc59258] and checkpoint snapshot [0xc5925c], the restore buffer 0xc57258 with the reason a block waits (unit / object / link parent, as 0x555640 / 0x5bb160 / 0x5bb640), the inventory area +0x34c of both game blocks (15 + 8 intro ids, 6 counts), the 64-slot waiting table 0xc592a8, dead bits; read only, 32 byte checks (TruSaveProbe.h); [Log] Save=1 (default 0, live) = two TruMenu.log lines per SAVE_SaveGame / SAVE_RestoreGame through their memcpy calls 0x557127 / 0x5571a3, 5 more byte checks); " "0.22.26 (test arena, Q76:page Tests group 'Arena 1 - Kampf (Q76)' - three flat floors with resident AI enemy kinds, arena.go 1a|1b|1c = one shortcut as cp.jump (backup, unit.go, wait.unit, flight, player.goto <intro> force; 1a l7_helheim03 generator 8785, 1b l7_yggdrasil_hall02 generator 8762, 1c dlc_yggdrasil_hall02 checkpoint 10644), arena.list (one list of arenas / spots: arena 2 Museum later), flight / god mode, the ai.spawn rows, ai.remove spawned (only the instances ai.spawn made, by address + allocation stamp +0x44), fight diagnosis rows; adrenaline meter: adren.meter (CM+0x3c / max [[0xfad764]+0x2d0], CM+0x1fc bits 22 / 27, doppelganger byte [[0xfadb58]+0x1244]; read only), adren.fill (the game's meter-full 0x6e6630, body of the script native 0x777a50; cheat), adren.keep 1|0 (refill once per game frame while below the maximum and bits 22 / 27 clear; not kept); 6 byte checks); " "0.22.25 (settings.reset writes the whole TruMenu.ini: the default text is measured and built in a buffer of its size - 0.10 .. 0.22.24 kept it in a static 16384-byte buffer and wrote only the first 16383 of the 42 KB, a truncated INI; text built before the backup, write and close checked, the answer names bytes and keys; other table texts: TruMenu.log lines up to 2047 characters (was 511, light.cut lines were cut), [Quick] Closed 1023 characters (was 383, too short for every group) and like [Debug] CheckpointHide only whole keys / ids, settings.show ends with the count of the keys it could not hold); " "0.22.24 (fall watch + fall net, Q19 hall02 fall out of the world: TruMenu.log lines at LogLevel 1 for Lara's chart records 742 / 743 / 1068 / 1080 and states 1008 / 1015 with position, a watchdog line every second while in the fall record 1068, safe-ground ring additions, rate-limited; [Rescue] FallNet=1 (default 0, live) puts Lara back on the newest safe-ground sample when she is more than 3 s in 1068 and more than 3000 units below it - player.unstuck's teleport, at most 3 per fall, never in menus / cinematics; 2 byte checks); " "0.22.23 (switches file limit:TruMenu.switches.txt holds up to 512 switch lines (was 160; 24 groups as before), file format unchanged; switch lines past 512 and group lines past 24 are not shown and named in one TruMenu.log line each with the count and the first line number, sw.reload / the bar head say so; the quick bar page Fixes (128 rows) names the rows of an open group it cannot hold instead of cutting them silently - the long menu section Fixes shows every row); " "0.22.22 (teaser timer line, live 2026-11-10: the line follows the bar language [Quick] Language as every overlay; it shows the game clock (the dt the clock got since its (re)start) next to TruMenu's wall clock since that (re)start, and 'Pause-Bit aktiv (halbe Zeit)' / 'Pause bit set (half time)' while the frame time [0xe7f188] is the fixed 0.5 of the pause bit [0xe7f0b4] & 0x10000000 - read only, 4 byte checks); " "0.22.21 (teaser timer: menu.attracttimer 1|0 / [Menu] AttractTimerShow, bar row 'Teaser-Uhr anzeigen' in Spiel-Einstellungen / Hauptmen\303\274 - while in the front end (main state 6 / 10) a line in a screen corner ([Menu] AttractTimerPosition, default tr) shows the AttractTimer clock: elapsed / alarm, or while menu.noattract holds it a shadow count (the dt the game hands the clock update while the clock runs, back to 0 when the game restarts the clock) that flashes 1 s and writes one TruMenu.log line each time it passes the alarm (40 s, then every 40 s with repeat) - the moment the teaser would have started; with menu.noattract off it flashes when the real clock fires; read only through the same update slot 0x84584c, no behaviour change, no new byte checks); " "0.22.20 (main menu attract video off: menu.noattract 1|0 / [Menu] NoAttract, bar row 'Hauptmen\303\274-Video aus' in Spiel-Einstellungen / Hauptmen\303\274 - the clock f11 native 0x795cc0 (called only by the AttractTimer script 60) hands TruMenu the AttractTimer clock, the clock update slot 0x84584c holds its elapsed time at 0 in the front end (main state 6 / 10), so the alarm never fires: no stopTitleMusic, no StopMovie, no teaser; every other clock and the menu background stay the game's; 13 byte checks); " "0.22.19 (pages remembered:the quick bar opens on the page it showed last ([Quick] LastPage, written 1 s after a page change or at the close; a name that is no page any more = page 1, logged) and the big window with the pages that were open ([Menu] OpenPages, written when a page is opened / closed), also after a restart, RememberPage=0 = off; power.infinite 1|0 = TruShadowPower 0.23 [Meter] Infinite written into TruShadowPower.ini (only that line, a missing key added), bar row 'Kraft unendlich' in Rettung / Cheats, greyed with the reason while TruShadowPower.asi 0.23+ is not loaded or its INI is missing); " "0.22.18 (volumes / mouse saved through the game's own write 0x4796b0 (0x478010 only refreshes their mirrors); every bar section a collapsible group, sub-groups, rows indented per level with a guide line, the long menu's groups collapsible; frame stepping: View held = step mode (each RB tap one frame), RB + View held 0.4 s = [Settings] StepRate frames per s; subtitles top / free height and left / right with a margin (origin x of 0x477180 moved per line); voice.lang = speech language only (MultiFS mask 0x472d80 while 0x472be0 is free), voice.full = speech now + registry Language; media list fallback, media.music.inlevels, music volume 0 warning row; goo drip candidate columns (bone 0, old position, physics body); light.demote = a 4th shadow caster takes a free plain place (hooks 0x504e06 / 0x504341); bar settings written back to TruMenu.ini (quick.lang, camera, mute, light switches); defaults: big menu window and ring off, quick bar on, bar language English; TruShadowPower [Meter] Infinite row); " "0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
+const char *const kVersion = "TruMenu 0.22.52 (reverb mark + DSP graph + sonar shader fade + area colours + joint row fix, owner wishes 2026-11-14 late evening: the whole FMOD DSP graph walked (live 22:02: 189 units - one SFX Reverb, two ParamEQ inserts of groups 58 / 59, stream codecs, 162 group heads; static: createDSPByType only 0x586fda / 0x5839f3 (oscillator, played as its own channel) / 0x5876df (group / node effects = ChannelGroup::addDSP inserts behind the mute), DSP::addInput only 0x58223b / 0x584188) - the reverb send is the only path past FMOD's mute; a reverb mark per line in box and monitor (arcs = reverb audible, struck = muted by ReverbFollowsMute / ReverbOff, dot = no send), monitor rows for the graph and every effect, a muted voice's send zeroed at once (W10Sweep, 50 ms) and the voice update rate counted; [Sonar] FadeFar drives the real dimming = the face shader lib 192 of materials 3348 / 3349 (1/d falloff floor c110.x 0.5, fade to black c108.w .. c109.w 200 .. 600 m; 6 byte checks), fog off for every value != 0; [Sonar] TintOthers 2 = a muted colour per area with a legend in the sonar view state; page Kapitel Raetsel: no drive for an open-ended range on a free hinge (motion detector), the range cut to the joint's limits, our lock taken back after a node change) - 0.22.51 (sonar view + base PDA + X default + DLC start from a level + reverb follows mute, owner wishes 2026-11-14 evening: the game's SFX reverb (holder [0xccde98]) gets a send from every pool voice that FMOD's mute never reaches - 'Hall folgt Stumm' [Sound] ReverbFollowsMute = call redirects 0x591591 / 0x5841bf -> W9SendStub (a muted voice sends 0), 'Hall aus' [Sound] ReverbOff = reverb -> master setMix 0 (old level back on off), audible = not paused and (dry > 0 or send > 0 with the reverb out > 0) in box / monitor, a reverb row, 11 more byte checks; 'Sonar: Abblenden Ferne' [Sonar] FadeFar = the sonar view's fog (0 game: near = far = 65536, n m = fog n/2 .. n, -1 aus; call redirects 0x6e4d94 / 0x6e4bf9 -> S5FogStub); 'Bereich anzeigen' = one unit of the sonar's own list drawn (0x6e42ac -> S5UnitStub, no load, no camera move); 'andere Bereiche einfaerben' [Sonar] TintOthers = units but Lara's drawn with an amber draw colour [0xee03bc] for their call; sonar.why + the open line log the view centre / axis and per unit the cut plane of 0x6dfa60 ((v0 - centre) . axis < -4000); 'Shadow-PDA durch Basis-PDA ersetzen' [PDA] ShadowPdaAsBasePda = g_pda script 3347 f1 word 04000001 -> 04000000 (ScriptSection hash map 0x8a6ed0, only the DLC g_pda, only while the PDA is closed); X on a value row = its default, footer 'X: Standard'; Kapitel DLC rows in a level = the pause menu's DLC start (RegisterAcceptChanges case 8 as the title update: f27(unit, rule, 0, 1), f7, f19); command line: level.start suggests every unit, level.load in the main menu suggests level.start; 22 byte checks) - 0.22.50 (sound log readable + FMOD channels + source hooks, chapters from the main menu, owner wishes 2026-11-14: the bottom-right sound box per line with an on / off box from FMOD's own mute bit (ChannelI +0x74 bit 3), the group as text, the source, a loop mark (FMOD mode 0x2 / 0x4), repetitions collapsed (same wave + source = one line xn, newest on top), a 'laeuft gerade' block of the looping channels; filters per kind (Lara, enemies, world, objects, PDA / UI, speech, music), only audible, collapse, max distance ([Sound] Log*, live); quick hearing per kind mute / solo (snd.catmute / snd.catsolo = snd.mute / snd.solo cat:<kind>: whole groups + per channel + the FMOD channels outside the pool), newest sound solo, everything back; two code redirects V1 0x591351 (the wave node's Play call: voice -> emitter of the node) and E1 0x5b99fc (6 bytes after the untouched create call of the anim event, TruTrace keys on it: emitter -> instance), [Sound] SourceHooks; the owner list walk at most once a second and only while shown, W6EmitterOwner gone; the monitor counts every used FMOD channel (SystemI +0x150), shows FMOD's mute / pause, 'Fremdkanal (DSP)' rows and the music slots; ONE 'Ambient aus' (media.muteambient = snd.ambmute: groups 15 .. 24 + the '_amb_' beds, kept) and ONE 'Musik aus'; page Kapitel from the main menu = the game's mission start (level.start, DLC starts as the DLC menu), the DLC start rows refused in a level (level.load keeps Lara's costume), cp.jump from the main menu; 27 byte checks) - 0.22.49 (sonar all floors + map info, adrenaline options, owner wishes 2026-11-14:[Sonar] AllFloors with FullMap = the frame 0x6e4130 also draws the map units of other floors the sonar loaded itself (0x6e429b je -> nop nop; the game's open path loads the floor's units and their direct portal neighbours - no load added), item sonar.allfloors 'Alle verbundenen Bereiche'; info row sonar.unitmap 'Karte dieser Unit' (real N faces / placeholder only / no file, read from the sonar's unit list while it is open) and one log line per sonar open (floor, radius, view distance, every map unit with mask / state / faces); [Sonar] TriangleCap with FullMap (default 300000; the imm32 of 0x6dfa69 = the per-frame budget 93572 - only a counter: the triangles are flushed in batches of 2000 into the device's growing vertex pool); 3 more byte checks (16); adren.keep renamed 'Nach Einsatz auffuellen' (it refills only outside the mode), adren.stayfull 'Adrenalin bleibt voll' = TruShadowCombat [Adrenaline] DrainPercent / DrainModePercent 0 (old values kept in TruMenu.ini, back when off); ModeWithoutTarget / StrikeWithoutButton options (no '(Test)'), AssistPointer 'Zielhilfe Kreis', a DLC 2 note; snd.sonar log line printed the wave list's address as SonarMute) - 0.22.48 (adrenaline at Lara + sonar full map, owner wishes 2026-11-14: page Figur group Adrenalin (Lara) owns adren.meter / adren.fill / adren.keep and the TruShadowCombat [Adrenaline] switches (FillPercent, DrainPercent, DrainModePercent, StrikeWithoutFullMeter, AssistPointer, ModeWithoutTarget, StrikeWithoutButton, Log), page Tests keeps copies; the switches rows ModeWithoutTarget / StrikeWithoutButton live (TruShadowCombat M15ReadSwitches, once a second); teaser display default 12 (small circle + count badge); page Kapitel without '(debug)', the unused slots named readable; Sonar komplett [Sonar] FullMap = every vertex counts as revealed in the draw 0x6e3a00 (0x6e3b25 / 0x6e3b59 / 0x6e3ba2, display only, no save data), HidePlaceholder = call stub at 0x6e3ab0 skips the 100-face / 56-vertex MAP mesh, FloorMarkers = 0x6e40c6, all live, the game's bytes when off, one line when the triangle cap [0xee03ec] is hit; 12 byte checks kSoChecks) - 0.22.47 (sound monitor, owner wishes 2026-11-14: the wave id of a voice from the wave entry +4 (0x591348 - 0.20.1 .. 0.22.46 read every voice as 'Stream') and the emitter through the node's params object +0x74 (0x5906e0); bar group Ton-Monitor (live) and Paket B: every voice playing / paused with name, wave / section, group name, volume, 2D / 3D, distance, state and source (object #intro / UI / music / stream), the last [Sound] HistoryMax starts, the active rules, right = mute w<id> / e<hex>; snd.monitor / snd.history to the log; the bottom-right box as a log ([Sound] OverlayStyle 1: newest on top, colour + ImGui-drawn icon per kind, fading); Sonar-Ton aus [Sound] SonarMute 1 = waves 914 / 915 / 916 of g_pda.drm per channel (2 = the whole group 57 incl. Lara's hints in child group 70), kept in TruMenu.ini; the list / switches also run from the Present hook while the game polls no pad (main menu); 6 byte checks) - 0.22.46 (arena from the main menu,owner live 2026-11-14 12:07 'arena.go 1a refused: level change pending (GameTracker+0xb9 = 1)': in the front end +0xb9 = 1 is a request nobody serves - only main state 1 serves one (0x5e0050 -> 0x5dab40), the next level start clears it (0x5de864), here TruMenu's own level.load of the unit.go step; LevelChangePending ignores it in main state 10, level.load is refused in the front end (main state 6 / 10), arena.go from the main menu starts the unit through the game's mission start (level.start <unit> 0 = uigamedata f22, f27(unit, 0, 0, 1), stdscreenmgr f19 + f7; new game data, fresh player tracker = main-game mode), waits for it, places Lara, cheat.onehitkill 0, arena.mode <spot> with unit + one-hit kill byte; refused outside the main menu itself (front-end state 0xfae8da != 3), during a one-shot movie or a cutscene, without a level; level.start [0|1] = f27's selection argument; 'level up' log line of the shortcut runner; 10 byte checks kFeChecks) - 0.22.45 (W6 sound switches,owner live notes 2026-11-13: snd.mute <target> [1|0] - single waves / SoundPlex sections / emitters per channel through FMOD's own ChannelI::setMute 0x7c92b5 behind the game's handle validate 0x7c7e5a, sound groups and ambience (group 15 + the '_amb_' srmusic beds) through ChannelGroupI::setMute, music tracks by name through the game's srmusic stop; snd.solo, snd.mutes, snd.ambmute, snd.now (voices with emitter + SoundPlex section), music.stop / music.next / music.mute; one 'snd.wave <id> START' log line per start of a watched wave ([Sound] WaveLog / WaveIds 10 / WaveLogMax) with unit, emitter (params - 0x14, vtable 0x851240), SoundPlex section and the object whose sound list [inst+0x248] holds it; 15 byte checks) - 0.22.44 (W2 order, owner live notes 2026-11-13: page Tests by the test guide packages A - F of 14.11. (group tg_1411, sub-groups tg_a .. tg_f with the items each package needs, checks tg<A-F>.<name>), the 11.11. Q90 packages, test spots, light / depth diagnosis and hall02 rows in the closed group Archiv / Alt (nothing deleted); Barrierefreiheit: no leading spaces, Arachnophobie in its own sub-group, the planned rows (no item) in the closed group Geplant; planned rows without the 3-space prefix; an INI without [Menu] Load (written before 0.22.18) reads Enabled the old way = Load, the big window stays off; row DeviceGlyphs on page Spiel-Einstellungen / Steuerung; kQbViewMax 256) - 0.22.43 (W5 markup, owner live notes 2026-11-13:draw.markup puts object markup (box +0xc owner) through the owner's bone matrix like the engine (0x5be360 / 0x49ba20, only with owner +0x2d8) - before every object ledge was drawn around the world origin (the dungeon 'coil' 21:53 = dlc1_uo_pillar_of_doom ledges); boxes the engine's markup query skips (record +0x32, disabled bit 31, owner flags, stream unit +5) are not drawn; label 'type #id' (DE / EN) within 15 m of Lara, nearest 24, one colour per type; dbg.roomonly and the occlusion fading apply to markup too; bar rows Markup / Nur Kanten first in their group; 6 byte checks) - 0.22.42 (W3 debug view, owner live notes 2026-11-13: RoomOnly keeps an object of another unit when its own stream unit +0xe0 is Lara's or it is within [Debug] RoomNear 3000 (dlc_level1_start holds copies of the dlc_caverns bridge objects), each drop / keep logged once; DistMetres default 1; labels within [Debug] OcclNear 600 and Lara's own never fade, test point 1 m above the origin; labels de-cluttered - one label per instance and frame (uber labels join it with their state line), same object x n, LabelStack 3, LabelCellMax 5 per screen cell; [Debug] HideEmptyPots 1 - no labels at plain / empty jars; teaser icon only in the main menu (front-end state 3, no one-shot Bink movie - not in the credits)) - 0.22.41 (Q126c compact attract styles, owner 2026-11-14 after trying 0.22.40: [Menu] AttractIcon 8 .. 16 appended, all without a box - 8 / 9 small circle without / with the red strike, 10 / 11 / 12 small circle + only the counter beside / below / as a badge on its edge, 13 terse 12s . 3, 14 terse 12/40 . x3, 15 / 16 only the counter as a word / with a skip arrow; no time next to a circle; blink at the limit for all; 0 .. 7 unchanged, default 7) - 0.22.40 (Q126b attract display styles, owner 2026-11-13: one cycle switch [Menu] AttractIcon 0 .. 7 (menu.attracticon, bar row Teaser-Anzeige with the style name) instead of AttractIcon 0 / 1 + AttractIconText - 0 off, 1 text only, 2 circle, 3 circle + red strike, 4 text inside the circle, 5 text below, 6 = 4 + strike, 7 the 0.22.39 look (default); a 0.22.39 INI is mapped once (1 + 1 -> 7, 1 + 0 -> 3) and AttractIconText removed; blink at the limit for all) - 0.22.39 (Q126 attract icon,owner idea 2026-11-13: [Menu] AttractIcon default 1 (menu.attracticon): top right in the main menu a circle that fills with the game's AttractTimer clock toward its limit (elapsed +0x10 / alarm +0x14 of the captured clock, NoAttract holding: the shadow count modulo the alarm), a play icon in the middle (crossed out while NoAttract holds), [Menu] AttractIconText seconds + counter skipped / teaser started, 3 orange blinks at each limit; read only through the 0.22.20 update slot, live re-read of both keys) - 0.22.38 (PD, owner decisions 2026-11-13: [Input] DeviceGlyphs default 1 (pad / keyboard prompts by the last used device); the co_ / fx_ filter also takes dlc_ / dlc1_ / dlc2_ in front (dlc_fx_*, dlc1_fx_*; exceptions co_rock*, *_grab_prompt kept); trigger edges with occlusion on are drawn whole and faded instead of cut by the depth test (one occlusion query pair per edge / circle, Occlusion 2 drops hidden edges), [Debug] TriggerNearest (dbg.trignear: only triggers with Lara + the n nearest) and TriggerCornerId (dbg.trigcorner: the intro id at one box corner)) - 0.22.37 (debug view P5, Paket R / Q119:labels as name / symbol / both per layer ([Debug] Style*, dbg.labelstyle; ImGui symbols + legend), room always + readable (kRoomNames, LabelRoom) and metres (DistMetres), key items layer dbg.keyitems (parts, switches, doors, grapple points, P1 part -> target lines, state from link parent +0x228 / uber node), the game's reward bit +0x3ed90 as 'collected' (LabelCollected semantics), DrawDistance + TruMenu.debugview.txt per unit, labels behind walls faded / hidden by D3D9 occlusion queries in the depth pass (Occlusion), co_ / fx_ hidden (HideCo / HideFx), live wishes: uber labels + key items of Lara's room only (RoomOnly, dbg.roomonly; then every _uo_ / _ei_ / _pt_ object of the room, readable name + node 'Kanaltor, verschlossen'), uber labels fade behind walls, readable names (kP5Readable: 'Wandschalter (einmalig)'), grey 'versteckt' for hidden non-collectibles, kChapOrder after Paket R (CP 76 return visit, 160 / 42, going_in / going_out, 7 return rows), arena.load references released at a level change; 6 byte checks) - 0.22.36 (label filter, live 2026-11-12: the name labels dbg.labels / dbg.names ask the 0.21 collected / hidden check LfNotDrawn as the collectibles layer - [Debug] LabelCollected 0 none / 1 grey 'eingesammelt'; Lara's own gear by game data (parent +0x54 = player from BirthObject, weapon-manager slots + gear list) - [Debug] LabelLaraGear 0 none / 1 shown; both live, items dbg.labelcollected / dbg.labelgear, 11 byte checks) - 0.22.35 (level chain, Q113: base-game checkpoints of the Kapitel page in walking order, loop directions + l4_temple side trip as headings) - 0.22.34 (achievements, photo.pose, group M; Q20 / I-2: [Achievements] Enabled=1 (default, read at the start) bends the 16 push immediates of the achievement binder 0x7abb80 (script 66, all bound to the empty 0x796620) to TruMenu's stubs before the generalbank binds them - 'achievement <id> <name> unlocked' once per profile (= the save folder) in TruMenu.log and TruMenu.achievements.txt, names / gamerscore of the Xbox ids f0 1 .. f15 18 (f12 - f15 unsure), repeats counted; ach.list / ach.status, page Figur group Erfolge, big window page Achievements; F2: photo.pose 1..7|next|off = Lara's screen_capture_0n (anim table 1605 - n, section checked, resident) through the game's anim request 0x444ba0 mode 0 (the uber / script play-anim path) - photo mode only; off / photo.off = the slot noted from processor +0x44 again in mode 1; J-5: chapter 1.2 heading before l1_kraken_entrance (title card from intro 696); K follow-up: ai.spawn warns when a resident kind's children are not loaded; 36 byte checks); " "0.22.33 (photo mode, arena.load, glyphs.status, group K; F1 / Q78: photo.on = the game's own FreeCamera (camera manager mode 5 through its switch 0x5edd70(mgr, 5, 0) - CAMERA_SetMode knows only 6 / 11 / 12; its own stick / mouse input and generalbank DTP 16 values) + the world pause bit 0x1000 (the camera update still runs) + the UI byte 0xcdc9a0 (the game's screenshot task hides the HUD the same way); photo.off / leaving by itself on a level change, a new player / unit, main state != 1, a cutscene, the game's pause menu or a camera the game took = mode, Lara's control, pause bit and HUD as before; refused in cutscenes / loading / pause / flight / cine.pause / another camera layer; photo.shot = shot.save clean photo_<n>; Q83: arena.load <kind> requests one of the 26 enemy kinds with the game's object request with reference 0x5c1760 (checks tracker 204 / anim pool 3000 / 3D navgraph / DRMs, at most 2 kinds), ready = object + children at status 2 and anim slots resolved (log line), ai.spawn refuses it before; arena.unload <kind>|all = STREAM_DumpObject 0x5c1790 once for its own requests; arena.enemies lists the states; Q95: glyphs.status = DeviceGlyphs, device now (pad / keyboard / mouse), last switch time, prompt counters; 37 byte checks, no new INI key); " "0.22.32 (arena, group A; Q86: ai.spawn names the LP each spawned enemy got from the game's enemy init (brain+0x2c64; tune health record by the EnemyHP step [[0xc59264]+0x3ef98]), the EnemyHP step and warns while one-hit kill [0xe91ffd] is on - the 2026-11-11 21:02 thrall 'LP 0' was that cheat, its AI ran; no name / an inexact or unloaded name = the list of the loaded AI enemy kinds with the reason; Q100: arena.mode [spot] = player object, doppelganger byte [[0xfadb58]+0x1244] and TruDlc2Player flag, fits / WARNING per spot, logged; arena.go reads the mode first - a main-game spot with the flag set loads with level.load (new game tracker clears it), a DLC 2 spot without it warns - and ends with arena.mode <spot>; Q98: spots 1d l5_valgrind CP 7329, 1e l2_puzzleroom CP 2074, 1f l4_traprooms CP 5722 - the largest open navmesh floors with a resident enemy kind; read only, no new INI key, no hook); " "0.22.31 (level navigation + puzzles, group B; Q105: the 15 unit names in no PC archive (q105_units.tsv: three base units of the level list, six container / costume / cine names, the six known DLC slots) grey and refused by level.load / level.start / unit.go / cp.jump unless a mods\\<unit>.drm exists, one 'units:' log line; page Kapitel base game in play order from the stream portals with chapter headings (callers of generalbank script 72 SetChapterUIData) and the checkpoint intros per unit - right 2x = backup + load, a checkpoint row = cp.jump <unit> <cp> force (new optional third word: cheat.flight 1;player.goto <cp> force); Q106: uber.dump prints every joint-range transition (condition 14 / 15) with the joint's live value (the engine's getter 0x4e1ef0 / 0x4e1ea0), joint.set <intro> <joint> <value>|stop drives a hinge / rail joint with the engine's limit setters 0x4d9fc0 / 0x4d9f50 / 0x4da0c0 + wake 0x4d8fd0 until the uber leaves its node or 6 s (game thread, a cheat), page Kapitel group 'Raetsel in der Naehe' lists the uber objects with their current node and joint targets, 'solve' rows run joint.set; 27 byte checks); " "0.22.30 (log dates, device glyphs, drawn guards; Q107: every TruMenu.log line starts with 'YYYY-MM-DD HH:MM:SS.mmm' and the first line of a process is the session header '=== <date time> TruMenu <version> session start (pid n) ===' (src/asi/TruLog.h, shared with the other plugins); the log page / overlay take a stamp with or without the date and show the time; Q95: [Input] DeviceGlyphs=1 (default 0) - the last used device (pad: a button, a trigger or a stick past its dead zone in the game's poll; keyboard / mouse: a key, a click, the wheel, a mouse move away from the client centre) decides the button prompts of UIText: 23 bytes of 0x5a7c20 at 0x5a7d75 call GlName - pad = the symbol of the first XInput binding (Start / Back U+1810 / U+1811 too), keyboard / mouse = the name of the first other binding, else the game's own name; 12 byte checks, 'glyphs:' log lines; Q103 rest: the quick bar's presses and every widget of the big menu (ImGuiItemFlags_Disabled) act only after 3 drawn frames since the open, else 'quick: buttons 0x.... ignored - not drawn (n frames)' / 'menu: input ignored - not drawn (n frames)'); " "0.22.29 (radial lock, Q103:[Radial] Enabled=0 also closes a ring that is still open (settings.reset) and drops its pending release / open / close requests; a release, confirm, A / click or R3 runs a ring entry only when DrawRadial drew the ring in at least 3 frames since the open, else 'radial: <what> ignored - not drawn (n frames)'; the close line names the drawn frames; no new INI key); " "0.22.28 (test packages, Q90: page Tests group 'Testpakete 11.11. (Q90)' with one closed sub-group per package A, 1 .. 9 of docs\\Testpakete-1111.md - a hint line, jump / load rows of existing items (level.start, level.load, arena.go), the existing switch rows of TruMenu.switches.txt the package toggles (kQbSwitch = the page Fixes row: TruShadowPower ShakeTuTimeStep / [Player] TuTimeStep / DoppelgangerSettings / CameraTuTimeStep, TruQoL [FrameLimit] Enabled / MaxFps, TruRockVein JumpTarget / LedgeProbe, TruMenu [Log] Save), probe rows (save.inv / save.find 5240 / 5695 / save.pending / save.waiting, adren.meter / adren.fill, phys.status, log.script / log.scriptfile) and TO TEST checks (kQbCheck tp<package>.<name>: right ok, left fail, X skip, again = open; added with test.add at the first mark, TruMenu.log 'tests: test.mark <id> <state>'); every row flagged kQfTp (test-package content: a real row of its page or deleted after the tests); no new INI key, no hook); " "0.22.27 (save probe, Q79:save.pending / save.inv / save.waiting / save.find read the save arenas - live [0xc59258] and checkpoint snapshot [0xc5925c], the restore buffer 0xc57258 with the reason a block waits (unit / object / link parent, as 0x555640 / 0x5bb160 / 0x5bb640), the inventory area +0x34c of both game blocks (15 + 8 intro ids, 6 counts), the 64-slot waiting table 0xc592a8, dead bits; read only, 32 byte checks (TruSaveProbe.h); [Log] Save=1 (default 0, live) = two TruMenu.log lines per SAVE_SaveGame / SAVE_RestoreGame through their memcpy calls 0x557127 / 0x5571a3, 5 more byte checks); " "0.22.26 (test arena, Q76:page Tests group 'Arena 1 - Kampf (Q76)' - three flat floors with resident AI enemy kinds, arena.go 1a|1b|1c = one shortcut as cp.jump (backup, unit.go, wait.unit, flight, player.goto <intro> force; 1a l7_helheim03 generator 8785, 1b l7_yggdrasil_hall02 generator 8762, 1c dlc_yggdrasil_hall02 checkpoint 10644), arena.list (one list of arenas / spots: arena 2 Museum later), flight / god mode, the ai.spawn rows, ai.remove spawned (only the instances ai.spawn made, by address + allocation stamp +0x44), fight diagnosis rows; adrenaline meter: adren.meter (CM+0x3c / max [[0xfad764]+0x2d0], CM+0x1fc bits 22 / 27, doppelganger byte [[0xfadb58]+0x1244]; read only), adren.fill (the game's meter-full 0x6e6630, body of the script native 0x777a50; cheat), adren.keep 1|0 (refill once per game frame while below the maximum and bits 22 / 27 clear; not kept); 6 byte checks); " "0.22.25 (settings.reset writes the whole TruMenu.ini: the default text is measured and built in a buffer of its size - 0.10 .. 0.22.24 kept it in a static 16384-byte buffer and wrote only the first 16383 of the 42 KB, a truncated INI; text built before the backup, write and close checked, the answer names bytes and keys; other table texts: TruMenu.log lines up to 2047 characters (was 511, light.cut lines were cut), [Quick] Closed 1023 characters (was 383, too short for every group) and like [Debug] CheckpointHide only whole keys / ids, settings.show ends with the count of the keys it could not hold); " "0.22.24 (fall watch + fall net, Q19 hall02 fall out of the world: TruMenu.log lines at LogLevel 1 for Lara's chart records 742 / 743 / 1068 / 1080 and states 1008 / 1015 with position, a watchdog line every second while in the fall record 1068, safe-ground ring additions, rate-limited; [Rescue] FallNet=1 (default 0, live) puts Lara back on the newest safe-ground sample when she is more than 3 s in 1068 and more than 3000 units below it - player.unstuck's teleport, at most 3 per fall, never in menus / cinematics; 2 byte checks); " "0.22.23 (switches file limit:TruMenu.switches.txt holds up to 512 switch lines (was 160; 24 groups as before), file format unchanged; switch lines past 512 and group lines past 24 are not shown and named in one TruMenu.log line each with the count and the first line number, sw.reload / the bar head say so; the quick bar page Fixes (128 rows) names the rows of an open group it cannot hold instead of cutting them silently - the long menu section Fixes shows every row); " "0.22.22 (teaser timer line, live 2026-11-10: the line follows the bar language [Quick] Language as every overlay; it shows the game clock (the dt the clock got since its (re)start) next to TruMenu's wall clock since that (re)start, and 'Pause-Bit aktiv (halbe Zeit)' / 'Pause bit set (half time)' while the frame time [0xe7f188] is the fixed 0.5 of the pause bit [0xe7f0b4] & 0x10000000 - read only, 4 byte checks); " "0.22.21 (teaser timer: menu.attracttimer 1|0 / [Menu] AttractTimerShow, bar row 'Teaser-Uhr anzeigen' in Spiel-Einstellungen / Hauptmen\303\274 - while in the front end (main state 6 / 10) a line in a screen corner ([Menu] AttractTimerPosition, default tr) shows the AttractTimer clock: elapsed / alarm, or while menu.noattract holds it a shadow count (the dt the game hands the clock update while the clock runs, back to 0 when the game restarts the clock) that flashes 1 s and writes one TruMenu.log line each time it passes the alarm (40 s, then every 40 s with repeat) - the moment the teaser would have started; with menu.noattract off it flashes when the real clock fires; read only through the same update slot 0x84584c, no behaviour change, no new byte checks); " "0.22.20 (main menu attract video off: menu.noattract 1|0 / [Menu] NoAttract, bar row 'Hauptmen\303\274-Video aus' in Spiel-Einstellungen / Hauptmen\303\274 - the clock f11 native 0x795cc0 (called only by the AttractTimer script 60) hands TruMenu the AttractTimer clock, the clock update slot 0x84584c holds its elapsed time at 0 in the front end (main state 6 / 10), so the alarm never fires: no stopTitleMusic, no StopMovie, no teaser; every other clock and the menu background stay the game's; 13 byte checks); " "0.22.19 (pages remembered:the quick bar opens on the page it showed last ([Quick] LastPage, written 1 s after a page change or at the close; a name that is no page any more = page 1, logged) and the big window with the pages that were open ([Menu] OpenPages, written when a page is opened / closed), also after a restart, RememberPage=0 = off; power.infinite 1|0 = TruShadowPower 0.23 [Meter] Infinite written into TruShadowPower.ini (only that line, a missing key added), bar row 'Kraft unendlich' in Rettung / Cheats, greyed with the reason while TruShadowPower.asi 0.23+ is not loaded or its INI is missing); " "0.22.18 (volumes / mouse saved through the game's own write 0x4796b0 (0x478010 only refreshes their mirrors); every bar section a collapsible group, sub-groups, rows indented per level with a guide line, the long menu's groups collapsible; frame stepping: View held = step mode (each RB tap one frame), RB + View held 0.4 s = [Settings] StepRate frames per s; subtitles top / free height and left / right with a margin (origin x of 0x477180 moved per line); voice.lang = speech language only (MultiFS mask 0x472d80 while 0x472be0 is free), voice.full = speech now + registry Language; media list fallback, media.music.inlevels, music volume 0 warning row; goo drip candidate columns (bone 0, old position, physics body); light.demote = a 4th shadow caster takes a free plain place (hooks 0x504e06 / 0x504341); bar settings written back to TruMenu.ini (quick.lang, camera, mute, light switches); defaults: big menu window and ring off, quick bar on, bar language English; TruShadowPower [Meter] Infinite row); " "0.22.17 (subtitle fallback: a cutscene subtitle record without the wanted language id goes to the reader 0x4538d0 with its English entry (id 0) as that id - only while no record of the same stream (cinematic handler, new on a handler change or when the stream time [s+0x384] goes back) carried the wanted id, so the DLC cinematics (ids 0 1 2 3 4 11) get English lines in Russian (9) and the base cutscenes with their own per-language cue times never mix; [Settings] SubtitleFallback=1, 0 = the game's; sub.lang rewrite and TruMenu's parse use the same rule; SbName(9)); " "0.22.16 (bar page Spiel-Einstellungen: the game's own options live - volumes, inversion, vibration, combat mode, mouse through the option setter 0x5d5100 and the settings save 0x478010 2 s after the last change; subtitle look (show, size, bar, bar opacity, colour, height) through the draw parameters of 0x583e20, kept in TruMenu.ini [Settings]; live graphics (fullscreen effects, depth of field, shadows, water, reflections, volumetric, filter, aspect) through ApplySettings 0x522a10 on a copy of the active block, PadHook only; gfx.save; gfx.next = registry values for the next start; D3D-reset settings as greyed rows; sub.lang cycles -1 / 0..4 / 11 (Nederlands) and a rewritten line is found again (U3); bar reorganised - Rettung / Cheats, Figur with the doppelganger switch groups, Gegner (KI), Render, Zeit / Ablauf, Licht (Diagnose) group; 29 byte checks); " "0.22.15 (aim.trace 1|0: the lock-on path per change into TruAim.log - aim input RT action 33 / LT action 35 held (+0x630 / +0x690 bit 2 of the action records; LT = pad code 4, RT = 5), tuning bytes [0xfad764]+0x294 / +0x27c (the LT / RT aim timer values), game gates 0x8ab4e6 / 0xe7f144 / 0xe7f143, weapon slot [[P+0x500]+0x134], aim timers P+0x588 / +0x58c / +0x798 / +0x788, CM+0x1fc bits 9 / 10 / 11 / 18 / 19 / 20 / 21, Lara's chart records, targeter 0 flags / target / candidates per filter group or rejected with distance and camera angle, the nearest enemy and a why code; aim.why info item: the first blocking step for the nearest enemy in plain words; read only, 25 byte checks);" "0.22.14 (sub.lang switches the subtitle lines on screen at once, also in a cutscene held by cine.pause: the call 0x4574ec of the cinematic handler update copies each subtitle record (every language, '<id>\\r<text>\\r...') into TruMenu's ring of the last 2 records before the reader 0x4538d0 runs, the call 0x453a17 notes the lines the reader hands to the box; sub.lang <v> then picks the new language from the stored records as the reader does and rewrites the box lines 0xccdec0 +0 / +0x100 - clock and floats stay, a line of no stored record (Bink movie) stays and is logged); " "0.22.13 (cutscene pad combos: LB + View / RB + View fire on release and only when no third combo button joined while they were held, the photo combo LB + RB + View at once; cine.pause also holds the subtitle line clock [0xccdec0+0x208] - the subtitle draw 0x583e20 counts it down by the scaled frame time 0xe7f188, its disp32 at 0x583f24 points to TruMenu's own value while a cutscene is held; sub.lang calls the game's settings save 0x478010 (the registry write of the shutdown path 0x5df930) so the language survives a restart; ring.bits info item, an enemy panel line and fight.trace columns for the combat reticle request (CM+0x1fc bits 9 / 10 / 11 / 21, HUD group 12 of 0xfae924, style 0xfae8ac, reticle +0x40); fight.trace goo drip columns (sources 10706 / 10707: uber node / time; copies 929 / 942: count, nearest position / dz / iflags / node) and Lara's LP drop per sample; enemy panel 'Kampf-Spur: an (n Zeilen)'); 0.22.12 (fight.trace also writes a Lara-only line (enemy columns -) when Lara's chart record of machine 1 or 2 or her machine-1 state ids change - before only machine 1's record counted; quick bar: bool rows whose value starts with the id (fight.trace, combo.trace) show an / aus again instead of always aus, action rows of value items show the value (sub.lang: subtitle language now)); 0.22.11 (Xbox comparison, PC side: fight.trace 1|0 writes TruFight.log in TruXenia's TSV column layout plus PC columns - enemies within 6000 units on change (LP, stamina, states, requested state, target, distance, attack slot, MeleeAttack record, last hit), Lara LP / chart records / state ids / position, shadow meter, power mode, world / player time scale, the meter's 7 time-scale request slots and the selector's choice, the last time-ramp native call (gamebase 23 / 24 = 0x776030 / 0x776090, pass-through counter, one TruMenu.log line per call), camera object / mode / offset to Lara / FOV; enemy.panel 1|0 = Gegneranzeige at the right edge for the nearest enemy); 0.22.10 (light cut of the set builder 0x504cc0: light.cutlabels shows the sets / cut sets of the last frame and a label at every dropped light, light.cut [frames] [all] writes the sets with the offered list (+ kept, - dropped) to TruMenu.log; light.stablecut / [Light] StableCut orders each object's lights before the cut - sun, shadow map, caster, plain, then address - the per-object alternative to light.stable); 0.22.9 (enemy diagnosis: a third enemy label line with target, attack-slot requests / grants (coordinator 0x67d780, pass-through counter), gate bits, requested state, layer 1, stamina, last hit reaction; ai.why [id] writes the full set to TruMenu.log; combo.trace 1|0 logs Lara's chart record path and the enemy's reaction per hit; sub.lang -1|0..4|7|9..12 sets the subtitle language live through the game's option setter 0x5d5100); 0.22.8 (cutscene pad combos on by default - PausePad 0x0120 View + LB, StepPad 0x0220 View + RB, ShotPad 0x0320 View + LB + RB; pause acts only while a cutscene plays or is held, step only while held; the pause badge shows a second line with the keys / combos as set now); 0.22.7 (cutscene keys: [Cine] PauseKey / StepKey / ShotKey keyboard keys and PausePad / StepPad / ShotPad XInput combos for cine.pause, cine.step 1 and claude.mark - map extra pad buttons (8BitDo R4 / L4) to a combo; all 0 = off by default; help texts within 60 characters again); 0.22.6 (Present re-entry guard against the Steam overlay loop of 2026-11-08: a nested Present / SwapChain Present call draws nothing and goes to d3d9 directly through a hot-patch trampoline behind the overlay's jmp, or returns D3D_OK; one log line; German texts with umlauts - tools/trumenu_umlauts.py wrote 251 words of a fixed list as octal UTF-8 escapes inside the string literals, the INI option table stays ASCII); 0.22.5 (light.stable on by default: [Light] Stable=1 in TruMenu.ini, read at the start, a missing key counts as 1 - better a steady light set than the end-cutscene flicker until the real fix; 0 = the game's own order); 0.22.4 (light.stable now sorts the light pass's own collected list +0x250 / +0x258 by address right after the collection loop - 6 bytes at 0x56d69a -> jmp LsStub, put back when off; the 0.22.3 visible-list sort never changed anything); 0.22.3 (light.stable 1|0: the scene lights (visible-entity list +0x9c entries with +0x1e0 == 10) sorted by address in their own slots before the light pass 0x56d5c0 (call 0x5723cb) - test / fix for the rotating shadow slots of the throne flicker); 0.22.2 (light.frame [n]: the per-frame light lists of the scene - instances scene+0x20 / +0x1020, light bytes when changed, resources scene+0x1024 / +0x11a4 - captured at the frame end call 0x5098ca of the reset 0x504c50 into TruMenu.lightframe.txt, summary per light with BLINK?; for the throne flicker); 0.22.1 (cutscene pause, live wishes of 2026-11-08: the sound is held with the picture - master channel group paused through the game's ChannelGroup_SetPaused 0x7b9490, only by TruMenu and only given back by it, cine.step runs it muted; badge '|| Szene angehalten  <s> s' top centre; cine.mark / cine.pauseat <seconds> hold the next cutscene at a remembered time (armed over loads); cine.pause without an argument only reports); 0.22 (cine.pause / cine.step / cine.status: hold a playing cutscene - the stream walk calls 0x5904e3 / 0x5954f8 of the stream update 0x5901a0 point to a gate that skips the playing cutscene stream ([obj+0x77c] handler, state 4) while the world, particles and lights run on; off by itself at a load; bar page Tests); 0.21.11 (light.list: the scene's PCRenderLights with the shadow gate fields (+0xc5 bit 2, resource +0x1878 / +0x1879, frame flags +0x64 / +0x65, position, NEW since the last list); light.shadow <n> 0|1 = SetCastShadows vf+0x4c on the game thread); 0.21.10 (page Kapitel: group of the unused DLC slots dlc_level3..6_start + dlc_level1_left / _right, grey 'ungenutzt - keine Daten (17p/17s)' with the engine's reaction to a load (Can't open file pc-w\\<unit>.drm: error box, the game exits); level list, command line values, level.load, level.start and the start-up scan mark and refuse dlc_level3..6_start like left / right); 0.21.9 (page Tests: test spots of 17i (cp.jump <unit> <checkpoint> = backup, unit.go, wait.unit, dbg.cpgo; end scene 020_ghoul, floor 25057, ceremony room 030_pod); DLC 1 / DLC 2 units without a .drm in mods grey and refused by level.load; page Kapitel: DLC 1 / DLC 2 units in play order (ring marked Rundweg) with their checkpoints as jump rows (left opens them); goo drip uber label (mode, next drop, hard without exit, goo_off commands); navmesh labels / legend with meaning (bit 26 custom, bit 27 blocked by an obstacle, penalty multipliers, violet = dbg.enemycoll?); TO TEST INI toggles name the switch's when column; F11 shot key in the bar footer / help); 0.21.8 (quick command line: suggestions under the input (the menu bar's list), the menu's on-screen keyboard with Y (one keyboard, target = the line; Start kept from the game while it is open), the picked history line shown before A runs it, kCmdDanger lines (cheats, god mode, level / unit / save loads, save writes, costume resets, sw.set ...) ask for a second A within 3 s; favourites with an argument ([Favorites] Ids \"<id>|<argument>\": Fixes switches, costume rows, chapter units, rows with an argument) and a star on pinned rows; story values story.values (hall02 population / deaths / tutorial / wall, Croft Manor flags; read only); sound group sliders snd.group / snd.vol.* ([SoundGroups], the FMOD channel groups of the eight proposed sliders); ai.kill check 0x6203e9 (TruShadowCombat 0.6.5 owns the call 0x6203e4); SweepAndPrune checks accept the TruRockVein 0.10 limits (3000 / 500)); 0.21.7 (bar footer: Y: - on rows that refuse Y, L3 = command line, a help line for rows that are not self-explanatory (kQbHelp; page Fixes from the hint column DE // EN), pad NOT held warning; TruMenu.switches.txt UTF-8 with umlauts; costume rows the game refuses (0x5c54e0, checked on the game thread) grey and skipped; page Kapitel: the units per chapter / DLC (level.load, DLC 2 note); uber labels dbg.uber / uber.dump (gate / platform node + time left, [Debug] UberRadius 8000); shader labels shader.labels / shader.dump / shader.reload (TruMenu.shaderlabel.txt, file vs live shader libs); navmesh labels nav.labels (layer.graph #area, unit, flag bits, colour legend); SweepAndPrune read-out sap.status / sap.reset (markup collision boxes / pair links / proxies, peaks, [Debug] SapWatch); front-end pad diagnosis lines); 0.21.6 (bar page Kost\303\274me: costume row left / right through the outfit cycle list, switched once the choice stood 0.5 s (X = now), list of all costumes, next costume, choose for the next load + reload; flight key line bottom right while flying ([Cheat] FlightHint); quick command line in the bar (L3, the command bar's path); Render-Details pass / Navmesh rows show an / aus (orange + reason when a Navmesh switch cannot draw)); 0.21.5 (bar page Fixes + menu section Fixes: the plugin INI switches of TruMenu.switches.txt, sw.set / sw.list / sw.reload; the ring is frozen - its ring-only entries are bar rows (new page Render-Details) and the menu section Quick bar pages shows every bar row); 0.21.4 (hall02 counter rescue for saves whose checkpoint 11258 already holds tutorial thralls: fix.hall02 sets dispatcher 11270 population = 0 (tutorial 2) when no tutorial thrall lives; thrall.scriptval shows the thrall-script int +8 (restored 0 / generator-born 2)); 0.21.3 (quick bar: Y pins / unpins the row as a favourite, X runs it (confirmation rows: X twice), X / Y kept from the game while the bar is open; the sound list is as wide as its rows of this frame); 0.21.2 (queued items run in the Present hook while another pad hook sits outside PadHook - an item's pad poll no longer makes TruLink cut the pad chain); 0.21.1 (ai.kill nearest / others / all / <intro> the game's own kill (death state: scripts count it), ai.remove warns about story enemies; sticky.get / sticky.set; room check for player.goto (parked templates, unloaded / far units, force) and pos.go, unit.go (thrall-fight Prepare), label 'geparkt', pot label from the drawn instance; phys.status / phys.dump (physics bodies of the ChunkDoll crash); ai.spawn of the loaded enemy kinds; bar: page 0 Favoriten / Zuletzt, page Tests (Prepare, teleports, TO TEST), collapsible groups ([Quick] Closed), the KI page in three groups; export TruMenuPadBlock; "
                              "0.21 (Arachnophobie: arachno.on / .hide / .picture / .mute - spider model off "
                              "through the InstanceDrawable slot 7 (draw-group mask only during the spider's draw call), "
                              "a wobbling picture at its bones (TruMenu.arachno.png next to tru.exe or a built-in one), "
@@ -904,13 +904,15 @@ const OptDef kOpts[] = {
                                        "93572); values up to 93572 = the\ngame's bytes, at most 1000000. A budget only: the "
                                        "triangles go out in batches of 2000 into the render\ndevice's growing vertex pool "
                                        "(84 bytes each). Live"},
-    {"Sonar", "FadeFar", "0", "0.22.51 (sonar.fade, 'Sonar: Abblenden Ferne'): the fog of the sonar view. 0 = the game's "
-                              "call (fog near = far =\n65536, no linear fog); n = 1 .. 2000 metres: the map fades from "
-                              "n/2 to n m into the background colour\n(the smaller, the stronger); -1 = aus (fog 90 / 100 "
-                              "km). Two call redirects 0x6e4d94 / 0x6e4bf9. Live"},
-    {"Sonar", "TintOthers", "0", "0.22.51 (sonar.tint, 'Sonar: andere Bereiche einfaerben'): 1 = every map unit but the one "
-                                 "of the sonar's open\n(Lara's) is drawn amber-tinted (the draw colour [0xee03bc] for "
-                                 "that unit's call, call redirect 0x6e42ac);\n0 = all cyan (the game's). Live"},
+    {"Sonar", "FadeFar", "0", "0.22.51 / 0.22.52 (sonar.fade, 'Sonar: Abblenden Ferne'): the dimming of far map parts. It "
+                              "is the face shader's\n(materials 3348 / 3349, PS lib 192): a 1/d falloff to half and a "
+                              "fade to black (game: 200 .. 600 m).\n0 = the game's; n = 1 .. 2000 metres: no falloff, "
+                              "black from n/2 to n m; -1 = aus (no falloff, no fade).\nEvery value != 0 also puts the "
+                              "fog out (call redirects 0x6e4d94 / 0x6e4bf9). Live"},
+    {"Sonar", "TintOthers", "0", "0.22.51 / 0.22.52 (sonar.tint, 'Sonar: Bereichsfarben'): the map units but the one of "
+                                 "the sonar's open\n(Lara's, cyan): 0 = all cyan (the game's), 1 = one amber tint, 2 = "
+                                 "a muted colour per area\n(the draw colour [0xee03bc] for that unit's call, call redirect "
+                                 "0x6e42ac). Live"},
     {"PDA", "ShadowPdaAsBasePda", "0", "0.22.51 (pda.basepda): 1 = DLC 2 shows the base PDA (Croft VX2 with the sonar map) "
                                        "instead of its journal\nPDA: in the resident g_pda script 3347 the DLC branch f1 "
                                        "returns 0 (word 04000001 -> 04000000), written\nonly while the PDA is closed, back "
@@ -1384,6 +1386,9 @@ void W9Levels(DWORD voice, DWORD ci, float *dry, float *send);   // 0.22.51 W9: 
 bool W9Audible(bool fmOk, bool paused, bool fmMute, float dry, float send);   // 0.22.51 W9: incl. the reverb path
 void W9Tick();                                // 0.22.51 W9: reverb send redirects, "Hall aus" (game thread)
 void W9SendText(bool fmMute, float send, bool de, char *o, size_t n);   // 0.22.51 W9: "  (stumm, Hall 0.34)"
+int W10RevState(DWORD voice, bool fmMute, float send);   // 0.22.52 W10: reverb mark on / muted / none
+void W10RevIcon(ImDrawList *dl, ImVec2 p, float s, int st, ImU32 c);   // 0.22.52 W10: the mark (draw list)
+void W10Tick();                               // 0.22.52 W10: immediate send mute, update rate, DSP graph (game thread)
 DWORD W8VoiceEmitter(DWORD voice, DWORD channel);   // the emitter the wave node gave the voice (hook V1), 0 = unknown
 void W8Extras(int cats[5], int groups);      // SnBuild: the used FMOD channels outside the voice pool (snapshot part)
 void W8Tick();                               // SnTick: the hooks (game thread), the filters' INI re-read
@@ -1777,6 +1782,7 @@ DWORD WINAPI PadHook(DWORD index, PadState *state) {
     SoTick();                                 // 0.22.48 Sonar komplett: every poll (the PDA may hold the game clock)
     S5Tick();                                 // 0.22.51 sonar area / tint / fade, base PDA (cheap: flags, ~1 s reads)
     W9Tick();                                 // 0.22.51 the game's reverb send follows mute, "Hall aus"
+    W10Tick();                                // 0.22.52 a muted voice's send to 0 at once, update rate, DSP graph
     DWORD clock = *kGameClock;
     if (clock != g_lastClock) {               // once per game frame (the game polls several pads per frame)
         g_lastClock = clock;
@@ -8067,9 +8073,18 @@ void JtTick() {                              // game thread, once per game frame
         DWORD dest = node;
         if (trans) ReadDword(trans + 4, &dest);
         UberNodeName(g_jt.b, static_cast<LONG>(dest), to, sizeof(to));
-        Out(line, sizeof(line), "node %ld %s -> %lu %s after %.1f s (value %.2f) - solved step", g_jt.node, from, dest, to,
-            (GetTickCount() - g_jt.start) / 1000.0, static_cast<double>(val ? v : 0.0f));
-        JtStop(line, false);
+        // 0.22.52 (j): our lock lo = hi = target stays on the joint unless the new node's actions set their own limits -
+        // with a free hinge (l3_secretchamber 22:13) it held the pillar at 5000.5 degrees after "solved step". Now the
+        // saved limits / bits come back when the joint still carries exactly our lock.
+        float lim[2] = {0.0f, 0.0f};
+        DWORD flags = 0;
+        const float t = g_jt.type == 1 ? g_jt.target * 0.017453292519943295f : g_jt.target;
+        const bool ours = ReadFloats(g_jt.joint + 0xd8, lim, 2) && ReadDword(g_jt.joint + 0x174, &flags) && (flags & 2) &&
+                          lim[0] == t && lim[1] == t;
+        Out(line, sizeof(line), "node %ld %s -> %lu %s after %.1f s (value %.2f) - solved step%s", g_jt.node, from, dest, to,
+            (GetTickCount() - g_jt.start) / 1000.0, static_cast<double>(val ? v : 0.0f),
+            ours ? "; our lock was still on the joint" : "");
+        JtStop(line, ours);
         return;
     }
     const DWORD now = GetTickCount();
@@ -17056,6 +17071,7 @@ struct SnVoice {
                                              // +0x64 loop) - the monitor and the log box show these, not TruMenu's rules
     float dry, send;                         // 0.22.51 W9: dry mix (real +0x2f8 -> +0xec, -1 unknown), the game's reverb send
     bool aud;                                // 0.22.51 W9: audible = not paused and (dry > 0 or (send > 0, reverb out > 0))
+    int rev;                                 // 0.22.52 W10: reverb mark kW9RevNone / On / Muted
 };
 enum { kSnStPlaying = 0, kSnStVirtual, kSnStPaused, kSnStMuted, kSnStPending, kSnStEnding, kSnStates };
 const char *const kSnStateDe[kSnStates] = {"spielt", "virtuell", "pausiert", "stumm", "startet", "endet"};
@@ -17241,6 +17257,7 @@ int SnBuild(int *audible) {
             v.loop = v.fmOk && (fmode & 6) != 0;
             W9Levels(v.voice, fci, &v.dry, &v.send);   // 0.22.51 W9: the dry mix and the game's reverb send
             v.aud = W9Audible(v.fmOk, v.fmPause, v.fmMute, v.dry, v.send);
+            v.rev = W10RevState(v.voice, v.fmMute, v.send);   // 0.22.52 W10
             if (v.fmMute) v.muted = true;    // bit 3 = effective mute (own or a group above): not audible
             v.dist = -1.0f;
             if (ReadDword(voice + 0x20, &source) && source && ReadDword(source + 0x18, &srcFlags) && (srcFlags & 0x100) &&
@@ -22640,6 +22657,7 @@ struct W7Hist {
     int count;                               // 0.22.50 (collapsed line): starts of this wave + source
     float dry, send;                         // 0.22.51 W9: dry mix / the game's reverb send (refreshed while it lives)
     bool aud;                                // 0.22.51 W9: audible incl. the reverb path (W9Audible)
+    int rev;                                 // 0.22.52 W10: reverb mark kW9RevNone / On / Muted
 };
 const int kW7HistCap = 200;
 W7Hist g_w7Hist[kW7HistCap];
@@ -22668,6 +22686,7 @@ void W8HistExtra(const W6Voice &v, int cat, W7Hist &h) {
     h.loop = h.alive && (mode & 6) != 0;
     W9Levels(v.voice, h.alive ? ci : 0, &h.dry, &h.send);   // 0.22.51 W9
     h.aud = W9Audible(h.alive, h.fmPause, h.fmMute, h.dry, h.send);
+    h.rev = h.alive ? W10RevState(v.voice, h.fmMute, h.send) : 0;   // 0.22.52 W10
     h.dist = -1.0f;
     float pos[3], lara[3];
     DWORD player = 0;
@@ -22715,6 +22734,7 @@ void W8AggRefresh() {
         a.loop = (mode & 6) != 0;
         W9Levels(a.voice, ci, &a.dry, &a.send);   // 0.22.51 W9: the reverb send follows the voice
         a.aud = W9Audible(true, a.fmPause, a.fmMute, a.dry, a.send);
+        a.rev = W10RevState(a.voice, a.fmMute, a.send);   // 0.22.52 W10
     }
     LeaveCriticalSection(&g_snLock);
 }
@@ -23859,10 +23879,11 @@ void DrawSoundLog() {
                 W7VoiceName(v.wave, v.cat, de, nm, sizeof(nm));
                 const ImU32 c = kW7KindColour[v.kind];
                 const ImVec2 p = ImGui::GetCursorScreenPos();
-                ImGui::Dummy(ImVec2(h * 3.3f, h));
+                ImGui::Dummy(ImVec2(h * 4.4f, h));
                 W8Box(dl, p, h, v.aud, c);           // 0.22.51 W9: filled = audible (dry or the game's reverb)
                 W7Icon(dl, ImVec2(p.x + h * 1.1f, p.y), h, v.kind, c);
                 W8LoopIcon(dl, ImVec2(p.x + h * 2.2f, p.y), h, c);
+                W10RevIcon(dl, ImVec2(p.x + h * 3.3f, p.y), h, v.rev, c);   // 0.22.52 W10: the reverb mark
                 ImGui::SameLine();
                 char cnt[16] = "";
                 if (loopCount[k] > 1) Out(cnt, sizeof(cnt), " \303\227%d", loopCount[k]);
@@ -23887,10 +23908,11 @@ void DrawSoundLog() {
             const int alpha = static_cast<int>(255.0f * (1.0f - 0.7f * k));
             const ImU32 c = (kW7KindColour[e.kind] & 0x00ffffff) | (static_cast<ImU32>(alpha) << 24);
             const ImVec2 p = ImGui::GetCursorScreenPos();
-            ImGui::Dummy(ImVec2(h * 3.3f, h));   // 0.22.50: box, kind icon, loop mark
+            ImGui::Dummy(ImVec2(h * 4.4f, h));   // 0.22.50: box, kind icon, loop mark (0.22.52: + the reverb mark)
             W8Box(dl, p, h, e.aud, c);           // 0.22.51 W9: filled = audible (dry or the game's reverb)
             W7Icon(dl, ImVec2(p.x + h * 1.1f, p.y), h, e.kind, c);
             if (e.loop) W8LoopIcon(dl, ImVec2(p.x + h * 2.2f, p.y), h, c);
+            W10RevIcon(dl, ImVec2(p.x + h * 3.3f, p.y), h, e.rev, c);   // 0.22.52 W10: the reverb mark
             ImGui::SameLine();
             char cnt[16] = "", dist[24] = "", rev[48] = "";
             if (e.count > 1) Out(cnt, sizeof(cnt), " \303\227%d", e.count);
@@ -24656,6 +24678,244 @@ void ValW9State(char *o, size_t n) {
 }
 // ---- end of 0.22.51 W9 ----
 
+// ======================================================================================================================
+// ---- 0.22.52 W10: the whole DSP graph, a reverb mark per line, the reverb's immediate mute (owner wishes 2026-11-14
+// late evening; workspace docs\Befund-TruMenu-02252-1411.md, live work\menu52_1411\live_dspwalk_1_report.txt) ----
+// Facts (static, tru.exe 6905b046; live 22:02 whole graph both directions, 189 units, 190 connections):
+// * The game creates DSP units at three places only: 0x586fda (SFX Reverb, the send target of W9), 0x5839f3
+//   (createDSPByType(2) = oscillator, played by System::playDSP 0x583a12 as its own channel; the game's setMix 0x587d72
+//   is on the oscillator -> channel head connection, upstream of the channel's dry connection, so FMOD's channel mute
+//   holds) and 0x5876df inside 0x587620 (the kind table 0x5876fc; callers 0x58dad0 / 0x58dd4c: the group / SoundPlex DSP
+//   node effects, put into an own channel group by ChannelGroup::addDSP 0x7b94fe -> an INSERT between a group head and
+//   its parent - downstream of the muted dry connection). DSP::addInput has two callers: 0x58223b (reverb -> master head)
+//   and 0x584188 (the voice sends). So the reverb send is the only path that leaves a channel before its mute.
+// * Live 22:02: 1 SFX Reverb (13 inputs, -> master head 1.0), 2 FMOD ParamEQ (groups 58 / 59: group head -> EQ -> group
+//   head, mix 1.0), 3 FMOD DSP Codec (stream decoders -> channel heads), 162 channel group heads, Target, SoundCard;
+//   no echo / chorus (groups 77 / 78 have no DSP on PC, ENGINE 18.3), no oscillator, no other send.
+// * A voice's send exists once its channel became real (callback 0x589b10 -> 0x589b60 -> attach 0x584130); its level is
+//   params (+0x1c) +0xc x the volume; the params ctors 0x5906e0 / 0x5907a0 start +0xc at 0.
+// * Voice update 0x591480 runs once per sound update 0x591e80 for every pool voice (0x591600 loop), called from the
+//   main loop at 0x47ad8f (once per frame); W10 counts the R1 / R2 stub calls per second as the live measure and zeroes a
+//   muted voice's send at once on the game thread (W10Sweep), so the mute does not wait for the next voice update.
+// (1) reverb mark per line (box + monitor): on = the send reaches the reverb (send > 0, reverb out > 0); muted = the
+//   game would send (params +0xc > 0) but ReverbFollowsMute / ReverbOff hold it at 0; none = no send / level 0.
+// (2) monitor rows: the DSP graph (units, effects) and one row per effect (name, type, level, active, voices of its
+//   group); found by a walk over the inputs from the FMOD target unit every 2 s while the monitor / box is shown.
+enum { kW9RevNone = 0, kW9RevOn, kW9RevMuted };
+float W10GameSend(DWORD voice) {             // the game's own send level of a voice (params +0xc; -1 = no params)
+    DWORD p = 0;
+    float f = -1.0f;
+    if (voice && ReadDword(voice + 0x1c, &p) && p && !ReadFloats(p + 0xc, &f, 1)) f = -1.0f;
+    return f;
+}
+int W10RevState(DWORD voice, bool fmMute, float send) {
+    DWORD conn = 0;
+    if (!g_w9Ok || !voice || !ReadDword(voice + 8, &conn) || !conn) return kW9RevNone;
+    const float out = W9RevOutNow();
+    if (send > 0.0f && out > 0.0f) return kW9RevOn;
+    if (!(W10GameSend(voice) > 0.0f)) return kW9RevNone;   // the game sends nothing for this sound
+    if (g_w9RevConn || out == 0.0f) return kW9RevMuted;     // Hall aus (ours) / the reverb's output at 0
+    if (fmMute && g_w9On) return kW9RevMuted;               // Hall folgt Stumm
+    return kW9RevNone;                                      // level 0 from the volume: silent anyway
+}
+// the mark: three arcs = the reverb (on), dim arcs struck through = muted, a small dot = no reverb
+void W10RevIcon(ImDrawList *dl, ImVec2 p, float s, int st, ImU32 c) {
+    if (st == kW9RevNone) {
+        dl->AddCircleFilled(ImVec2(p.x + s * 0.5f, p.y + s * 0.5f), s * 0.08f, (c & 0x00ffffff) | 0x80000000u, 8);
+        return;
+    }
+    const ImVec2 m(p.x + s * 0.22f, p.y + s * 0.5f);
+    const ImU32 k = st == kW9RevOn ? c : ((c & 0x00ffffff) | 0x70000000u);
+    for (int i = 1; i <= 3; ++i) {
+        dl->PathArcTo(m, s * 0.21f * static_cast<float>(i), -0.85f, 0.85f, 10);
+        dl->PathStroke(k, 0, s * 0.09f);
+    }
+    if (st == kW9RevMuted) dl->AddLine(ImVec2(p.x + s * 0.12f, p.y + s * 0.88f), ImVec2(p.x + s * 0.88f, p.y + s * 0.12f), c,
+                                       s * 0.1f);
+}
+const char *W10RevWord(int st, bool de) {    // the legend words (log / monitor count column)
+    return st == kW9RevOn ? (de ? "Hall" : "reverb") : st == kW9RevMuted ? (de ? "Hall stumm" : "reverb muted")
+                                                                           : (de ? "kein Hall" : "no reverb");
+}
+// ---- (2) the DSP graph (game thread, every 2 s while shown) ----
+struct W10Fx { DWORD dsp, into; int group, type, ins; bool active; float mix; char name[32]; };
+const int kW10FxMax = 16, kW10UnitMax = 640;
+W10Fx g_w10Fx[kW10FxMax];                    // under g_snLock
+int g_w10FxN = 0, g_w10Units = 0, g_w10Heads = 0, g_w10GroupHeads = 0;
+LONG g_w10RevIns = -1;                       // the reverb's FMOD input count (DSPI +0x3c)
+DWORD g_w10ScanTick = 0;
+bool g_w10Scanned = false;
+DWORD g_w10Seen[kW10UnitMax];
+bool W10UnitName(DWORD d, char *o, size_t n) {
+    o[0] = 0;
+    return ReadString(d + 0x54, o, n) && o[0];
+}
+int W10GroupOfHead(DWORD head) {             // the game group whose channel group's DSP head this is (-1 = none)
+    DWORD tab = 0, cnt = 0;
+    if (!ReadDword(0x008a80d8, &tab) || !tab || !ReadDword(0x008a80dc, &cnt) || cnt > 256) return -1;
+    for (DWORD k = 0; k < cnt; ++k) {
+        DWORD obj = 0, cg = 0, h = 0;
+        if (ReadDword(tab + k * 0x84 + 0x64, &obj) && obj && ReadDword(obj + 0x6c, &cg) && cg && ReadDword(cg + 0x10, &h) &&
+            h == head)
+            return static_cast<int>(k);
+    }
+    return -1;
+}
+void W10FxScan(DWORD now) {
+    if (g_w10ScanTick && now - g_w10ScanTick < 2000) return;
+    // only while the monitor rows are drawn (W7QbRows sets g_w7BarAt) or the box is on (snd.list)
+    if ((!g_w7BarAt || now - g_w7BarAt > 3000) && !g_snOn) return;
+    g_w10ScanTick = now ? now : 1;
+    DWORD sys = 0, master = 0, mhead = 0, node = 0, target = 0;
+    if (!ReadDword(kSnFmodSystem, &sys) || !sys || !ReadDword(sys + 0x9568, &master) || !master ||
+        !ReadDword(master + 0x10, &mhead) || !mhead || !ReadDword(mhead + 0x30, &node) || node == mhead + 0x30 ||
+        !ReadDword(node - 0xc + 0xe4, &target) || !target)
+        return;
+    W10Fx fx[kW10FxMax];
+    int fxn = 0, seen = 0, heads = 0, gheads = 0, q = 0;
+    g_w10Seen[seen++] = target;
+    while (q < seen && seen < kW10UnitMax) {
+        const DWORD d = g_w10Seen[q++];
+        char nm[32];
+        W10UnitName(d, nm, sizeof(nm));
+        const bool chHead = !strncmp(nm, "FMOD Channel DSPHead", 20);
+        if (chHead) { ++heads; continue; }   // a channel: its own inputs (wave table / codec / oscillator) are not walked
+        if (!strncmp(nm, "ChannelGroup", 12)) ++gheads;
+        const DWORD sent = d + 0x24;
+        DWORD p = 0;
+        if (!ReadDword(sent, &p)) continue;
+        for (int s = 0; p && p != sent && s < 600 && seen < kW10UnitMax; ++s) {
+            DWORD src = 0, next = 0;
+            float mix = 0.0f;
+            if (!ReadDword(p + 0xe0, &src) || !ReadFloats(p + 0xec, &mix, 1) || !ReadDword(p, &next)) break;
+            p = next;
+            if (!src) continue;
+            bool known = false;
+            for (int i = 0; i < seen && !known; ++i) known = g_w10Seen[i] == src;
+            if (known) continue;
+            g_w10Seen[seen++] = src;
+            char sn[32];
+            W10UnitName(src, sn, sizeof(sn));
+            if (!strncmp(sn, "ChannelGroup", 12) || !strncmp(sn, "FMOD Channel DSPHead", 20) ||
+                !strncmp(sn, "FMOD WaveTable", 14) || !strncmp(sn, "FMOD DSP Codec", 14) || fxn >= kW10FxMax)
+                continue;
+            W10Fx &f = fx[fxn++];
+            memset(&f, 0, sizeof(f));
+            f.dsp = src;
+            f.into = d;
+            f.mix = mix;
+            strncpy_s(f.name, sizeof(f.name), sn[0] ? sn : "?", _TRUNCATE);
+            DWORD ty = 0, fl = 0, ins = 0;
+            ReadDword(src + 0xc0, &ty);
+            ReadDword(src + 0xf4, &fl);
+            ReadDword(src + 0x3c, &ins);
+            f.type = static_cast<int>(ty);
+            f.active = (fl & 2) != 0;
+            f.ins = static_cast<int>(ins);
+            f.group = W10GroupOfHead(d);
+        }
+    }
+    DWORD holder = 0, rev = 0, rins = 0;
+    const LONG ri = ReadDword(kW9Holder, &holder) && holder && ReadDword(holder, &rev) && rev && ReadDword(rev + 0x3c, &rins)
+                        ? static_cast<LONG>(rins) : -1;
+    EnterCriticalSection(&g_snLock);
+    memcpy(g_w10Fx, fx, sizeof(W10Fx) * static_cast<size_t>(fxn));
+    g_w10FxN = fxn;
+    g_w10Units = seen;
+    g_w10Heads = heads;
+    g_w10GroupHeads = gheads;
+    g_w10RevIns = ri;
+    LeaveCriticalSection(&g_snLock);
+    if (!g_w10Scanned) {
+        g_w10Scanned = true;
+        char list[400] = "";
+        size_t used = 0;
+        for (int i = 0; i < fxn; ++i)
+            LabelAdd(list, sizeof(list), &used, "%s%s (type %d, %s, into %s%d, mix %.2f)", used ? ", " : "", fx[i].name,
+                     fx[i].type, fx[i].active ? "active" : "inactive", fx[i].group >= 0 ? "g" : "head 0x",
+                     fx[i].group >= 0 ? fx[i].group : static_cast<int>(fx[i].into), static_cast<double>(fx[i].mix));
+        Log(1, "0.22.52 DSP graph (first walk from the target unit over the inputs): %d units, %d channel heads, %d group "
+            "heads, reverb inputs %ld; effects: %s", seen, heads, gheads, ri, used ? list : "none");
+    }
+}
+// the monitor rows of the graph (render thread, under g_snLock by the caller's copy)
+const char *W10TypeName(int t) {
+    switch (t) {
+    case 2: return "Oszillator";
+    case 3: case 4: case 19: return "Tiefpass";
+    case 5: return "Hochpass";
+    case 6: case 16: return "Echo";
+    case 7: return "Flanger";
+    case 8: return "Verzerrung";
+    case 9: return "Normalize";
+    case 10: return "ParamEQ";
+    case 11: return "Pitch";
+    case 12: return "Chorus";
+    case 13: case 18: return "Hall";
+    case 17: return "Kompressor";
+    default: return "?";
+    }
+}
+// ---- the immediate mute of a send + the voice update rate (game thread) ----
+volatile LONG g_w10Swept = 0, g_w10Rate = -1, g_w10RateVoices = 0;
+LONG g_w10RateCalls = 0;
+DWORD g_w10RateTick = 0, g_w10SweepTick = 0;
+bool g_w10RateLogged = false;
+void W10Sweep(DWORD now) {
+    if (!g_w9On || (g_w10SweepTick && now - g_w10SweepTick < 50)) return;
+    g_w10SweepTick = now ? now : 1;
+    DWORD node = 0, end = 0;
+    if (!ReadDword(kSnPool + 8, &node) || !ReadDword(kSnPoolEnd, &end)) return;
+    for (int steps = 0; node && node != end && steps < 1024; ++steps) {
+        DWORD voice = 0, next = 0, conn = 0, handle = 0, ci = 0, fl = 0, rf = 0, mode = 0;
+        if (!ReadDword(node + 4, &voice) || !ReadDword(node, &next)) break;
+        node = next;
+        float mix = 0.0f;
+        if (!voice || !ReadDword(voice + 8, &conn) || !conn || !ReadFloats(conn + 0xec, &mix, 1) || !(mix > 0.0f)) continue;
+        if (!ReadDword(voice + 4, &handle) || !handle || !W8FmOf(handle, &ci, &fl, &rf, &mode) || !(fl & 8)) continue;
+        if (W9SetMix(conn, 0.0f)) InterlockedIncrement(&g_w10Swept);
+    }
+}
+void W10Rate(DWORD now) {
+    if (!g_w10RateTick) { g_w10RateTick = now ? now : 1; g_w10RateCalls = g_w9Calls; return; }
+    if (now - g_w10RateTick < 1000) return;
+    const LONG calls = g_w9Calls;
+    const LONG per = static_cast<LONG>((static_cast<double>(calls - g_w10RateCalls) * 1000.0) / (now - g_w10RateTick));
+    g_w10RateTick = now ? now : 1;
+    g_w10RateCalls = calls;
+    if (!g_w9On) { InterlockedExchange(&g_w10Rate, -1); return; }
+    int sends = 0;                           // pool voices with a send now (the stub runs once per such voice update)
+    DWORD node = 0, end = 0;
+    if (ReadDword(kSnPool + 8, &node) && ReadDword(kSnPoolEnd, &end))
+        for (int steps = 0; node && node != end && steps < 1024; ++steps) {
+            DWORD voice = 0, next = 0, conn = 0;
+            if (!ReadDword(node + 4, &voice) || !ReadDword(node, &next)) break;
+            node = next;
+            if (voice && ReadDword(voice + 8, &conn) && conn) ++sends;
+        }
+    InterlockedExchange(&g_w10Rate, per);
+    InterlockedExchange(&g_w10RateVoices, sends);
+    if (!g_w10RateLogged && sends > 0 && per > 0) {
+        g_w10RateLogged = true;
+        Log(1, "0.22.52 reverb: voice updates through R1 / R2 %ld per second for %d voices with a send = %.1f per voice and "
+            "second (the game's update rate of the send; W10Sweep zeroes a muted voice's send within 50 ms, %ld so far)",
+            per, sends, static_cast<double>(per) / sends, g_w10Swept);
+    }
+}
+void W10Tick() {                             // game thread, after W9Tick
+    if (!g_w9Ok) return;
+    const DWORD now = GetTickCount();
+    W10Sweep(now);
+    W10Rate(now);
+    W10FxScan(now);
+}
+void ValW10State(char *o, size_t n) {
+    Out(o, n, "DSP graph %d units (%d channel heads, %d group heads), %d effects, reverb inputs %ld; voice updates %ld/s for "
+        "%ld sends; sends zeroed at once %ld", g_w10Units, g_w10Heads, g_w10GroupHeads, g_w10FxN, g_w10RevIns, g_w10Rate,
+        g_w10RateVoices, g_w10Swept);
+}
+// ---- end of 0.22.52 W10 ----
+
 // ---- 0.22.48 Sonar komplett (owner wish 2026-11-14 "ganze Karte / ganzes DLC als Sonarkarte"; workspace
 // docs\Befund-Sonar-Komplett-1411.md option C + filter H3 + optional C4, its byte checker work\sonar_1411\
 // sonar_patch_check.py: 104 OK) ----
@@ -25197,6 +25457,10 @@ __declspec(naked) void S5FogStub() {
         jmp dword ptr [g_s5FogFn]
     }
 }
+DWORD __stdcall S5ColourFor(DWORD unit);    // 0.22.52: the tint of a unit (one tint / per area), 0 = the game's
+void S6Apply(const char *why);               // 0.22.52 S6 (section "0.22.52 S6", after S5): the shader fade values
+void S6Shutdown();
+void S6State(char *o, size_t n);
 // game thread, inside the frame 0x6e4130 (instead of 0x6e3a00(unit, 0)): area filter, then the tint for that call
 __declspec(naked) void S5UnitStub() {
     __asm {
@@ -25211,15 +25475,15 @@ __declspec(naked) void S5UnitStub() {
     s5u_draw:
         cmp dword ptr [g_s5Tint], 0
         je s5u_plain
-        mov ecx, dword ptr [g_s5AnchorAt]
-        cmp eax, dword ptr [ecx]
+        push eax                             // 0.22.52: the colour of this unit (0 = the game's): one tint or per area
+        call S5ColourFor                     // __stdcall (unit) -> eax; eax / ecx / edx are the caller's scratch (cdecl)
+        test eax, eax
         je s5u_plain
         mov ecx, dword ptr [g_s5ColourAt]
         push dword ptr [ecx]
-        mov edx, dword ptr [g_s5TintColour]
-        mov dword ptr [ecx], edx
-        push dword ptr [esp + 0xc]
-        push eax
+        mov dword ptr [ecx], eax
+        push dword ptr [esp + 0xc]           // argument 2 (0)
+        push dword ptr [esp + 0xc]           // argument 1 (the unit)
         call dword ptr [g_s5DrawFn]
         add esp, 8
         mov ecx, dword ptr [g_s5ColourAt]
@@ -25256,9 +25520,10 @@ void S5Check() {
         static_cast<int>(sizeof(kS5Checks) / sizeof(kS5Checks[0])), g_s5Fade, g_s5Tint, g_s5Pda);
 }
 LONG S5FadeClamp(LONG v) { return v < -1 ? -1 : v > 2000 ? 2000 : v; }
+LONG S5TintClamp(LONG v) { return v <= 0 ? 0 : v >= 2 ? 2 : 1; }   // 0.22.52: 0 aus, 1 ein Farbton, 2 je Bereich
 void S5ReadOptions(const char *ini) {
     InterlockedExchange(&g_s5Fade, S5FadeClamp(OptInt(ini, "Sonar", "FadeFar")));
-    InterlockedExchange(&g_s5Tint, OptInt(ini, "Sonar", "TintOthers") != 0 ? 1 : 0);
+    InterlockedExchange(&g_s5Tint, S5TintClamp(OptInt(ini, "Sonar", "TintOthers")));
     InterlockedExchange(&g_s5Pda, OptInt(ini, "PDA", "ShadowPdaAsBasePda") != 0 ? 1 : 0);
 }
 // the three keys from TruMenu.ini about once a second (page Fixes writes the INI only)
@@ -25267,7 +25532,7 @@ void S5ReadSwitch() {
     auto key = [](const char *sec, const char *k) {
         return static_cast<LONG>(GetPrivateProfileIntA(sec, k, atoi(OptDefault(sec, k)), g_iniPath));
     };
-    const LONG f = S5FadeClamp(key("Sonar", "FadeFar")), t = key("Sonar", "TintOthers") != 0 ? 1 : 0,
+    const LONG f = S5FadeClamp(key("Sonar", "FadeFar")), t = S5TintClamp(key("Sonar", "TintOthers")),
                p = key("PDA", "ShadowPdaAsBasePda") != 0 ? 1 : 0;
     if (g_s5Read && (f != g_s5Fade || t != g_s5Tint || p != g_s5Pda))
         Log(1, "0.22.51: [Sonar] FadeFar %ld -> %ld, TintOthers %ld -> %ld, [PDA] ShadowPdaAsBasePda %ld -> %ld (TruMenu.ini, "
@@ -25281,8 +25546,9 @@ void S5ReadSwitch() {
 void S5FogValues() {
     const LONG f = g_s5Fade;
     float nearV = 0.0f, farV = 0.0f;
-    if (f < 0) { nearV = 9.0e6f; farV = 1.0e7f; }                  // aus: 90 / 100 km
-    else if (f > 0) { farV = static_cast<float>(f) * 100.0f; nearV = farV * 0.5f; }   // n m (100 units = 1 m)
+    // 0.22.52: every value != 0 puts the fog out (90 / 100 km): the game's fog call near = far = 65536 is a hard step
+    // at 655 m into the background colour; the fade itself is the shader's (S6) - the fog adds nothing but that step
+    if (f != 0) { nearV = 9.0e6f; farV = 1.0e7f; }
     LONG a = 0, b = 0;
     memcpy(&a, &nearV, 4);
     memcpy(&b, &farV, 4);
@@ -25290,17 +25556,49 @@ void S5FogValues() {
     InterlockedExchange(&g_s5FogFar, b);
 }
 // the tint of the other units: the game's colour 40 % towards amber (255, 170, 40), alpha kept
-void S5TintValue() {
-    DWORD c = 0;
-    if (!ReadDword(g_s5ColourAt, &c)) return;
-    const DWORD tint[3] = {255, 170, 40};
+// 0.22.52: [Sonar] TintOthers 2 = a colour per area from a muted palette (each 40 % from the game's cyan, like the amber)
+const int kS5PalN = 8;
+const BYTE kS5Pal[kS5PalN][3] = {{255, 170, 40}, {60, 200, 150}, {165, 115, 230}, {235, 120, 155},
+                                 {175, 175, 55}, {110, 150, 225}, {215, 180, 125}, {205, 105, 70}};
+const char *const kS5PalDe[kS5PalN] = {"bernstein", "t\303\274rkisgr\303\274n", "violett", "rosa", "oliv", "taubenblau", "sand",
+                                       "rost"};
+const char *const kS5PalEn[kS5PalN] = {"amber", "teal green", "violet", "rose", "olive", "slate blue", "sand", "rust"};
+volatile LONG g_s5PalColour[kS5PalN];        // ARGB of each palette entry (the game's colour blended, alpha kept)
+DWORD g_s5TintUnit[64];                      // game thread: the sonar list's units in order (S5ListTick), 0 = end
+int g_s5TintUnitN = 0;
+DWORD S5Blend(DWORD c, const BYTE *tint) {
     DWORD out = c & 0xff000000;
     for (int k = 0; k < 3; ++k) {
         const int shift = 16 - 8 * k;
         const DWORD ch = (c >> shift) & 0xff, mixed = (ch * 6 + tint[k] * 4) / 10;
         out |= (mixed & 0xff) << shift;
     }
-    InterlockedExchange(&g_s5TintColour, static_cast<LONG>(out));
+    return out;
+}
+void S5TintValue() {
+    DWORD c = 0;
+    if (!ReadDword(g_s5ColourAt, &c)) return;
+    InterlockedExchange(&g_s5TintColour, static_cast<LONG>(S5Blend(c, kS5Pal[0])));
+    for (int i = 0; i < kS5PalN; ++i) InterlockedExchange(&g_s5PalColour[i], static_cast<LONG>(S5Blend(c, kS5Pal[i])));
+}
+// the palette slot of a unit: its place in the sonar's list without the open unit (Lara's, cyan), modulo the palette
+int S5PalIndex(DWORD unit, DWORD anchor) {
+    int k = 0;
+    for (int i = 0; i < g_s5TintUnitN; ++i) {
+        if (g_s5TintUnit[i] == anchor) continue;
+        if (g_s5TintUnit[i] == unit) return k % kS5PalN;
+        ++k;
+    }
+    return -1;
+}
+// game thread, from S5UnitStub: 0 = draw with the game's colour
+DWORD __stdcall S5ColourFor(DWORD unit) {
+    const LONG mode = g_s5Tint;
+    DWORD anchor = 0;
+    if (!mode || !ReadDword(g_s5AnchorAt, &anchor) || unit == anchor) return 0;
+    if (mode == 1) return static_cast<DWORD>(g_s5TintColour);
+    const int i = S5PalIndex(unit, anchor);
+    return static_cast<DWORD>(i >= 0 ? g_s5PalColour[i] : g_s5TintColour);
 }
 // game thread: a refused site puts back what is ours and S5 stays off for this run
 void S5AllBack() {
@@ -25323,6 +25621,7 @@ void S5Refused(const char *site, DWORD at) {
 void S5Apply(const char *why) {
     if (!g_s5Ok) return;
     S5FogValues();
+    S6Apply(why);                            // 0.22.52: the shader's falloff / fade (the real dimming)
     if (g_s5Tint) S5TintValue();
     const bool wantD = g_s5ShowUnit != 0 || g_s5Tint != 0, wantF = g_s5Fade != 0;
     if (wantD == g_s5OnD && wantF == g_s5OnF) return;
@@ -25351,6 +25650,7 @@ SRWLOCK g_s5Lock = SRWLOCK_INIT;
 char g_s5Names[kS5NameMax][48];              // the units of the last sonar list (kept after the close)
 int g_s5NameN = 0;
 char g_s5Area[48] = "";                      // the chosen unit ("" = every unit)
+char g_s5Legend[600] = "";                   // 0.22.52: unit name -> colour of [Sonar] TintOthers 2 (last sonar list)
 DWORD g_s5ListTick = 0;
 bool S5UnitName(DWORD u, char *o, size_t n) {
     size_t k = 0;
@@ -25382,9 +25682,22 @@ void S5ListTick(DWORD now) {
         if (!ReadDword(list + 4 * k, &u) || !u || !S5UnitName(u, names[n], sizeof(names[n]))) continue;
         units[n++] = u;
     }
+    // 0.22.52: the order for the per-area colours (the stub reads it on this thread) and the legend
+    for (int i = 0; i < n; ++i) g_s5TintUnit[i] = units[i];
+    g_s5TintUnitN = n;
+    DWORD anchor = 0;
+    ReadDword(g_s5AnchorAt, &anchor);
+    char legend[sizeof(g_s5Legend)] = "";
+    size_t lused = 0;
+    for (int i = 0; i < n; ++i) {
+        const int p = units[i] == anchor ? -1 : S5PalIndex(units[i], anchor);
+        LabelAdd(legend, sizeof(legend), &lused, "%s%s %s", lused ? ", " : "", names[i],
+                 p < 0 ? "cyan" : (g_qbLang == 0 ? kS5PalDe : kS5PalEn)[p]);
+    }
     AcquireSRWLockExclusive(&g_s5Lock);
     memcpy(g_s5Names, names, sizeof(names[0]) * static_cast<size_t>(n));
     g_s5NameN = n;
+    strncpy_s(g_s5Legend, sizeof(g_s5Legend), legend, _TRUNCATE);
     DWORD show = 0;
     for (int i = 0; i < n && g_s5Area[0]; ++i)
         if (!_stricmp(names[i], g_s5Area)) show = units[i];
@@ -25577,6 +25890,7 @@ void S5Tick() {
 // unload: our call bytes and our PDA word back
 void S5Shutdown() {
     S5AllBack();
+    S6Shutdown();                            // 0.22.52: the game's shader values back (ours only)
     const DWORD game = kS5PdaGame;
     DWORD word = 0;
     if (g_s5PdaOursAt && ReadDword(g_s5PdaOursAt, &word) && word == kS5PdaOurs) WriteBytes(g_s5PdaOursAt, &game, 4);
@@ -25615,24 +25929,43 @@ bool RunS5Fade(const char *arg, char *o, size_t n) {
     char t[24];
     S5FadeText(v, de, t, sizeof(t));
     Log(1, "sonar.fade %ld (src=%s, was %ld): [Sonar] FadeFar=%ld written - %s", v, ShotSource("sonar.fade"), was, v,
-        v == 0 ? "the game's fog call (near = far = 65536)" : v < 0 ? "fog 90 / 100 km (no fog)" : "fog from n/2 to n metres");
+        v == 0 ? "the game's shader values and fog call" : v < 0 ? "shader falloff + fade off, fog off (0.22.52)"
+                                                          : "shader falloff off, black from n/2 to n metres, fog off (0.22.52)");
     Out(o, n, de ? "Sonar: Abblenden Ferne %s%s - [Sonar] FadeFar=%ld" : "Sonar: distance fade %s%s - [Sonar] FadeFar=%ld", t,
-        v > 0 ? (de ? " (ab der H\303\244lfte in die Hintergrundfarbe)" : " (into the background from half of it)") : "", v);
+        v > 0 ? (de ? " (Schwarz ab der H\303\244lfte, kein N\303\244he-Abdunkeln)" : " (black from half of it, no near dimming)")
+              : v < 0 ? (de ? " (kein Abdunkeln)" : " (no dimming)") : "", v);
     return true;
 }
 void ValS5Tint(char *o, size_t n) { Out(o, n, "%ld", g_s5Tint); }
+// 0.22.52: a value row "Sonar: Bereichsfarben" - aus / ein Farbton (amber, 0.22.51) / je Bereich (palette)
+void S5TintText(LONG t, bool de, char *o, size_t n) {
+    Out(o, n, "%s", t == 0 ? (de ? "aus" : "off") : t == 1 ? (de ? "ein Farbton" : "one tint") : (de ? "je Bereich" : "per area"));
+}
 bool RunS5Tint(const char *arg, char *o, size_t n) {
     const bool de = g_qbLang == 0;
     if (!g_s5Ok) { Out(o, n, "disabled: pre-check failed (%s)", g_s5Why); return false; }
-    const bool on = BoolArg(arg, g_s5Tint != 0);
-    const LONG was = InterlockedExchange(&g_s5Tint, on ? 1 : 0);
-    IniKeepInt("Sonar", "TintOthers", on ? 1 : 0);
+    LONG t = 0;
+    if (!arg || !arg[0]) t = g_s5Tint ? 0 : 1;   // no argument: on / off as before (one tint)
+    else if (!_stricmp(arg, "aus") || !_stricmp(arg, "off")) t = 0;
+    else if (!_stricmp(arg, "ein") || !_stricmp(arg, "on") || !_stricmp(arg, "eins") || !_stricmp(arg, "one")) t = 1;
+    else if (!_stricmp(arg, "bereich") || !_stricmp(arg, "area") || !_stricmp(arg, "je")) t = 2;
+    else t = S5TintClamp(atol(arg));
+    const LONG was = InterlockedExchange(&g_s5Tint, t);
+    IniKeepInt("Sonar", "TintOthers", t);
     S5Apply("sonar.tint");
-    Log(1, "sonar.tint %d (src=%s, was %ld): [Sonar] TintOthers=%d written (tint colour 0x%08lx)", on ? 1 : 0,
-        ShotSource("sonar.tint"), was, on ? 1 : 0, static_cast<DWORD>(g_s5TintColour));
-    Out(o, n, de ? "Andere Bereiche einf\303\244rben: %s - [Sonar] TintOthers=%d" : "Tint other areas: %s - [Sonar] TintOthers=%d",
-        on ? (de ? "an (Laras Bereich cyan, andere bernsteinfarben)" : "on (Lara's area cyan, others amber)")
-           : (de ? "aus (alles cyan, Spiel)" : "off (all cyan, the game's)"), on ? 1 : 0);
+    char legend[sizeof(g_s5Legend)];
+    AcquireSRWLockShared(&g_s5Lock);
+    strncpy_s(legend, sizeof(legend), g_s5Legend, _TRUNCATE);
+    ReleaseSRWLockShared(&g_s5Lock);
+    Log(1, "sonar.tint %ld (src=%s, was %ld): [Sonar] TintOthers=%ld written (one tint 0x%08lx; per area: %s)", t,
+        ShotSource("sonar.tint"), was, t, static_cast<DWORD>(g_s5TintColour), legend[0] ? legend : "list after the next open");
+    char tt[24];
+    S5TintText(t, de, tt, sizeof(tt));
+    Out(o, n, de ? "Sonar: Bereichsfarben %s%s - [Sonar] TintOthers=%ld" : "Sonar: area colours %s%s - [Sonar] TintOthers=%ld",
+        tt, t == 1 ? (de ? " (Laras Bereich cyan, andere bernstein)" : " (Lara's area cyan, others amber)")
+              : t == 2 ? (de ? " (Laras Bereich cyan, Legende: Sonar-Ansicht: Stand)" : " (Lara's area cyan, legend: sonar "
+                                                                                      "view: state)")
+                       : (de ? " (alles cyan, Spiel)" : " (all cyan, the game's)"), t);
     return true;
 }
 // "Bereich anzeigen": alle / one unit of the sonar's own list (kept by name for the session, not in the INI)
@@ -25747,12 +26080,143 @@ void ValS5Status(char *o, size_t n) {
     AcquireSRWLockShared(&g_s5Lock);
     Out(area, sizeof(area), "%s", g_s5Area[0] ? g_s5Area : "all");
     ReleaseSRWLockShared(&g_s5Lock);
-    Out(o, n, "%s; area %s%s (D1 %s, skipped %ld), tint %ld (%ld calls, colour 0x%08lx), fade %s (F1/F2 %s, %ld fog calls)",
+    char legend[sizeof(g_s5Legend)];
+    AcquireSRWLockShared(&g_s5Lock);
+    strncpy_s(legend, sizeof(legend), g_s5Legend, _TRUNCATE);
+    ReleaseSRWLockShared(&g_s5Lock);
+    // 0.22.52: the shader values (S6) and, with TintOthers 2, the legend unit -> colour
+    char shader[96];
+    S6State(shader, sizeof(shader));
+    Out(o, n, "%s; area %s%s (D1 %s, skipped %ld), tint %ld (%ld calls, colour 0x%08lx), fade %s (F1/F2 %s, %ld fog calls; "
+        "%s)%s%s",
         g_s5Ok ? "ok" : g_s5Why, area, g_s5Area[0] && !g_s5ShowUnit ? " (inactive)" : "", g_s5OnD ? "ours" : "game",
         g_s5AreaSkips, g_s5Tint,
-        g_s5Tinted, static_cast<DWORD>(g_s5TintColour), t, g_s5OnF ? "ours" : "game", g_s5FogCalls);
+        g_s5Tinted, static_cast<DWORD>(g_s5TintColour), t, g_s5OnF ? "ours" : "game", g_s5FogCalls, shader,
+        g_s5Tint == 2 ? "; colours: " : "", g_s5Tint == 2 ? (legend[0] ? legend : "(open the sonar)") : "");
 }
 // ---- end of 0.22.51 S5 ----
+
+// ---- 0.22.52 S6: the sonar's real distance dimming (owner live test 0.22.51 21:58: FadeFar -1 = fog off, the far map
+// still dark). Evidence (work\menu52_1411\live_sonar_material_2.txt 22:13, shader dump of lib 192 local only):
+// the sonar view puts tuning [0xee03e0] +0x34 / +0x40 into the face batches' material (0x6e4c2a .. 0x6e4c77: batch
+// +0x29044 at 0xf09534 / 0xf32580); the flush 0x6df9e0 -> device +0x4c 0x503fa0 draws with it, and per draw 0x505aba
+// uploads the material data's PS MaterialParams ([mat+4] +0x58 count / +0x5c pointer) to PS c100. Live: material 3348
+// (faces A) and 3349 (faces B), both PS lib 192 / VS lib 193 (191 depth pass), 11 params. Lib 192's colour pass: depth
+// d = (pos - g_CameraPosition c1) . CameraDirection c97; colour x clamp(1 / (max(d - c108.x, 1e-5) x c108.y), c110.x,
+// 1) (a 1/d falloff, floor c110.x) and x (1 - smoothstep(c108.w, c109.w, d)) (fade to black), then the engine fog
+// (s15 attenuation, FogColor c0). Live values: 3348 c108 (3000, 1e-5, 9000, 5e4), c109.w 6e4, c110.x 0.5 -> dims from
+// 1030 m to half at 2030 m, black 500 .. 600 m; 3349 c108 (3000, 1e-4, 9000, 2e4), c109.w 3e4, c110.x 0.5 -> dims
+// from 130 m to half at 230 m, black 200 .. 300 m. [Sonar] FadeFar now drives exactly these three values of both
+// materials (game thread, our values written only over the game's, back on 0 / when the material changes / unload):
+// -1 aus = c110.x 1 (no falloff), c108.w / c109.w 9e6 / 1e7 (no fade); n m = no falloff, black from n/2 to n m.
+const DvCheck kS6Checks[] = {
+    // the sonar view: tuning +0x34 / +0x40 -> the face batches' material (and +0x4c / +0x50 for the marker batches)
+    {0x006e4c2a, "8b4834 890df003ee00"},
+    {0x006e4c45, "8b5040 8915fc03ee00"},
+    {0x006e4c71, "890d3495f000 89158025f300"},
+    // the tuning pointer [0xee03e0]
+    {0x006dd9a4, "a3e003ee00"},
+    // per draw: PS MaterialParams of [mat+4] (+0x58 count, +0x5c pointer) -> PS c100 (0x526920)
+    {0x00505aba, "8b5504 837a5800 7411 8bc2 8b5058 8b405c 52 50 6a64 e84c0e0200"},
+    // the device's primitive call reads [mat+4] +0x44 (the material data)
+    {0x00503fdb, "8b4f04 f7414400000040"},
+};
+const DWORD kS6Tuning = 0x00ee03e0, kS6MatVt = 0x00849018;
+const DWORD kS6Off[3] = {0x8c, 0x9c, 0xa0};  // c108.w (fade start), c109.w (fade end), c110.x (falloff floor)
+struct S6Mat { DWORD mat, params; float game[3], ours[3]; bool on; };
+S6Mat g_s6[2];
+bool g_s6Ok = false;
+char g_s6Why[96] = "not checked";
+LONG g_s6Writes = 0, g_s6Backs = 0;
+bool S6Params(DWORD mat, DWORD *params) {   // the PS MaterialParams block of a sonar material (11 vec4s, lib 192)
+    DWORD vt = 0, data = 0, cnt = 0, p = 0;
+    if (!mat || !ReadDword(mat, &vt) || vt != kS6MatVt || !ReadDword(mat + 4, &data) || !data || !ReadDword(data + 0x58, &cnt) ||
+        cnt != 11 || !ReadDword(data + 0x5c, &p) || !p)
+        return false;
+    *params = p;
+    return true;
+}
+void S6Back(S6Mat &m, const char *why) {    // the game's values back where ours still stand
+    if (!m.on) return;
+    int back = 0;
+    for (int k = 0; k < 3; ++k) {
+        float cur = 0.0f;
+        if (ReadFloats(m.params + kS6Off[k], &cur, 1) && cur == m.ours[k] && cur != m.game[k] &&
+            WriteBytes(m.params + kS6Off[k], &m.game[k], 4))
+            ++back;
+    }
+    g_s6Backs += back;
+    Log(1, "0.22.52 sonar fade (%s): material 0x%08lx params 0x%08lx - %d of 3 game values back (c108.w %.0f, c109.w %.0f, "
+        "c110.x %.2f)", why, m.mat, m.params, back, static_cast<double>(m.game[0]), static_cast<double>(m.game[1]),
+        static_cast<double>(m.game[2]));
+    m.on = false;
+}
+// game thread (S5Apply): FadeFar != 0 -> our three values in both face materials, 0 -> the game's back
+void S6Apply(const char *why) {
+    if (!g_s6Ok) return;
+    const LONG f = g_s5Fade;
+    DWORD tun = 0, mats[2] = {0, 0};
+    if (f != 0 && ReadDword(kS6Tuning, &tun) && tun) {
+        ReadDword(tun + 0x34, &mats[0]);
+        ReadDword(tun + 0x40, &mats[1]);
+        if (mats[1] == mats[0]) mats[1] = 0;
+    }
+    float v[3];
+    if (f < 0) { v[0] = 9.0e6f; v[1] = 1.0e7f; }
+    else { v[1] = static_cast<float>(f) * 100.0f; v[0] = v[1] * 0.5f; }   // 100 units = 1 m
+    v[2] = 1.0f;
+    for (int i = 0; i < 2; ++i) {
+        S6Mat &m = g_s6[i];
+        DWORD params = 0;
+        const bool ok = f != 0 && mats[i] && S6Params(mats[i], &params);
+        if (m.on && (!ok || params != m.params || mats[i] != m.mat)) S6Back(m, f == 0 ? why : "material changed");
+        if (!ok) continue;
+        if (!m.on) {
+            float g[3] = {0.0f, 0.0f, 0.0f};
+            bool read = true;
+            for (int k = 0; k < 3; ++k) read = read && ReadFloats(params + kS6Off[k], &g[k], 1);
+            if (!read) continue;
+            m.mat = mats[i];
+            m.params = params;
+            for (int k = 0; k < 3; ++k) { m.game[k] = g[k]; m.ours[k] = g[k]; }
+            m.on = true;
+        }
+        int wrote = 0;
+        for (int k = 0; k < 3; ++k) {
+            float cur = 0.0f;
+            if (!ReadFloats(params + kS6Off[k], &cur, 1) || cur == v[k]) continue;
+            if (cur != m.game[k] && cur != m.ours[k]) {   // someone else's value: leave it
+                Log(0, "0.22.52 sonar fade: material 0x%08lx value +0x%lx is %.4f - neither the game's %.4f nor ours; left alone",
+                    m.mat, kS6Off[k], static_cast<double>(cur), static_cast<double>(m.game[k]));
+                continue;
+            }
+            if (WriteBytes(params + kS6Off[k], &v[k], 4)) { m.ours[k] = v[k]; ++wrote; }
+        }
+        if (wrote) {
+            g_s6Writes += wrote;
+            Log(1, "0.22.52 sonar fade (%s): material %d 0x%08lx params 0x%08lx: c108.w %.0f -> %.0f, c109.w %.0f -> %.0f, "
+                "c110.x %.2f -> %.2f (FadeFar %ld; the game's 1/d falloff and fade to black of lib 192)", why, i, m.mat,
+                params, static_cast<double>(m.game[0]), static_cast<double>(v[0]), static_cast<double>(m.game[1]),
+                static_cast<double>(v[1]), static_cast<double>(m.game[2]), static_cast<double>(v[2]), f);
+        }
+    }
+}
+void S6Check() {
+    DWORD at = 0;
+    g_s6Ok = DvChecks(kS6Checks, sizeof(kS6Checks) / sizeof(kS6Checks[0]), &at);
+    if (g_s6Ok) Out(g_s6Why, sizeof(g_s6Why), "ok");
+    else Out(g_s6Why, sizeof(g_s6Why), "code differs at 0x%08lx", at);
+    Log(g_s6Ok ? 1 : 0, "0.22.52 sonar fade (shader values): checks %s (%d rows)", g_s6Why,
+        static_cast<int>(sizeof(kS6Checks) / sizeof(kS6Checks[0])));
+}
+void S6Shutdown() {
+    for (int i = 0; i < 2; ++i) S6Back(g_s6[i], "unload");
+}
+void S6State(char *o, size_t n) {
+    Out(o, n, "shader %s, %d / 2 materials ours, %ld writes, %ld back", g_s6Why, (g_s6[0].on ? 1 : 0) + (g_s6[1].on ? 1 : 0),
+        g_s6Writes, g_s6Backs);
+}
+// ---- end of 0.22.52 S6 ----
 
 // ======================================================================================================================
 // ---- 0.21 arachnophobia, camera shake, labels, ai.remove (Lukas / coordinator 2026-11-06) ----
@@ -37441,6 +37905,9 @@ const Item kItems[] = {
                               "back); [Sound] ReverbOff, live", true, ValW9Off, RunW9Off},
     {"snd.reverb", "info", "0.22.51: the game's reverb - output level, follows mute, voice updates seen / sends set to 0",
      false, ValW9State, nullptr},
+    {"snd.dspgraph", "info", "0.22.52: the FMOD DSP graph (walked from the target unit over the inputs every 2 s while the "
+                             "monitor / box is shown): units, effects, reverb inputs, voice updates per second, sends zeroed "
+                             "at once on mute", false, ValW10State, nullptr},
     // 0.22.48 Sonar komplett (section "0.22.48 Sonar komplett")
     {"sonar.full", "bool", "0.22.48: Sonar komplett - the PDA sonar shows every face of the loaded map units of the floor "
                            "(display only: 3 patches in the draw 0x6e3a00, the reveal state in the save untouched); "
@@ -37459,11 +37926,15 @@ const Item kItems[] = {
     {"sonar.unitmap", "info", "0.22.49: the sonar map of the current unit (read while the sonar is open, kept after): "
                               "real (faces) / placeholder only / no file", false, ValSoUnitMap, nullptr},
     // 0.22.51 S5 (section "0.22.51 S5")
-    {"sonar.fade", "action", "0.22.51 <n|0|-1>: Sonar: Abblenden Ferne - the sonar view's fog: 0 = the game's, n metres = "
-                             "fade from n/2 to n m, -1 = aus (call redirects 0x6e4d94 / 0x6e4bf9); [Sonar] FadeFar, live",
+    {"sonar.fade", "action", "0.22.51 <n|0|-1>: Sonar: Abblenden Ferne - 0.22.52: the face shader's (lib 192) distance "
+                             "falloff and fade to black of materials 3348 / 3349 (PS c108.w / c109.w / c110.x): 0 = the "
+                             "game's, n metres = no falloff, black from n/2 to n m, -1 = aus (no falloff, no fade); the "
+                             "fog (call redirects 0x6e4d94 / 0x6e4bf9) off for every value != 0; [Sonar] FadeFar, live",
      true, ValS5Fade, RunS5Fade},
-    {"sonar.tint", "bool", "0.22.51: the map units other than Lara's (the sonar's open unit [0xedf254]) drawn amber-tinted "
-                           "(call redirect 0x6e42ac); [Sonar] TintOthers, live", true, ValS5Tint, RunS5Tint},
+    {"sonar.tint", "action", "0.22.51 / 0.22.52 <aus|ein|bereich> = 0 / 1 / 2: Sonar: Bereichsfarben - the map units other "
+                             "than Lara's (the sonar's open unit [0xedf254]): 1 = one amber tint, 2 = a muted colour per "
+                             "area (amber, teal green, violet, rose, olive, slate blue, sand, rust; legend in sonar.view) "
+                             "(call redirect 0x6e42ac); [Sonar] TintOthers, live", true, ValS5Tint, RunS5Tint},
     {"sonar.area", "action", "0.22.51 <alle|unit>: Bereich anzeigen - only this unit of the sonar's own list is drawn "
                              "(call redirect 0x6e42ac; no load, no camera move; kept for the session)", true, ValS5Area,
      RunS5Area},
@@ -39727,6 +40198,7 @@ bool ItemValueShort(const char *id, bool de, char *o, size_t n) {
         const LONG s = g_atStyle;
         Out(o, n, "%ld %s", s, de ? AtStyleOf(s).de : AtStyleOf(s).en);
     } else if (!_stricmp(id, "sonar.fade")) S5FadeText(g_s5Fade, de, o, n);   // 0.22.51 S5
+    else if (!_stricmp(id, "sonar.tint")) S5TintText(g_s5Tint, de, o, n);   // 0.22.52
     else if (!_stricmp(id, "sonar.area")) S5AreaShort(de, o, n);
     else if (GsShort(id, de, o, n)) {        // 0.22.16 game settings page (sub look, volumes, graphics, mouse)
     } else return false;
@@ -41428,7 +41900,8 @@ enum QbVal { kQvNone = 0, kQvDepth, kQvAlpha, kQvBright, kQvEncl, kQvSpeed, kQvP
              kQvSubAlignV, kQvSubAlignH, kQvSubMargin,    // 0.22.18 subtitle alignment
              kQvVoiceLang,                                // 0.22.18 voice.lang
              kQvAtStyle,                                  // 0.22.40 menu.attracticon 0 .. 7 (Q126b); 0.22.41 0 .. 16
-             kQvSoFade, kQvSoArea };                      // 0.22.51 sonar.fade (8 steps) / sonar.area (alle + the list)
+             kQvSoFade, kQvSoArea,                        // 0.22.51 sonar.fade (8 steps) / sonar.area (alle + the list)
+             kQvSoTint };                                 // 0.22.52 sonar.tint aus / ein Farbton / je Bereich
 // colour 0 = the layer's; flags = QbFlag
 struct QbRow { const char *de, *en, *id, *arg; int kind, layer, count, val; ImU32 colour; int flags; };
 // 0.22.18 (owner 2026-11-10, shot pc_leiste_gruppen_164959): the nesting level of a group heading - 0 top, 1 a sub-group
@@ -41500,6 +41973,7 @@ const QbRow kQbSettings[] = {
     {"Hall folgt Stumm", "Reverb follows mute", "snd.reverbmute", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
     {"Hall aus", "Reverb off", "snd.reverboff", "", kQbBool, -1, kQcNone, 0, kQbSound, 0},
     {"Hall: Stand", "Reverb: state", "snd.reverb", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
+    {"DSP-Graph: Stand", "DSP graph: state", "snd.dspgraph", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},   // 0.22.52 W10
     {"Musik: Thailand", "Music: Thailand", "media.music.play", "l2_waters_of_thailand", kQbAction, -1, kQcNone, 0,
      kQbTime, 0},
     {"Musik stoppen", "Music stop", "media.music.stop", "all", kQbAction, -1, kQcNone, 0, kQbTime, 0},
@@ -41608,7 +42082,7 @@ const QbRow kQbSettings[] = {
     // DLC 2 base PDA switch (acts only with the DLC g_pda)
     {"Sonar: Abblenden Ferne", "Sonar: distance fade", "sonar.fade", "", kQbValue, -1, kQcNone, kQvSoFade, kQbBlue, 0},
     {"Bereich anzeigen", "Show area", "sonar.area", "", kQbValue, -1, kQcNone, kQvSoArea, kQbBlue, 0},
-    {"Sonar: andere Bereiche einf\303\244rben", "Tint other areas", "sonar.tint", "", kQbBool, -1, kQcNone, 0, kQbBlue, 0},
+    {"Sonar: Bereichsfarben", "Sonar: area colours", "sonar.tint", "", kQbValue, -1, kQcNone, kQvSoTint, kQbBlue, 0},
     {"Sonar: warum fehlt ein Bereich? (Log)", "Sonar: why is an area missing? (log)", "sonar.why", "", kQbAction, -1,
      kQcNone, 0, kQbGrey, 0},
     {"Sonar-Ansicht: Stand", "Sonar view: state", "sonar.view", "", kQbInfo, -1, kQcNone, 0, kQbGrey, 0},
@@ -42264,10 +42738,16 @@ const QbRow kQbTests[] = {
     {"Hall folgt Stumm", "Reverb follows mute", "snd.reverbmute", "", kQbBool, -1, kQcNone, 0, kQbSound, kQfTg},
     {"Hall aus", "Reverb off", "snd.reverboff", "", kQbBool, -1, kQcNone, 0, kQbSound, kQfTg},
     {"Hall: Stand", "Reverb: state", "snd.reverb", "", kQbInfo, -1, kQcNone, 0, kQbGrey, kQfTg},
+    {"DSP-Graph: Stand", "DSP graph: state", "snd.dspgraph", "", kQbInfo, -1, kQcNone, 0, kQbGrey, kQfTg},   // 0.22.52
     {"Eitr-Strahl, alles stumm: kein Ton mehr (B2.8)", "Eitr beam, all muted: no tone left (B2.8)", "test.mark",
      "tgB2.reverb", kQbCheck, -1, kQcNone, 0, kQbWhite, kQfTg},
     {"Hall aus: Spiel ohne Hall, an = zur\303\274ck (B2.9)", "Reverb off: no reverb, on = back (B2.9)", "test.mark",
      "tgB2.revoff", kQbCheck, -1, kQcNone, 0, kQbWhite, kQfTg},
+    // 0.22.52 W10
+    {"Hall-Zeichen je Zeile: B\303\266gen / gestrichen / Punkt (B2.10)", "Reverb mark per line: arcs / struck / dot (B2.10)",
+     "test.mark", "tgB2.revmark", kQbCheck, -1, kQcNone, 0, kQbWhite, kQfTg},
+    {"Monitor: DSP-Graph + je Effekt eine Zeile (B2.11)", "Monitor: DSP graph + one row per effect (B2.11)", "test.mark",
+     "tgB2.dspgraph", kQbCheck, -1, kQcNone, 0, kQbWhite, kQfTg},
     {"Kasten voll = h\303\266rbar, leer = stumm (B2.1)", "Box filled = audible, empty = muted (B2.1)", "test.mark",
      "tgB2.box", kQbCheck, -1, kQcNone, 0, kQbWhite, kQfTg},
     {"Gruppe als Text, Quelle viking_thrall #.. / Lara (B2.2)", "Group as text, source viking_thrall #.. / Lara (B2.2)",
@@ -42367,8 +42847,7 @@ const QbRow kQbTests[] = {
     // 0.22.51 S5: copies of the new rows of page Spiel-Einstellungen / PDA / Sonar (the same items)
     {"Sonar: Abblenden Ferne", "Sonar: distance fade", "sonar.fade", "", kQbValue, -1, kQcNone, kQvSoFade, kQbBlue, kQfTg},
     {"Bereich anzeigen", "Show area", "sonar.area", "", kQbValue, -1, kQcNone, kQvSoArea, kQbBlue, kQfTg},
-    {"Sonar: andere Bereiche einf\303\244rben", "Tint other areas", "sonar.tint", "", kQbBool, -1, kQcNone, 0, kQbBlue,
-     kQfTg},
+    {"Sonar: Bereichsfarben", "Sonar: area colours", "sonar.tint", "", kQbValue, -1, kQcNone, kQvSoTint, kQbBlue, kQfTg},
     {"Sonar: warum fehlt ein Bereich? (Log)", "Sonar: why is an area missing? (log)", "sonar.why", "", kQbAction, -1,
      kQcNone, 0, kQbClaude, kQfTg},
     {"Sonar-Ansicht: Stand", "Sonar view: state", "sonar.view", "", kQbInfo, -1, kQcNone, 0, kQbGrey, kQfTg},
@@ -42950,9 +43429,16 @@ const QbHelp kQbHelp[] = {
     {"snd.reverbmute", "", "Stumme T\303\266ne ohne Spiel-Hall|Muted sounds without the game's reverb"},
     {"snd.reverboff", "", "Spiel-Hall ganz aus (auch h\303\266rbare T\303\266ne)|Game reverb off (audible sounds too)"},
     {"snd.reverb", "", "Hall-Pegel, folgt Stumm, Z\303\244hler|Reverb level, follows mute, counters"},
-    {"sonar.fade", "", "Nebel der Sonar-Ansicht: Spiel / aus / bis n m|Fog of the sonar view: game / off / up to n m"},
+    // 0.22.52 W10: the legend of the reverb mark (box + monitor)
+    {"snd.list", "", "Hall: B\303\266gen = h\303\266rbar, gestrichen = stumm, Punkt = keiner|"
+                     "Reverb: arcs = audible, struck = muted, dot = none"},
+    {"snd.monitor", "voices", "Hall: B\303\266gen = an, gestrichen = stumm, Punkt = keiner|"
+                              "Reverb mark: arcs = on, struck = muted, dot = none"},
+    {"snd.dspgraph", "", "Einheiten, Effekte, Hall-Eing\303\244nge, Updates/s, sofort 0|Units, effects, reverb inputs, "
+                         "updates/s, zeroed at once"},
+    {"sonar.fade", "", "Abdunkeln: Spiel / aus / schwarz ab n/2 bis n m|Dimming: game / off / black from n/2 to n m"},
     {"sonar.area", "", "Nur einen geladenen Bereich zeichnen (X: alle)|Draw one loaded area only (X: all)"},
-    {"sonar.tint", "", "Laras Bereich cyan, andere bernsteinfarben|Lara's area cyan, the others amber"},
+    {"sonar.tint", "", "Aus / ein Farbton / je Bereich eine Farbe (Lara cyan)|Off / one tint / a colour per area (Lara cyan)"},
     {"sonar.why", "", "Mitte, Achse, Schnitt-Ebene je Bereich ins Log|Centre, axis, cut plane per area to the log"},
     {"sonar.view", "", "Bereich / Einf\303\244rben / Abblenden: Stand|Area / tint / fade: state"},
     {"pda.basepda", "", "DLC 2 mit Basis-PDA (nur mit DLC-g_pda)|DLC 2 with the base PDA (DLC g_pda only)"},
@@ -43207,6 +43693,7 @@ int QbValueCount(int val) {
          : val == kQvGfx3 || val == kQvStepRate || val == kQvSubAlignV || val == kQvSubAlignH ? 3
          : val == kQvSubMargin ? 5 : val == kQvVoiceLang ? kVlChoiceN
          : val == kQvAtStyle ? kAtStyleN                                         // 0.22.40 (Q126b)
+         : val == kQvSoTint ? 3                                                  // 0.22.52 sonar.tint
          : val == kQvSoFade ? kS5FadeStepN : val == kQvSoArea ? S5AreaCount() : 0;   // 0.22.51 S5
 }
 // 0.22.16: sub.lang steps - game language, English, French, German, Italian, Spanish, Dutch (the DLC 2 records' ids)
@@ -43255,6 +43742,7 @@ void QbValueArg(int val, int i, char *o, size_t n) {
     case kQvAtStyle: Out(o, n, "%d", i); break;            // 0.22.40 (Q126b)
     case kQvSoFade: Out(o, n, "%ld", kS5FadeSteps[i]); break;   // 0.22.51 S5
     case kQvSoArea: S5AreaArg(i, o, n); break;
+    case kQvSoTint: Out(o, n, "%d", i); break;              // 0.22.52
     default: o[0] = 0;
     }
 }
@@ -43312,6 +43800,7 @@ int QbValueNow(int val) {
     case kQvAtStyle: v = static_cast<int>(g_atStyle); break;   // 0.22.40 (Q126b)
     case kQvSoFade: v = S5FadeIndex(); break;                  // 0.22.51 S5
     case kQvSoArea: v = S5AreaNow(); break;
+    case kQvSoTint: v = static_cast<int>(g_s5Tint); break;   // 0.22.52
     case kQvSndPos: v = g_snPos; break;                 // 0.20.1
     case kQvSndSort: v = g_snSort; break;
     case kQvShake:                                      // 0.21: the nearest step
@@ -43401,7 +43890,8 @@ bool QbValueDefault(int val, char *o, size_t n) {
     case kQvAtStyle: i = atoi(OptDefault("Menu", "AttractIcon")); break;
     case kQvSoFade: i = kS5FadeStepDefault; break;          // 0.22.51: the game's fog
     case kQvSoArea: i = 0; break;                           // alle
-    default: return false;                                  // kQvVol / kQvMouse / kQvGfx3 / kQvPass / kQvNone
+    case kQvSoTint: i = atoi(OptDefault("Sonar", "TintOthers")); break;   // 0.22.52: aus
+    default: return false;                                 // kQvVol / kQvMouse / kQvGfx3 / kQvPass / kQvNone
     }
     if (i < 0 || i >= QbValueCount(val)) return false;
     QbValueArg(val, i, o, n);
@@ -43935,6 +44425,7 @@ struct QbView {
     bool fav;                                // 0.21.8: its item + argument is a favourite (a yellow star after the name)
     int depth;                               // 0.22.18: indentation steps (a heading: its level; a row: the level below)
     bool head;                               // 0.22.18: a group heading / label (drawn without the square column)
+    int rev;                                 // 0.22.52 W10: 0 = no reverb mark, else 1 + kW9RevNone / On / Muted
 };
 QbView g_qbView[kQbViewMax];
 int g_qbViewN = 0, g_qbViewPage = -1;
@@ -45040,7 +45531,12 @@ void DrawQuick() {
         dl->AddText(font, fs, ImVec2(nameX, y), v.col, v.name);
         if (v.fav)                           // 0.21.8: a favourite (item + argument in [Favorites] Ids)
             dl->AddText(font, fs, ImVec2(nameX + width(v.name, fs), y), IM_COL32(255, 220, 90, 255), " *");
-        dl->AddText(font, fs, ImVec2(stateX, y), v.stateCol, v.state);
+        if (v.rev) {                         // 0.22.52 W10: the reverb mark in front of the state
+            W10RevIcon(dl, ImVec2(stateX, y), fs, v.rev - 1, v.stateCol | 0xff000000u);
+            dl->AddText(font, fs, ImVec2(stateX + fs * 1.15f, y), v.stateCol, v.state);
+        } else {
+            dl->AddText(font, fs, ImVec2(stateX, y), v.stateCol, v.state);
+        }
         if (v.count[0]) dl->AddText(font, fs, ImVec2(countRight - width(v.count, fs), y), v.col | 0xff000000u, v.count);
         y += rowH;
     }
@@ -47698,10 +48194,36 @@ void PzRefresh(bool de) {
                     de ? "Bereich nicht lesbar" : "range not readable");
             const bool inside = val && range && lo <= v && v < hi;
             Out(r->count, sizeof(r->count), "%s", inside ? (de ? "drin" : "inside") : "");
-            if (cond == 14 && range && found && (type == 1 || type == 3) && index >= 0)
-                Out(r->arg, sizeof(r->arg), "%lu %d %.2f", intro, index, static_cast<double>((lo + hi) * 0.5f));
+            // 0.22.52 (j): the target. Owner live test 22:13 l3_secretchamber: a FREE hinge (limits off, [0, 0]) with the
+            // open-ended ranges [1, 10000) / [-10001, -1) (Not_Rotating -> Rotating = a motion detector, not a solving
+            // step) got the middle 5000.5 degrees -> the pillar was locked at 87 rad and spun through the geometry.
+            // Now: open-ended range on a free hinge = list only; otherwise the range is cut to the joint's own limits
+            // (limit on, lo < hi; ma_rb_chapel_gate_round At_Top [774.3, 948.2) vs limits [0, 790.1]: 861 -> 782.2) and
+            // an open bound (|x| >= 360 degrees on a hinge) is replaced by the near bound + 2 degrees.
+            float lim[2] = {0.0f, 0.0f};
+            DWORD jfl = 0;
+            const bool limOk = found && ReadFloats(joint + 0xd8, lim, 2) && ReadDword(joint + 0x174, &jfl);
+            const bool limOn = limOk && (jfl & 2) != 0;
+            const float open = type == 1 ? 360.0f : 1.0e6f;
+            const bool loOpen = range && fabsf(lo) >= open, hiOpen = range && fabsf(hi) >= open;
+            const bool motion = type == 1 && limOk && !limOn && (loOpen || hiOpen);
+            float a = lo, z = hi;
+            if (limOn && lim[0] < lim[1]) {
+                const float lr0 = type == 1 ? lim[0] * 57.29577951f : lim[0], lr1 = type == 1 ? lim[1] * 57.29577951f : lim[1];
+                if (a < lr0) a = lr0;
+                if (z > lr1) z = lr1;
+            }
+            float target = (a + z) * 0.5f;
+            if (loOpen && !hiOpen) target = z - (type == 1 ? 2.0f : 5.0f);
+            else if (hiOpen && !loOpen) target = a + (type == 1 ? 2.0f : 5.0f);
+            const bool usable = !motion && a < z && !(loOpen && hiOpen);
+            if (cond == 14 && range && found && (type == 1 || type == 3) && index >= 0 && usable)
+                Out(r->arg, sizeof(r->arg), "%lu %d %.2f", intro, index, static_cast<double>(target));
             Out(r->state, sizeof(r->state), "%s", r->arg[0] ? (de ? "rechts 2x = l\303\266sen" : "right 2x = solve")
-                                                            : (de ? "nur Anzeige" : "list only"));
+                                                  : motion ? (de ? "Bewegungs-Melder, kein Ziel" : "motion detector, no target")
+                                                  : cond == 14 && range && found && !(a < z)
+                                                      ? (de ? "Bereich au\303\237erhalb der Grenzen" : "range outside the limits")
+                                                      : (de ? "nur Anzeige" : "list only"));
         }
     }
 }
@@ -47879,6 +48401,41 @@ int W7QbRows(QbView *v, int max, const char *what, int depth, bool de) {
             }
             W9RevRow(de, sends, mutedSends, smax, name, sizeof(name), state, sizeof(state));
             view(name, state, "", IM_COL32(150, 200, 255, 255), W9RevOutNow() > 0.0f && sends ? red : grey, 0, -1);
+            // 0.22.52 W10: the whole DSP graph (walked from the FMOD target unit) and one row per effect
+            static W10Fx fx[kW10FxMax];
+            int fxn = 0, units = 0;
+            LONG rins = -1;
+            EnterCriticalSection(&g_snLock);
+            fxn = g_w10FxN;
+            memcpy(fx, g_w10Fx, sizeof(W10Fx) * static_cast<size_t>(fxn));
+            units = g_w10Units;
+            rins = g_w10RevIns;
+            LeaveCriticalSection(&g_snLock);
+            if (units) {
+                Out(name, sizeof(name), de ? "-- DSP-Graph: %d Einheiten, %d Effekte; Hall-Eing\303\244nge %ld; Updates %ld/s "
+                                             "(%ld Sends), sofort auf 0: %ld"
+                                           : "-- DSP graph: %d units, %d effects; reverb inputs %ld; updates %ld/s (%ld "
+                                             "sends), zeroed at once: %ld",
+                    units, fxn, rins, g_w10Rate, g_w10RateVoices, g_w10Swept);
+                view(name, "", "", grey, grey, 0, -1);
+                for (int i = 0; i < fxn; ++i) {
+                    const W10Fx &f = fx[i];
+                    int voices = 0;
+                    for (int k = 0; k < count0; ++k) voices += f.group >= 0 && g_w7QbVoices[k].group == f.group ? 1 : 0;
+                    char into[24];
+                    if (f.group >= 0) Out(into, sizeof(into), "g%d", f.group);
+                    else Out(into, sizeof(into), "0x%08lx", f.into);
+                    const bool isRev = !strcmp(f.name, "SFX Reverb");
+                    Out(name, sizeof(name), de ? "-- DSP %s (%s): -> %s %.2f, %d Eing\303\244nge%s"
+                                               : "-- DSP %s (%s): -> %s %.2f, %d inputs%s",
+                        f.name, W10TypeName(f.type), into, static_cast<double>(f.mix), f.ins,
+                        isRev ? (de ? " (Sends, umgeht Stumm)" : " (sends, bypasses mute)")
+                              : (de ? " (Einschub hinter dem Stumm)" : " (insert behind the mute)"));
+                    Out(state, sizeof(state), "%s", f.active ? (de ? "aktiv" : "active") : (de ? "inaktiv" : "inactive"));
+                    Out(count, sizeof(count), de ? "%d Stimmen" : "%d voices", isRev ? sends : voices);
+                    view(name, state, count, IM_COL32(150, 200, 255, 255), grey, 0, -1);
+                }
+            }
         }
         int shown = 0;
         for (int pass = 0; pass < 2; ++pass)
@@ -47909,8 +48466,10 @@ int W7QbRows(QbView *v, int max, const char *what, int depth, bool de) {
                 else Out(count, sizeof(count), "%.2f %s", static_cast<double>(x.vol), x.dist < -1.5f ? "3D" : "2D");
                 ImU32 c = kW7KindColour[x.kind];
                 if (st != kSnStPlaying) c = (c & 0x00ffffff) | 0x90000000;
+                const int at = n;
                 view(name, state, count, c, muted ? red : grey, muted ? 2 : 1,
                      slotOf(0, x.wave, x.group, x.emitter, x.sid, nm));
+                if (n > at) v[at].rev = 1 + x.rev;   // 0.22.52 W10: the reverb mark in front of the state
                 ++shown;
             }
         if (count0 > shown) {
@@ -51087,6 +51646,7 @@ void Start(HMODULE self) {
     W8Check();                                // 0.22.50 sound log / FMOD channels / source hooks (precheck_02250.txt, 27)
     S5Check();                                // 0.22.51 sonar view / base PDA (precheck_02251.txt, 22 rows)
     W9Check();                                // 0.22.51 the game's reverb send (precheck_02251_reverb.txt, 11 rows)
+    S6Check();                                // 0.22.52 the sonar's shader fade (precheck_02252.txt, 6 rows)
     M21Check();                               // 0.21 arachnophobia / camera / labels / ai.remove (precheck_021.txt)
     P5Check();                                // 0.22.37 debug view P5 (precheck_02237.txt; after M20Check / M21Check:
                                               // needs the intro data and label checks)

@@ -1,0 +1,18 @@
+# TruMenu 0.22.52 S6: the sonar's shader fade - kS6Checks, in this order (+ the evidence rows below, not in the build).
+# Run: ../bin/pyt -t 120 tools/pe_bytes_check.py ../data/pc/tru.exe --file work/menu52_1411/precheck_02252.txt
+# Finding: workspace docs\Befund-TruMenu-02252-1411.md; live work/menu52_1411/live_sonar_material_2.txt (22:13);
+# listings (local): work/menu52_1411/_archiv/dis_sonar.txt, shader_192/lib192_entry00028.asm.
+#
+# --- the sonar view copies tuning [0xee03e0] +0x34 .. +0x50 and fills the four batches' material (+0x29044)
+0x006e4c2a 8b4834 890df003ee00
+0x006e4c45 8b5040 8915fc03ee00
+0x006e4c71 890d3495f000 89158025f300
+# --- the tuning pointer [0xee03e0]
+0x006dd9a4 a3e003ee00
+# --- per draw: PS MaterialParams of [mat+4] (+0x58 count, +0x5c pointer) -> PS c100 (0x526920)
+0x00505aba 8b5504 837a5800 7411 8bc2 8b5058 8b405c 52 50 6a64 e84c0e0200
+# --- the device's primitive call (vtable 0x8492cc +0x4c = 0x503fa0) reads [mat+4] +0x44
+0x00503fdb 8b4f04 f7414400000040
+# --- evidence only: the vtable slot +0x4c, the flush hands batch +0x29044 to it
+0x0084931c 203f5000
+0x006dfa11 8b8e44900200

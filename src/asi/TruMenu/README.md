@@ -2928,6 +2928,58 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.52 - reverb mark per line, the whole DSP graph in the monitor, the sonar's real distance dimming, a colour per area, the puzzle row fix (2026-11-14 late)
+
+Build `work\asi\menu0275\TruMenu.asi`. Workspace finding `docs\Befund-TruMenu-02252-1411.md`.
+
+- **DSP graph (analysis, live 22:02 read only + static):** 189 DSP units - one game `SFX Reverb` (13 sends, -> master
+  head 1.0), two `FMOD ParamEQ` (groups 58 / 59: group head -> EQ -> group head = inserts behind the channels' muted
+  dry connections), three stream codecs, 162 channel group heads, target, sound card. No echo / chorus (groups 77 / 78
+  have no DSP on PC), no oscillator playing, no other send. Static: the game creates DSPs only at 0x586fda (the reverb),
+  0x5839f3 (oscillator, played by System::playDSP as its own channel - FMOD's channel mute holds) and 0x5876df (kinds
+  1 .. 11 for groups / SoundPlex DSP nodes, put in with ChannelGroup::addDSP = inserts); DSP::addInput only at 0x58223b
+  (reverb -> master) and 0x584188 (the voice sends). **The reverb send stays the only path past the mute** - no second
+  effect needs a mute rule.
+- **Reverb mark per line** (box and monitor): arcs = the send reaches the reverb; arcs struck through = the game would
+  send (params +0xc > 0) but "Hall folgt Stumm" / "Hall aus" hold it at 0; a dot = no send. Legend in the help line of
+  "Ton-Anzeige unten rechts" and "Aktive Stimmen".
+- **Monitor:** a row `DSP-Graph: n Einheiten, m Effekte; Hall-Eingaenge, Updates/s, sofort auf 0` and one row per effect
+  (name, kind, the head it feeds, level, inputs, active, voices of its group); info row "DSP-Graph: Stand"
+  (`snd.dspgraph`). The walk runs every 2 s only while the monitor or the box is shown.
+- **Hall folgt Stumm at once:** a muted voice's send is set to 0 on the game thread within 50 ms (W10Sweep); the game's
+  next voice update (once per frame, 0x47ad8f -> 0x591e80 -> 0x591480) keeps it at 0 through R1. The count of voice
+  updates per second is measured (log line `0.22.52 reverb: voice updates ...`).
+- **Sonar: Abblenden Ferne** now drives the real dimming: the face shader (PS lib 192 of materials 3348 / 3349) darkens
+  with the depth - a 1/d falloff down to half (floor c110.x 0.5) and a fade to black between c108.w and c109.w (3348:
+  500 .. 600 m, 3349: 200 .. 300 m). `aus` = no falloff, no fade; `n m` = no falloff, black from n/2 to n m; `Spiel` =
+  untouched. The fog is put out for every value != 0 (the game's fog call is a hard step at 655 m). Only the three
+  values of both materials are written, over the game's values only, back at `Spiel`, on a material change and at
+  unload. 6 byte checks (`0.22.52 sonar fade (shader values): checks ok (6 rows)`).
+- **Sonar: Bereichsfarben** (value row, `[Sonar] TintOthers` 0 / 1 / 2): aus / ein Farbton (amber, as 0.22.51) / je
+  Bereich = a muted colour per area (amber, teal green, violet, rose, olive, slate blue, sand, rust - each 40 % from the
+  game's cyan), Lara's area stays cyan; the legend `colours: <unit> <colour>, ...` is in "Sonar-Ansicht: Stand".
+- **Kapitel / Raetsel (j):** the l3_secretchamber pillar (free hinge, limits off) offered `joint.set ... 5000.50` - the
+  middle of the open range [1, 10000) of the motion detector Not_Rotating -> Rotating - and our lock lo = hi = 5000.5
+  degrees stayed after the node change, so the pillar spun through the geometry. Now: an open-ended range on a free hinge
+  is list only ("Bewegungs-Melder, kein Ziel"); every range is cut to the joint's own limits first
+  (ma_rb_chapel_gate_round At_Top: 861 -> 782.2 inside [0, 790.1]); an open bound is replaced by the near bound + 2
+  degrees / 5 units; after a node change our lock is taken back when it still stands. The pillar's real solution is not
+  a joint range of its uber graph (only Not_Rotating / Rotating) - no "solve" row for it.
+
+### TO TEST 0.22.52
+
+| # | Where | Do | Expected |
+|---|---|---|---|
+| 1 | start | read `TruMenu.log` | `0.22.52 sonar fade (shader values): checks ok (6 rows)`; later `0.22.52 DSP graph (first walk ...)` with `SFX Reverb` and `FMOD ParamEQ` |
+| 2 | DLC 2 Eitr beam, box + monitor | everything muted, "Hall folgt Stumm" on | beam lines: struck arcs; monitor: struck arcs before `stumm`; tone gone; log `0.22.52 reverb: voice updates ... per voice and second` |
+| 3 | same | "Hall folgt Stumm" off | arcs (not struck), tone back |
+| 4 | Ton-Monitor | look at the rows under `Hall (Spiel-Reverb)` | `DSP-Graph: ...` + `DSP SFX Reverb (Hall)` + 2 x `DSP FMOD ParamEQ` (where groups 58 / 59 are loaded) |
+| 5 | DLC 1 water wheel, sonar | "Sonar: Abblenden Ferne" -> aus | the far map no longer darkens (screenshot); log `0.22.52 sonar fade (sonar.fade): material 0 ... c110.x 0.50 -> 1.00` |
+| 6 | same | -> 50 m, then X | 50 m: black from 25 m; X = Spiel: the game's look, log `... 3 of 3 game values back` |
+| 7 | sonar | "Sonar: Bereichsfarben" -> je Bereich | every area its own soft colour, Lara's cyan; "Sonar-Ansicht: Stand" lists `colours: ...` |
+| 8 | l3_secretchamber (reload first: the pillar of 22:13) | page Kapitel / Raetsel | the pillar rows read `Bewegungs-Melder, kein Ziel`, no `rechts 2x` |
+| 9 | a rail puzzle (chapel gate / bend switches) | right 2x | target inside the joint's limits; after the node change `... solved step` (with `our lock was still on the joint` if it stood) |
+
 ## 0.22.51 - sonar: fade of the far map, one area, other areas tinted, why one is missing; base PDA in DLC 2; X = default; DLC start from a level; the game's reverb follows mute (2026-11-14)
 
 Built into `work\asi\menu0274`, not installed, no live test (owner wishes of 14.11. evening; report in the workspace

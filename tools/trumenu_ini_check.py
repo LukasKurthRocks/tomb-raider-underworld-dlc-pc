@@ -269,7 +269,8 @@ QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'chea
                   # 0.22.18 subtitle alignment, voice language, frame-step rate
                   'sub.valign', 'sub.halign', 'sub.margin', 'voice.lang', 'cine.steprate',
                   'menu.attracticon',                                            # 0.22.40 (Q126b) styles 0 .. 7
-                  'sonar.fade', 'sonar.area')                                    # 0.22.51 S5
+                  'sonar.fade', 'sonar.area',                                    # 0.22.51 S5
+                  'sonar.tint')                                                  # 0.22.52 aus / ein / je Bereich
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
@@ -4889,7 +4890,8 @@ def check_02240(ini_path, switches_path):
         problems.append('TruMenu.cpp: bar row "Teaser-Anzeige" (kQbValue kQvAtStyle) must follow menu.attracttimer in set_main')
     if '"menu.attracticon", "", kQbBool' in src: problems.append('TruMenu.cpp: the bool bar row menu.attracticon must be gone')
     # 0.22.51: kQvSoFade / kQvSoArea follow kQvAtStyle (was: kQvAtStyle closed the enum)
-    if not re.search(r'kQvAtStyle,[^\n]*\n\s*kQvSoFade, kQvSoArea \};', src):
+    # 0.22.52: kQvSoTint after kQvSoArea
+    if not re.search(r'kQvAtStyle,[^\n]*\n\s*kQvSoFade, kQvSoArea(,[^\n]*\n\s*kQvSoTint)? \};', src):
         problems.append('TruMenu.cpp: kQvAtStyle must be in the QbVal enum (0.22.51: before kQvSoFade, kQvSoArea)')
     if ': val == kQvAtStyle ? kAtStyleN ' not in fn_body(src, 'int QbValueCount('):
         problems.append('TruMenu.cpp: QbValueCount must give kAtStyleN for kQvAtStyle')
@@ -6503,7 +6505,8 @@ S5_CHECKS_02251 = os.path.join(ROOT, 'work', 'menu51_1411', 'precheck_02251.txt'
 S5_KEYS_02251 = (('Sonar', 'FadeFar', '0'), ('Sonar', 'TintOthers', '0'), ('PDA', 'ShadowPdaAsBasePda', '0'),
                  ('Sound', 'ReverbFollowsMute', '1'), ('Sound', 'ReverbOff', '0'))   # the last two: W9 (reverb)
 # item, type, game thread (queued)
-S5_ITEMS_02251 = (('sonar.fade', 'action', 'true'), ('sonar.tint', 'bool', 'true'), ('sonar.area', 'action', 'true'),
+# 0.22.52: sonar.tint became an action (the 0 / 1 / 2 value row "Sonar: Bereichsfarben")
+S5_ITEMS_02251 = (('sonar.fade', 'action', 'true'), ('sonar.tint', 'action', 'true'), ('sonar.area', 'action', 'true'),
                   ('sonar.why', 'action', 'true'), ('sonar.view', 'info', 'false'), ('pda.basepda', 'bool', 'true'),
                   ('pda.state', 'info', 'false'), ('snd.reverbmute', 'bool', 'true'), ('snd.reverboff', 'bool', 'true'),
                   ('snd.reverb', 'info', 'false'))
@@ -6515,9 +6518,10 @@ S5_FOG_STUB = ('mov eax, dword ptr [g_s5FogFar]', 'test eax, eax', 'je s5f_go', 
                's5f_go:', 'jmp dword ptr [g_s5FogFn]')
 S5_UNIT_STUB = ('mov eax, dword ptr [esp + 4]', 'mov ecx, dword ptr [g_s5ShowUnit]', 'test ecx, ecx', 'je s5u_draw',
                 'cmp eax, ecx', 'je s5u_draw', 'lock inc dword ptr [g_s5AreaSkips]', 'ret', 's5u_draw:',
-                'cmp dword ptr [g_s5Tint], 0', 'je s5u_plain', 'mov ecx, dword ptr [g_s5AnchorAt]', 'cmp eax, dword ptr [ecx]',
+                # 0.22.52: the colour comes from S5ColourFor (one tint / per area; 0 = the game's), the unit pushed again
+                'cmp dword ptr [g_s5Tint], 0', 'je s5u_plain', 'push eax', 'call S5ColourFor', 'test eax, eax',
                 'je s5u_plain', 'mov ecx, dword ptr [g_s5ColourAt]', 'push dword ptr [ecx]',
-                'mov edx, dword ptr [g_s5TintColour]', 'mov dword ptr [ecx], edx', 'push dword ptr [esp + 0xc]', 'push eax',
+                'mov dword ptr [ecx], eax', 'push dword ptr [esp + 0xc]', 'push dword ptr [esp + 0xc]',
                 'call dword ptr [g_s5DrawFn]', 'add esp, 8', 'mov ecx, dword ptr [g_s5ColourAt]', 'pop edx',
                 'mov dword ptr [ecx], edx', 'lock inc dword ptr [g_s5Tinted]', 'ret', 's5u_plain:',
                 'jmp dword ptr [g_s5DrawFn]')
@@ -6539,7 +6543,8 @@ def check_02251(switches_path):
     src = read_cpp()
     code = re.sub(r'//[^\n]*', '', src)
     ver = src[:src.find('\n', src.find('kVersion = '))]
-    if '"TruMenu 0.22.51 (sonar view + base PDA + X default + DLC start from a level' not in ver:
+    # 0.22.52: the 0.22.51 part follows the 0.22.52 text in kVersion
+    if '0.22.51 (sonar view + base PDA + X default + DLC start from a level' not in ver:
         problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.51 (sonar view + base PDA + X default + DLC '
                         'start from a level"')
     # ---- (1) checks, order
@@ -6597,11 +6602,12 @@ def check_02251(switches_path):
         problems.append('TruMenu.cpp: in the S5 section only the PDA word is written with WriteBytes (S5PdaTick, S5Shutdown)')
     # ---- (3) fade / tint values
     fv = fn_body(src, 'void S5FogValues(')
-    for want in ('if (f < 0) { nearV = 9.0e6f; farV = 1.0e7f; }',
-                 'else if (f > 0) { farV = static_cast<float>(f) * 100.0f; nearV = farV * 0.5f; }'):
+    # 0.22.52: every FadeFar != 0 puts the fog out (the fade is the shader's, check_02252)
+    for want in ('if (f != 0) { nearV = 9.0e6f; farV = 1.0e7f; }',):
         if want not in fv: problems.append('TruMenu.cpp: S5FogValues lacks %s' % want)
-    if 'const DWORD tint[3] = {255, 170, 40};' not in fn_body(src, 'void S5TintValue(') or \
-            'mixed = (ch * 6 + tint[k] * 4) / 10' not in fn_body(src, 'void S5TintValue('):
+    # 0.22.52: the amber tint = palette entry 0, blended 40 % by S5Blend (alpha kept)
+    if '{{255, 170, 40},' not in src or 'mixed = (ch * 6 + tint[k] * 4) / 10' not in fn_body(src, 'DWORD S5Blend(') or \
+            'S5Blend(c, kS5Pal[0])' not in fn_body(src, 'void S5TintValue('):
         problems.append('TruMenu.cpp: S5TintValue: 40 % towards amber (255, 170, 40), alpha kept')
     if 'LONG S5FadeClamp(LONG v) { return v < -1 ? -1 : v > 2000 ? 2000 : v; }' not in src:
         problems.append('TruMenu.cpp: S5FadeClamp must keep FadeFar in -1 .. 2000')
@@ -6645,7 +6651,8 @@ def check_02251(switches_path):
     for sec_, key, default in S5_KEYS_02251:
         if keys.get((sec_, key)) != default: problems.append('TruMenu.cpp: kOpts [%s] %s=%s missing' % (sec_, key, default))
         f = sw_rows.get('TruMenu:%s:%s' % (sec_, key))
-        if not f or f[6] != 'live' or f[7] != default or len(f) < 10 or f[9] != 'TruMenu 0.22.51':
+        # 0.22.52: FadeFar / TintOthers rows were renewed for 0.22.52
+        if not f or f[6] != 'live' or f[7] != default or len(f) < 10 or f[9] not in ('TruMenu 0.22.51', 'TruMenu 0.22.52'):
             problems.append('switches: row TruMenu | %s | %s | ... | live | %s | ... | TruMenu 0.22.51 missing' %
                             (sec_, key, default))
     if sw_rows.get('TruMenu:Sonar:FadeFar', [''] * 4)[3] != 'int:-1..2000:50':
@@ -6656,7 +6663,7 @@ def check_02251(switches_path):
             if r[0] != tbl: continue
             if r[4] == 'kQbGroup': grp = r[3]; continue
             if grp == grp_want: have.add((r[2], r[4]))
-        for it in (('sonar.fade', 'kQbValue'), ('sonar.area', 'kQbValue'), ('sonar.tint', 'kQbBool'),
+        for it in (('sonar.fade', 'kQbValue'), ('sonar.area', 'kQbValue'), ('sonar.tint', 'kQbValue'),   # 0.22.52 tint
                    ('sonar.why', 'kQbAction'), ('sonar.view', 'kQbInfo'), ('pda.basepda', 'kQbBool'), ('pda.state', 'kQbInfo')):
             if it not in have: problems.append('TruMenu.cpp: %s group %s lacks %s (%s)' % (tbl, grp_want, it[0], it[1]))
     for want in ('"sonar.fade", "", kQbValue, -1, kQcNone, kQvSoFade,', '"sonar.area", "", kQbValue, -1, kQcNone, kQvSoArea,'):
@@ -6792,6 +6799,105 @@ def sv_rows(src, name):
     if not m: return []
     return [(a, ''.join(LIT.findall(b)).replace(' ', '')) for a, b in
             re.findall(r'\{0x([0-9a-f]{8}), ((?:"[0-9a-f ]+"\s*)+)\}', m.group(1))]
+
+
+S6_CHECKS_02252 = os.path.join(ROOT, 'work', 'menu52_1411', 'precheck_02252.txt')
+
+
+def check_02252(switches_path):
+    """0.22.52 (owner wishes 2026-11-14 late evening; workspace docs/Befund-TruMenu-02252-1411.md): (1) kVersion starts with
+    0.22.52; (2) kS6Checks = the first 6 rows of work/menu52_1411/precheck_02252.txt in order, S6Check right after W9Check,
+    S6Apply inside S5Apply before the early return, S6Shutdown in S5Shutdown, S6 writes only the three shader values over
+    the game's (S6Apply / S6Back) and only with WriteBytes; (3) W10: W10Tick right after W9Tick, the reverb mark in both
+    box loops and the monitor (QbView.rev), W10Sweep zeroes through W9SetMix only for an FMOD-muted voice, snd.dspgraph
+    info item + rows; (4) sonar.tint 0 / 1 / 2 (S5TintClamp, kQvSoTint value row, S5ColourFor in the stub, palette 8);
+    (5) (j) the Raetsel row: no drive for an open range on a free hinge, the range cut to the limits, JtTick takes our
+    lock back after a node change; (6) README 0.22.52 + TO TEST"""
+    problems = []
+    src = read_cpp()
+    ver = src[:src.find('\n', src.find('kVersion = '))]
+    if '"TruMenu 0.22.52 (reverb mark + DSP graph + sonar shader fade + area colours + joint row fix' not in ver:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.52 (reverb mark + DSP graph ..."')
+    # ---- (2) S6
+    offline = []
+    if os.path.exists(S6_CHECKS_02252):
+        for line in open(S6_CHECKS_02252, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/menu52_1411/precheck_02252.txt (the offline byte list) is missing')
+    rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kS6Checks')]
+    if len(rows) != 6 or rows != offline[:6]:
+        problems.append('TruMenu.cpp: kS6Checks (%d rows) must be the first 6 rows of precheck_02252.txt in order' % len(rows))
+    if not re.search(r'\n    W9Check\(\);[^\n]*\n    S6Check\(\);', src):
+        problems.append('TruMenu.cpp: the load must call S6Check right after W9Check')
+    ap = fn_body(src, 'void S5Apply(')
+    if not 0 <= ap.find('S6Apply(why);') < ap.find('if (wantD == g_s5OnD && wantF == g_s5OnF) return;'):
+        problems.append('TruMenu.cpp: S5Apply must call S6Apply(why) before its early return')
+    if 'S6Shutdown();' not in fn_body(src, 'void S5Shutdown('):
+        problems.append('TruMenu.cpp: S5Shutdown must call S6Shutdown')
+    sec = src[src.find('// ---- 0.22.52 S6:'):src.find('// ---- end of 0.22.52 S6 ----')]
+    if not sec: problems.append('TruMenu.cpp: the section "0.22.52 S6" is missing')
+    sc = re.sub(r'//[^\n]*', '', sec)
+    for bad in ('WriteDword(', 'WriteByte(', 'VirtualProtect(', 'SoWrite('):
+        if bad in sc: problems.append('TruMenu.cpp: the S6 section must not call %s' % bad)
+    if sc.count('WriteBytes(') != 2: problems.append('TruMenu.cpp: S6 writes with exactly two WriteBytes (S6Apply, S6Back)')
+    for want in ('const DWORD kS6Off[3] = {0x8c, 0x9c, 0xa0};', 'const DWORD kS6Tuning = 0x00ee03e0, kS6MatVt = 0x00849018;'):
+        if want not in src: problems.append('TruMenu.cpp: %s missing' % want)
+    sp = fn_body(src, 'bool S6Params(')
+    if 'cnt != 11' not in sp or 'vt != kS6MatVt' not in sp:
+        problems.append('TruMenu.cpp: S6Params must check the vtable 0x849018 and 11 PS MaterialParams')
+    sa = fn_body(src, 'void S6Apply(')
+    for want in ('if (cur != m.game[k] && cur != m.ours[k])', 'v[2] = 1.0f;', 'ReadDword(tun + 0x34, &mats[0]);',
+                 'ReadDword(tun + 0x40, &mats[1]);'):
+        if want not in sa: problems.append('TruMenu.cpp: S6Apply lacks %s' % want)
+    if 'cur == m.ours[k] && cur != m.game[k]' not in fn_body(src, 'void S6Back('):
+        problems.append('TruMenu.cpp: S6Back must put back only over our own value')
+    # ---- (3) W10
+    if not re.search(r'\n    W9Tick\(\);[^\n]*\n    W10Tick\(\);', src):
+        problems.append('TruMenu.cpp: PadHook must call W10Tick() right after W9Tick()')
+    dl = fn_body(src, 'void DrawSoundLog(')
+    if dl.count('W10RevIcon(dl, ImVec2(p.x + h * 3.3f, p.y), h, ') != 2:
+        problems.append('TruMenu.cpp: DrawSoundLog must draw the reverb mark in both line loops')
+    if 'W10RevIcon(dl, ImVec2(stateX, y), fs, v.rev - 1,' not in src or 'int rev;' not in src:
+        problems.append('TruMenu.cpp: the bar must draw QbView.rev in front of the state')
+    sw = fn_body(src, 'void W10Sweep(')
+    if '!(fl & 8)' not in sw or 'W9SetMix(conn, 0.0f)' not in sw or 'if (!g_w9On' not in sw:
+        problems.append('TruMenu.cpp: W10Sweep must zero only FMOD-muted voices (bit 3) through W9SetMix while R1 / R2 are ours')
+    if not re.search(r'\{"snd\.dspgraph", "info", "0\.22\.52[^}]*?false, ValW10State, nullptr\}', src, re.S):
+        problems.append('TruMenu.cpp: item snd.dspgraph (info) missing')
+    if src.count('"snd.dspgraph", "", kQbInfo') != 2:
+        problems.append('TruMenu.cpp: two bar rows snd.dspgraph (Spiel-Einstellungen / Ton + Paket B2)')
+    for tag in ('tgB2.revmark', 'tgB2.dspgraph'):
+        if '"%s", kQbCheck' % tag not in src: problems.append('TruMenu.cpp: TO TEST row %s missing' % tag)
+    # ---- (4) area colours
+    for want in ('LONG S5TintClamp(LONG v) { return v <= 0 ? 0 : v >= 2 ? 2 : 1; }', 'const int kS5PalN = 8;',
+                 'kQvSoTint };', 'DWORD __stdcall S5ColourFor(DWORD unit) {'):
+        if want not in src: problems.append('TruMenu.cpp: %s missing' % want)
+    if src.count('"sonar.tint", "", kQbValue, -1, kQcNone, kQvSoTint,') != 2:
+        problems.append('TruMenu.cpp: two value rows "Sonar: Bereichsfarben" (settings + Paket G)')
+    sw_rows = {}
+    for line in open(switches_path, encoding='utf-8').read().splitlines():
+        f = [x.strip() for x in line.split('|')]
+        if line.startswith('#') or len(f) < 9 or f[0] == 'group': continue
+        sw_rows['%s:%s:%s' % (f[0], f[1], f[2])] = f
+    if sw_rows.get('TruMenu:Sonar:TintOthers', [''] * 4)[3] != 'int:0..2':
+        problems.append('switches: TintOthers must be int:0..2')
+    # ---- (5) (j) joint rows
+    pz = fn_body(src, 'void PzRefresh(')
+    for want in ('const bool motion = type == 1 && limOk && !limOn && (loOpen || hiOpen);', 'if (a < lr0) a = lr0;',
+                 'if (z > lr1) z = lr1;', 'const bool usable = !motion && a < z && !(loOpen && hiOpen);'):
+        if want not in pz: problems.append('TruMenu.cpp: PzRefresh lacks %s' % want)
+    jt = fn_body(src, 'void JtTick(')
+    if 'JtStop(line, ours);' not in jt or 'lim[0] == t && lim[1] == t' not in jt:
+        problems.append('TruMenu.cpp: JtTick must take our lock back after a node change when it still stands')
+    # ---- (6) README
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8-sig').read()
+    if '## 0.22.52' not in readme or 'TO TEST 0.22.52' not in readme:
+        problems.append('README.md: section "## 0.22.52" with "TO TEST 0.22.52" missing')
+    return problems, 'reverb mark + DSP graph (W10), shader fade S6 (%d byte checks), area colours, joint rows (j)' % len(rows)
 
 
 def check_02227(ini_path, switches_path):
@@ -7425,6 +7531,10 @@ def main(argv):
     for p in cproblems51: print('Q02251 %s' % p)
     if not cproblems51: print('ok: 0.22.51 %s' % csummary51)
     problems += cproblems51
+    cproblems52, csummary52 = check_02252(opt.get('--switches', SWITCHES))   # 0.22.52 (reverb mark, DSP graph, S6, joint)
+    for p in cproblems52: print('Q02252 %s' % p)
+    if not cproblems52: print('ok: 0.22.52 %s' % csummary52)
+    problems += cproblems52
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

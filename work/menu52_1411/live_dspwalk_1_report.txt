@@ -1,0 +1,53 @@
+﻿units 189, connections with both ends known 190 (of 207 dumps)
+
+== every unit that is not a channel head / wave table / channel group head
+0x19742348 FMOD SoundCard Unit            type 0 (mixer/head) flags 0x2
+    <- 0x197444a0 FMOD ChannelGroup Target Unit  mix 1.0000  (conn 0x1973d3fc)
+0x197444a0 FMOD ChannelGroup Target Unit  type 0 (mixer/head) flags 0x2
+    <- 0x198883f0 ChannelGroup:                  mix 1.0000  (conn 0x1973d120)
+    <- 0x19744660 ChannelGroup:FMOD master group mix 1.0000  (conn 0x1973d308)
+    -> 0x19742348 FMOD SoundCard Unit            mix 1.0000  (conn 0x1973d3fc)
+0x197bbfd8 FMOD DSP Codec                 type 1000 (codec) flags 0x0
+    -> 0x1974709c FMOD Channel DSPHead Unit      mix 1.0000  (conn 0x19ccaa2c)
+    -> 0x1974559c FMOD Channel DSPHead Unit      mix 1.0000  (conn 0x19ccb784)
+0x197bd0a8 FMOD DSP Codec                 type 1000 (codec) flags 0x8
+    -> 0x1974769c FMOD Channel DSPHead Unit      mix 1.0000  (conn 0x19cc5464)
+0x197bd910 FMOD DSP Codec                 type 1000 (codec) flags 0x8
+    -> 0x19745b9c FMOD Channel DSPHead Unit      mix 1.0000  (conn 0x19cc74cc)
+0x197e7a50 SFX Reverb                     type 18 (sfxreverb) flags 0x2
+    <- 0x1974619c FMOD Channel DSPHead Unit      mix 0.0000  (conn 0x19cc4cc4)
+    <- 0x19744f9c FMOD Channel DSPHead Unit      mix 0.0000  (conn 0x19cc5370)
+    <- 0x1974649c FMOD Channel DSPHead Unit      mix 0.0000  (conn 0x19cc5834)
+    <- 0x19745e9c FMOD Channel DSPHead Unit      mix 0.0000  (conn 0x19cc63a4)
+    <- 0x19746a9c FMOD Channel DSPHead Unit      mix 0.0000  (conn 0x19cc658c)
+    <- 0x1974679c FMOD Channel DSPHead Unit      mix 0.0000  (conn 0x19cdc46c)
+    <- 0x19744c9c FMOD Channel DSPHead Unit      mix 0.0000  (conn 0x19cdea8c)
+    <- 0x1974589c FMOD Channel DSPHead Unit      mix 0.0000  (conn 0x19cdf044)
+    -> 0x19744660 ChannelGroup:FMOD master group mix 1.0000  (conn 0x1973d214)
+0x19d17ec0 FMOD ParamEQ                   type 10 (parameq) flags 0x22
+    <- 0x19cd6850 ChannelGroup:                  mix 1.0000  (conn 0x19cdbccc)
+    -> 0x19d18118 ChannelGroup:                  mix 1.0000  (conn 0x19cdbeb4)
+0x19d18240 FMOD ParamEQ                   type 10 (parameq) flags 0x22
+    <- 0x19cd6c20 ChannelGroup:                  mix 1.0000  (conn 0x19cdc09c)
+    -> 0x19d18498 ChannelGroup:                  mix 1.0000  (conn 0x19cdc284)
+
+== channel heads: outputs (dry to a group head / send to the reverb / other)
+0x19744c9c outs 2: ['ChannelGroup: 0.0000', 'SFX Reverb 0.0000'] | ins: ['FMOD WaveTable Unit 1.000']
+0x19744f9c outs 1: ['SFX Reverb 0.0000'] | ins: []
+0x1974559c outs 0: [] | ins: ['FMOD DSP Codec 1.000']
+0x1974589c outs 2: ['ChannelGroup: 0.0000', 'SFX Reverb 0.0000'] | ins: ['FMOD WaveTable Unit 1.000']
+0x19745b9c outs 0: [] | ins: ['FMOD DSP Codec 1.000']
+0x19745e9c outs 2: ['SFX Reverb 0.0000', 'ChannelGroup: 0.0000'] | ins: ['FMOD WaveTable Unit 1.000']
+0x1974619c outs 1: ['SFX Reverb 0.0000'] | ins: ['FMOD WaveTable Unit 1.000']
+0x1974649c outs 2: ['SFX Reverb 0.0000', 'ChannelGroup: 0.0000'] | ins: ['FMOD WaveTable Unit 1.000']
+0x1974679c outs 1: ['SFX Reverb 0.0000'] | ins: ['FMOD WaveTable Unit 1.000']
+0x19746a9c outs 2: ['SFX Reverb 0.0000', 'ChannelGroup: 0.0000'] | ins: ['FMOD WaveTable Unit 1.000']
+0x1974709c outs 0: [] | ins: ['FMOD DSP Codec 1.000']
+0x1974769c outs 0: [] | ins: ['FMOD DSP Codec 1.000']
+channel heads 12, with a send into SFX Reverb 8
+
+== group heads that feed something other than a group head (inserts, effects)
+0x19744660 ChannelGroup:FMOD master group -> 0x197444a0 FMOD ChannelGroup Target Unit mix 1.0000
+0x198883f0 ChannelGroup: -> 0x197444a0 FMOD ChannelGroup Target Unit mix 1.0000
+0x19cd6850 ChannelGroup: -> 0x19d17ec0 FMOD ParamEQ mix 1.0000
+0x19cd6c20 ChannelGroup: -> 0x19d18240 FMOD ParamEQ mix 1.0000
