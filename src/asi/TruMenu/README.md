@@ -2928,6 +2928,70 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.40 - Q126b: attract display styles, one cycle switch (2026-11-13)
+
+Built into `work\asi\menu0263`, not installed, no live test (finding in the workspace
+`docs\Befund-AttractIcon-Varianten-1311.md`; owner wish Q126b of 13.11.: "either the icon or only text, one switch
+instead of two, several variants to pick from"). Same values, slot, counters and blink as 0.22.39 - only the drawing and
+the switch changed; read only, no new byte checks.
+
+`[Menu] AttractIcon` is now **one cycle switch 0 .. 7** (replaces `AttractIcon` 0 / 1 + `AttractIconText`), default
+**7** = the 0.22.39 look, so nothing changes until a style is picked. Every circle style keeps the filling circle and the
+play triangle; every style (1 .. 7) blinks orange three times at the limit.
+
+| Value | Name (DE / EN) | Drawn |
+|---|---|---|
+| 0 | Aus / off | nothing (the update slot is put back as in 0.22.39 when nothing else wants it) |
+| 1 | Nur Text / text only | the two lines `12 / 40 s` and `übersprungen 3` / `Teaser gestartet 1`, no circle |
+| 2 | Kreis / circle | circle + play icon, no strike, no text |
+| 3 | Kreis + Strich / circle + strike | circle + play icon, red strike while NoAttract holds, no text |
+| 4 | Kreis, Text innen / circle, text inside | larger circle (about six font sizes, wider when the text needs it), small play icon in the upper part, `12 / 40 s` and the short counter (`übersp. 3` / `skipped 3`, `Teaser 1` / `teaser 1`) inside, white with a dark shadow; no strike |
+| 5 | Kreis, Text unten / circle, text below | circle + play icon, both lines centred below it; no strike |
+| 6 | Kreis + Strich, Text innen / circle + strike, text inside | as 4 with the red strike over the small icon |
+| 7 | wie 0.22.39 (Text links) / as 0.22.39 (text left) | the 0.22.39 look: circle + strike, the two lines left of it |
+
+- Bar: Spiel-Einstellungen / Hauptmenü **"Teaser-Anzeige"** (was the bool row "Teaser-Symbol (Kreis)"), a value row:
+  left / right step 0 .. 7 (at the ends "Ende"), the row shows `< 4 Kreis, Text innen >` (EN: `< 4 circle, text inside >`).
+  Help "Aus, nur Text oder Kreis bis zum Teaser (Varianten 2-7)". Page Fixes, group "Hauptmenü (TruMenu)": one row
+  `AttractIcon` `int:0..7`, live (the row `AttractIconText` is gone).
+- `menu.attracticon 0..7` (item type `value`; one digit or `off`; anything else = usage, nothing changed; no argument =
+  report, e.g. `4 (circle, text inside; the game's elapsed; clock read, 12.40 / 40.00 s = 31 %, ...)`). **`1` is now
+  "text only"**, no longer "on"; `on` / `true` are refused.
+- Old INI: `AtStyleRead` maps a 0.22.39 INI (key `AttractIconText` present) - `AttractIcon=0` -> 0, `1` + text 1 -> **7**,
+  `1` + text 0 -> **3**; about a second after the start `AtReadSwitch` writes the mapped value to `AttractIcon`, removes
+  `AttractIconText` and logs `menu.attracticon: TruMenu.ini of 0.22.39 (AttractIcon 1, AttractIconText 1) -> AttractIcon 7,
+  AttractIconText removed`. `RunAt` removes the old key before it writes, so a new `1` is never read as the old "on". A
+  value outside 0 .. 7 = 7 (one log line). Without both keys (an INI older than 0.22.39) the default 7 applies.
+- In styles 4 / 6 a reason of NaWhy (checks differ / patch refused) is drawn below the circle (too long for inside).
+- INI keys 278 (-1), switches rows -1, items 0, bar rows 0 (changed). Check: `trumenu_ini_check` `check_02240`
+  (`check_02239` keeps the 0.22.39 parts that did not change). Build: 0 warnings in TruMenu.cpp.
+
+### TO TEST 0.22.40
+
+Main menu, NoAttract on (`menu.noattract 1`) unless noted, so the strike / light blue / `übersprungen` are visible; one
+input in the menu first so the clock runs. Switch with the bar row "Teaser-Anzeige" (left / right) or `menu.attracticon n`.
+
+| # | Point | Step | Expected |
+|---|---|---|---|
+| 1 | old INI | before the start: `[Menu] AttractIcon=1` and `AttractIconText=1` in TruMenu.ini | the 0.22.39 look at once; after about 1 s the log line `... -> AttractIcon 7, AttractIconText removed`; TruMenu.ini then holds `AttractIcon=7` and no `AttractIconText` |
+| 2 | old INI, text off | as 1 with `AttractIconText=0` | style 3 (circle + strike, no text); INI `AttractIcon=3` |
+| 3 | style 1 | `menu.attracticon 1` | only the two text lines top right, no circle; at the limit 3 orange blinks |
+| 4 | style 2 | right -> 2 | circle + play icon, **no** strike, no text; light blue while NoAttract holds |
+| 5 | style 3 | right -> 3 | as 2 with the red strike |
+| 6 | style 4 | right -> 4 | larger circle, small icon at the top, `12 / 40 s` and `übersp. 3` inside, readable over the fill; no strike |
+| 7 | style 5 | right -> 5 | circle, both lines centred below it; no strike |
+| 8 | style 6 | right -> 6 | as 4 with the red strike over the small icon |
+| 9 | style 7 | right -> 7 | the 0.22.39 look (text left, strike) |
+| 10 | blink | in each style wait for a limit (40 s) | 3 orange blinks, counter + 1 |
+| 11 | NoAttract off | `menu.noattract 0`, styles 3 / 6 / 7 | no strike, amber; at the limit the teaser starts, `Teaser gestartet 1` (style 4 / 6: `Teaser 1`) |
+| 12 | language | bar language EN, style 4 and 5 | `skipped 3`, `teaser 1` / `teaser started 1`; row `< 4 circle, text inside >` |
+| 13 | Fixes row | page Fixes, "Hauptmenü (TruMenu)", AttractIcon 2 -> 5 | within about a second the style changes (live) |
+| 14 | negative: off | style 0 (NoAttract 0, timer line 0) | display gone; log `menu.noattract off ...` (slot back) |
+| 15 | negative: values | `menu.attracticon 8`, `on`, `12`; then without argument | usage line each, style unchanged; no argument = report only |
+| 16 | negative: bad INI | `AttractIcon=9` in the INI (game closed), start | style 7 and one log line `[Menu] AttractIcon=9 is not 0 .. 7 - 7 used` |
+| 17 | negative: level | start a level | no display in the level (front end only) |
+| 18 | timer box | `menu.attracttimer 1` (tr), style 4 | the display sits below the timer box |
+
 ## 0.22.39 - Q126: attract icon in the main menu (2026-11-13)
 
 Built into `work\asi\menu0262`, not installed, no live test (finding in the workspace `docs\Befund-AttractIcon-1311.md`;

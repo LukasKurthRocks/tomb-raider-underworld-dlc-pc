@@ -1,0 +1,4 @@
+Built work\asi\menu0263\TruMenu.asi (2085376 bytes, x86 DLL, sha256 71374f9d167be140a6b124b71b55f6c24c603dfd3a0effbcf4e0cb8fc2b80f4b) - TruMenu 0.22.40
+  warnings: 2 (both imgui_demo.cpp), 0 in TruMenu.cpp; imports / exports = 0.22.39 (tools/pe_import_export_diff.py: 151 functions, same 6 exports, no new DLL)
+  INI / switches / radial / tour in the build folder = source (cmp)
+No new byte checks (the 13 kNaChecks rows of 0.22.20 pin the clock layout and the update slot the display reads through).

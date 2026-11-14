@@ -267,7 +267,8 @@ QB_VALUE_ITEMS = ('dbg.depth', 'dbg.alpha', 'dbg.bright', 'dbg.enclosing', 'chea
                   'game.vol.voice', 'game.mouse', 'gfx.filter', 'gfx.aspect', 'gfx.r.vsync', 'gfx.r.triple', 'gfx.r.aa',
                   'gfx.r.mode', 'gfx.r.fullscreen', 'gfx.r.present2',
                   # 0.22.18 subtitle alignment, voice language, frame-step rate
-                  'sub.valign', 'sub.halign', 'sub.margin', 'voice.lang', 'cine.steprate')
+                  'sub.valign', 'sub.halign', 'sub.margin', 'voice.lang', 'cine.steprate',
+                  'menu.attracticon')                                            # 0.22.40 (Q126b) styles 0 .. 7
 # 0.18: the new items, the 0 / 1 keys, the bar pages (QbPage rows of kQbPages: 10 pages, special ones without a table)
 Q18_ITEMS = {'overlay.larain': 'bool', 'pos.goload': 'action', 'save.load': 'action'}
 Q18_KEYS = (('Menu', 'OverlayLaraIn'), ('Debug', 'LegendLaraIn'), ('Saves', 'DirectLoad'), ('Shot', 'OnCineSegments'))
@@ -1828,8 +1829,8 @@ SW_LIVE = {
     ('TruMenu', 'Debug', 'LabelCollected'): 'void LgReadSwitch(',       # TruMenu 0.22.36 (labels, about once a second)
     ('TruMenu', 'Debug', 'LabelLaraGear'): 'void LgReadSwitch(',
     ('TruMenu', 'Log', 'Save'): 'void SvReadSwitch(',                   # TruMenu 0.22.27 (Q79, TruSaveProbe.h)
-    ('TruMenu', 'Menu', 'AttractIcon'): 'void AtReadSwitch(',           # TruMenu 0.22.39 (Q126, about once a second)
-    ('TruMenu', 'Menu', 'AttractIconText'): 'void AtReadSwitch(',
+    # TruMenu 0.22.39 (Q126, about once a second); 0.22.40 (Q126b): AtReadSwitch -> AtStyleRead, AttractIconText gone
+    ('TruMenu', 'Menu', 'AttractIcon'): 'LONG AtStyleRead(',
 }
 # Q75 (2026-11-11): keys the plugin re-reads at run time only when they were 1 at the game start (the code is patched
 # only then; a 1 after a start with 0 needs a restart). No "when" form of TruMenu says that: live-if:<Key> asks the key's
@@ -4648,35 +4649,17 @@ def check_02239(ini_path, switches_path):
     at the f11 native, with NoAttract holding the shadow modulo the alarm - read through the 0.22.20 update slot (NaTick
     patches it for hold || line || icon; nothing new is written), AtOnLimit from NtPost counts skipped / started and sets
     the blink; drawn only in the front end, below the timer box when that is top right; item / bar row / help / greying;
-    the icon functions read only TruMenu's own variables; README 0.22.39 with TO TEST; Set-TruMenu knows the 0.22.38 hash"""
+    the icon functions read only TruMenu's own variables; README 0.22.39 with TO TEST; Set-TruMenu knows the 0.22.38 hash.
+    0.22.40 (Q126b): the keys / default, the switches row, ReadOptions / AtReadSwitch, RunAt's values, the item type and the
+    bar row kind moved to check_02240 (AttractIcon 0 .. 7, AttractIconText gone); the rest stays checked here"""
     problems = []
     src = read_cpp()
-    if '"TruMenu 0.22.39 (Q126 attract icon' not in src[:src.find('\n', src.find('kVersion = '))]:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.39 (Q126 attract icon"')
-    ini = open(ini_path, encoding='utf-8').read().replace('\r\n', '\n')
-    block = re.search(r'^\[Menu\]\n(.*?)(?=^\[|\Z)', ini, re.M | re.S)
-    for key, val in AT_KEYS_02239:
-        if not re.search(r'\{"Menu", "%s", "%s",' % (key, val), src):
-            problems.append('TruMenu.cpp: kOpts [Menu] %s default must be "%s"' % (key, val))
-        if not block or not re.search(r'^%s=%s$' % (key, val), block.group(1), re.M):
-            problems.append('%s: [Menu] %s=%s missing' % (os.path.basename(ini_path), key, val))
-    sw = [l.rstrip('\r\n').split(' | ') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Menu | ')]
-    for key, val in AT_KEYS_02239:
-        f = [x for x in sw if len(x) >= 10 and x[2] == key]
-        if not f or f[0][3] != 'bool' or f[0][6] != 'live' or f[0][7] != val or f[0][9] != 'TruMenu 0.22.39':
-            problems.append('%s: row TruMenu | Menu | %s | bool | ... | live | %s | ... | TruMenu 0.22.39 missing'
-                            % (os.path.basename(switches_path), key, val))
+    if '0.22.39 (Q126 attract icon' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.40: a later part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.39 part "0.22.39 (Q126 attract icon"')
     groups = [l.rstrip('\r\n') for l in open(switches_path, encoding='utf-8') if l.startswith('group | tmhauptmenue | ')]
     if len(groups) != 1: problems.append('%s: group tmhauptmenue missing' % os.path.basename(switches_path))
-    ro = fn_body(src, 'void ReadOptions(')
-    for key, var in (('AttractIcon', 'g_atWant'), ('AttractIconText', 'g_atText')):
-        if 'InterlockedExchange(&%s, OptInt(ini, "Menu", "%s") != 0 ? 1 : 0);' % (var, key) not in ro:
-            problems.append('TruMenu.cpp: ReadOptions must read [Menu] %s into %s' % (key, var))
-    rd = fn_body(src, 'void AtReadSwitch(')
-    for want in ('GetPrivateProfileIntA("Menu", "AttractIcon", atoi(OptDefault("Menu", "AttractIcon")), g_iniPath)',
-                 'GetPrivateProfileIntA("Menu", "AttractIconText", atoi(OptDefault("Menu", "AttractIconText")),',
-                 'if (on != g_atIniOn) {', 'if (text != g_atIniText) {'):
-        if want not in rd: problems.append('TruMenu.cpp: AtReadSwitch must hold %s' % want)
+    if 'AtReadSwitch();' not in fn_body(src, 'void AtTick('):
+        problems.append('TruMenu.cpp: AtTick must call AtReadSwitch')
     if 'if (g_atReadTick && now - g_atReadTick < 1000) return;' not in fn_body(src, 'void AtTick('):
         problems.append('TruMenu.cpp: AtTick must read the INI at most once a second')
     tick = fn_body(src, 'void NaTick(')
@@ -4709,8 +4692,9 @@ def check_02239(ini_path, switches_path):
     single = [t for t in left if re.search(r'[A-Za-z]{2}', re.sub(r'%[-.0-9]*[a-z]+', '', t)) and t != '##TruAttractIcon']
     if single: problems.append('TruMenu.cpp: DrawAt texts without a de / en pair: %s' % ', '.join(single))
     for want in ('const bool blinking = blinkAt && now - blinkAt < kAtBlinkMs;', 'g_ntPos == 2 && g_ntBoxH > 0.0f',
-                 'AtSector(dl, c, r, a, a + kPi * 0.5f < a1 ? a + kPi * 0.5f : a1, fill);', 'if (g_atText) {',
+                 'AtSector(dl, c, r, a, a + kPi * 0.5f < a1 ? a + kPi * 0.5f : a1, fill);',
                  'bersprungen %ld" : "skipped %ld"', 'NaWhy();'):   # read_cpp turns the umlaut escape into ue
+        # 0.22.40: 'if (g_atText) {' became the style switch (check_02240)
         if want not in draw: problems.append('TruMenu.cpp: DrawAt must hold %s' % want)
     if 'const DWORD kAtBlinkMs = 1200, kAtBlinkPhaseMs = 200;' not in src:
         problems.append('TruMenu.cpp: kAtBlinkMs 1200 / kAtBlinkPhaseMs 200 missing')
@@ -4721,23 +4705,14 @@ def check_02239(ini_path, switches_path):
         if any(w in body for w in ('reinterpret_cast<', 'WriteByte(', 'WriteBytes(', 'WriteDword(', 'LcPatch(', 'Fn>(')):
             problems.append('TruMenu.cpp: %s must read only TruMenu\'s own values (no game memory, no game call)'
                             % fn.strip('('))
-    # item: bool, explicit value, no argument = report (never a flip), written at once
-    if not re.search(r'\{"menu\.attracticon", "bool", ".*?,\s+false, ValAt, RunAt\}', src, re.S):
-        problems.append('TruMenu.cpp: item menu.attracticon (bool, ValAt / RunAt) missing')
+    # item: no argument = report (never a flip); 0.22.40: type, values, INI write and bar row kind in check_02240
     run = fn_body(src, 'bool RunAt(')
-    for want in ('if (!arg || !arg[0]) { ValAt(o, n); return true; }', 'IniKeep("Menu", "AttractIcon", on ? "1" : "0");',
-                 'usage: menu.attracticon 1|0'):
-        if want not in run: problems.append('TruMenu.cpp: RunAt must hold %s' % want)
+    if 'if (!arg || !arg[0]) { ValAt(o, n); return true; }' not in run:
+        problems.append('TruMenu.cpp: RunAt must report without an argument')
     if 'BoolArg(' in run: problems.append('TruMenu.cpp: RunAt must not use BoolArg (an empty argument would flip)')
     if 'if (!_stricmp(id, "menu.attracticon")) return NaWhy();' not in fn_body(src, 'const char *RadialWhy('):
         problems.append('TruMenu.cpp: RadialWhy must grey menu.attracticon with NaWhy')
-    tables = src[src.find('const QbRow kQbSettings[] = {'):]
-    tables = tables[:tables.find('\n};')]
-    a, r, t = (tables.find('"menu.attracttimer", "", kQbBool'), tables.find('"menu.attracticon", "", kQbBool'),
-               tables.find('"set_tm", kQbGroup'))
-    if not (0 <= a < r < t):
-        problems.append('TruMenu.cpp: row menu.attracticon (bool) must follow menu.attracttimer in group set_main')
-    hm = re.search(r'\{"menu\.attracticon", "", "((?:[^"\\]|\\.)*)"\s*"((?:[^"\\]|\\.)*)"\}', src)
+    hm =re.search(r'\{"menu\.attracticon", "", "((?:[^"\\]|\\.)*)"\s*"((?:[^"\\]|\\.)*)"\}', src)
     if not hm: problems.append('TruMenu.cpp: kQbHelp row menu.attracticon missing')
     else:
         de, en = unescape(hm.group(1) + hm.group(2)).split('|')
@@ -4751,8 +4726,142 @@ def check_02239(ini_path, switches_path):
     ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
     if '0246bd14f4c26d0bbc370587e44d8398c646138fafab85d325109e6a0eed758e' not in ps:
         problems.append('Set-TruMenu.ps1: the 0.22.38 build hash (work/asi/menu0261) is missing')
-    return problems, ('attract icon (Q126): [Menu] AttractIcon=1 / AttractIconText=1 live, the game\'s clock values '
-                      'through the 0.22.20 slot, AtOnLimit counts + blink, front end only, item / row / help / greying')
+    return problems, ('attract icon (Q126): the game\'s clock values through the 0.22.20 slot, AtOnLimit counts + '
+                      'blink, front end only, help / greying (keys / row / item: check_02240)')
+
+
+AT_STYLES_02240 = (('Aus', 'off'), ('Nur Text', 'text only'), ('Kreis', 'circle'), ('Kreis + Strich', 'circle + strike'),
+                   ('Kreis, Text innen', 'circle, text inside'), ('Kreis, Text unten', 'circle, text below'),
+                   ('Kreis + Strich, Text innen', 'circle + strike, text inside'),
+                   ('wie 0.22.39 (Text links)', 'as 0.22.39 (text left)'))
+# circle, strike, text place of the 8 styles (owner Q126b: 1 text, 2 no strike, 3 strike, 4 inside, 5 below, 6 = 4 +
+# strike; 7 = the 0.22.39 look, the default)
+AT_SHAPES_02240 = (('0', '0', 'kAtTextNone'), ('0', '0', 'kAtTextOnly'), ('1', '0', 'kAtTextNone'),
+                   ('1', '1', 'kAtTextNone'), ('1', '0', 'kAtTextInside'), ('1', '0', 'kAtTextBelow'),
+                   ('1', '1', 'kAtTextInside'), ('1', '1', 'kAtTextLeft'))
+
+
+def check_02240(ini_path, switches_path):
+    """0.22.40 (Q126b, owner 13.11.; workspace docs/Befund-AttractIcon-Varianten-1311.md): one cycle switch [Menu]
+    AttractIcon 0 .. 7 (default 7 = the 0.22.39 look) instead of AttractIcon 0 / 1 + AttractIconText: kOpts / INI /
+    switches row (int:0..7, live via AtStyleRead from AtReadSwitch), AttractIconText gone everywhere except the one-time
+    mapping of a 0.22.39 INI (0 -> 0, 1 + 1 -> 7, 1 + 0 -> 3; key removed); the style table (8 rows, DE / EN names, circle /
+    strike / text place); DrawAt draws by the style (text only returns before the circle, the strike only for strike
+    styles, text inside / below / left); item menu.attracticon "value" 0..7 (one digit or off, else usage; the old key
+    removed before the write); bar row kQbValue kQvAtStyle after menu.attracttimer with the style name (ItemValueShort);
+    kVersion 0.22.40; README 0.22.40 with TO TEST; Set-TruMenu knows the 0.22.39 hash"""
+    problems = []
+    src = read_cpp()
+    if '"TruMenu 0.22.40 (Q126b attract display styles' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.40 (Q126b attract display styles"')
+    # keys: one key, default 7; AttractIconText only in AtStyleRead / RunAt (the 0.22.39 mapping) and comments / texts
+    if not re.search(r'\{"Menu", "AttractIcon", "7",', src): problems.append('TruMenu.cpp: kOpts [Menu] AttractIcon must be "7"')
+    if re.search(r'\{"Menu", "AttractIconText",', src): problems.append('TruMenu.cpp: kOpts [Menu] AttractIconText must be gone')
+    if 'g_atText' in src: problems.append('TruMenu.cpp: g_atText must be gone (the style replaces it)')
+    code = re.sub(r'//[^\n]*', '', src)
+    uses = [m.start() for m in re.finditer(r'"AttractIconText"', code)]
+    sr, ra = fn_body(code, 'LONG AtStyleRead('), fn_body(code, 'bool RunAt(')
+    if len(uses) != sr.count('"AttractIconText"') + ra.count('"AttractIconText"') or sr.count('"AttractIconText"') != 2 \
+            or ra.count('"AttractIconText"') != 1:
+        problems.append('TruMenu.cpp: "AttractIconText" only in AtStyleRead (read + remove) and RunAt (remove)')
+    ini = open(ini_path, encoding='utf-8').read().replace('\r\n', '\n')
+    block = re.search(r'^\[Menu\]\n(.*?)(?=^\[|\Z)', ini, re.M | re.S)
+    if not block or not re.search(r'^AttractIcon=7$', block.group(1), re.M):
+        problems.append('%s: [Menu] AttractIcon=7 missing' % os.path.basename(ini_path))
+    if re.search(r'^AttractIconText=', ini, re.M): problems.append('%s: AttractIconText must be gone' % os.path.basename(ini_path))
+    sw = [l.rstrip('\r\n').split(' | ') for l in open(switches_path, encoding='utf-8') if l.startswith('TruMenu | Menu | ')]
+    f = [x for x in sw if len(x) >= 10 and x[2] == 'AttractIcon']
+    if not f or f[0][3] != 'int:0..7' or f[0][6] != 'live' or f[0][7] != '7' or f[0][9] != 'TruMenu 0.22.40':
+        problems.append('%s: row TruMenu | Menu | AttractIcon | int:0..7 | ... | live | 7 | ... | TruMenu 0.22.40 missing'
+                        % os.path.basename(switches_path))
+    if [x for x in sw if len(x) >= 3 and x[2] == 'AttractIconText']:
+        problems.append('%s: row AttractIconText must be gone' % os.path.basename(switches_path))
+    # the style table
+    m = re.search(r'const AtStyleDef kAtStyles\[\] = \{(.*?)\};', src, re.S)
+    rows = re.findall(r'\{(\d), (\d), (kAtText[A-Za-z]+), "((?:[^"\\]|\\.)*)", "((?:[^"\\]|\\.)*)"\}', m.group(1)) if m else []
+    if len(rows) != 8: problems.append('TruMenu.cpp: kAtStyles must hold 8 rows (got %d)' % len(rows))
+    else:
+        for i, (row, shape, names) in enumerate(zip(rows, AT_SHAPES_02240, AT_STYLES_02240)):
+            if row[:3] != shape: problems.append('TruMenu.cpp: kAtStyles[%d] must be %s (got %s)' % (i, shape, row[:3]))
+            if (unescape(row[3]), row[4]) != names:
+                problems.append('TruMenu.cpp: kAtStyles[%d] names must be %s / %s' % (i, names[0], names[1]))
+            if len(names[0]) > 40 or len(names[1]) > 40: problems.append('kAtStyles[%d]: name over 40 characters' % i)
+    if 'const int kAtStyleN = 8, kAtStyleDefault = 7;' not in src:
+        problems.append('TruMenu.cpp: kAtStyleN 8 / kAtStyleDefault 7 missing')
+    if 'return kAtStyles[s >= 0 && s < kAtStyleN ? s : kAtStyleDefault];' not in fn_body(src, 'const AtStyleDef &AtStyleOf('):
+        problems.append('TruMenu.cpp: AtStyleOf must clamp to the default')
+    # reading: the INI value, the 0.22.39 mapping, the range; migrate only from AtReadSwitch
+    sr = fn_body(src, 'LONG AtStyleRead(')
+    for want in ('GetPrivateProfileIntA("Menu", "AttractIcon", def, ini)',
+                 'GetPrivateProfileStringA("Menu", "AttractIconText", "", old, sizeof(old), ini);',
+                 'const int mapped = v == 0 ? 0 : v == 1 ? (text ? 7 : 3) : v;',
+                 'WritePrivateProfileStringA("Menu", "AttractIconText", nullptr, ini)',
+                 'if (v < 0 || v >= kAtStyleN) { *bad = true; v = def; }'):
+        if want not in sr: problems.append('TruMenu.cpp: AtStyleRead must hold %s' % want)
+    if not re.search(r'if \(migrate\) \{', sr): problems.append('TruMenu.cpp: AtStyleRead may write only with migrate')
+    rd = fn_body(src, 'void AtReadSwitch(')
+    for want in ('AtStyleRead(g_iniPath, true, &bad, &raw);', 'if (style != g_atIniOn) {',
+                 'InterlockedExchange(&g_atStyle, style);', 'InterlockedExchange(&g_atWant, style ? 1 : 0);'):
+        if want not in rd: problems.append('TruMenu.cpp: AtReadSwitch must hold %s' % want)
+    ro = fn_body(src, 'void ReadOptions(')
+    for want in ('AtStyleRead(ini, false, &bad, &raw);', 'InterlockedExchange(&g_atStyle, style);',
+                 'InterlockedExchange(&g_atWant, style ? 1 : 0);'):
+        if want not in ro: problems.append('TruMenu.cpp: ReadOptions must hold %s' % want)
+    # drawing by the style
+    draw = fn_body(src, 'void DrawAt(')
+    for want in ('const AtStyleDef &st = AtStyleOf(g_atStyle);',
+                 'if (why[0] && textAt == kAtTextInside) textAt = kAtTextBelow;', 'if (!st.circle) {',
+                 'if (textAt == kAtTextLeft) {', 'const bool textBelow = textAt == kAtTextBelow;', 'if (held && st.strike)',
+                 'if (inside) {', 'd = fs * 6.0f > need ? fs * 6.0f : need;'):
+        if want not in draw: problems.append('TruMenu.cpp: DrawAt must hold %s' % want)
+    i_only, i_ret, i_circle = draw.find('if (!st.circle) {'), draw.find('return;'), draw.find('AddCircleFilled(')
+    if not (0 <= i_only < i_ret < i_circle): problems.append('TruMenu.cpp: DrawAt style 1 must return before the circle')
+    if draw.count('ImGui::End();') != 2 or draw.count('if (lit) ImGui::PopStyleColor();') != 2:
+        problems.append('TruMenu.cpp: DrawAt must End / pop the colour on both paths')
+    if 'if (held) dl->AddLine(' in draw: problems.append('TruMenu.cpp: DrawAt must strike only in strike styles')
+    for fn in ('LONG AtStyleRead(', 'const AtStyleDef &AtStyleOf(', 'void AtReadSwitch(', 'void DrawAt(', 'bool RunAt('):
+        body = fn_body(src, fn)
+        if any(w in body for w in ('reinterpret_cast<', 'WriteByte(', 'WriteBytes(', 'WriteDword(', 'LcPatch(', 'Fn>(')):
+            problems.append('TruMenu.cpp: %s must not touch game memory' % fn.strip('('))
+    # item, bar row, help, value helpers
+    if not re.search(r'\{"menu\.attracticon", "value", "0\.22\.40 0\.\.7 .*?,\s+false, ValAt, RunAt\}', src, re.S):
+        problems.append('TruMenu.cpp: item menu.attracticon ("value", "0.22.40 0..7 ...", ValAt / RunAt) missing')
+    run = fn_body(src, 'bool RunAt(')
+    for want in ('if (!arg || !arg[0]) { ValAt(o, n); return true; }',
+                 "if (arg[0] >= '0' && arg[0] <= '9' && !arg[1]) v = arg[0] - '0';",
+                 'else if (!_stricmp(arg, "off")) v = 0;', 'if (v < 0 || v >= kAtStyleN) {', 'usage: menu.attracticon 0..%d',
+                 'IniKeepInt("Menu", "AttractIcon", v);'):
+        if want not in run: problems.append('TruMenu.cpp: RunAt must hold %s' % want)
+    i_del, i_keep = run.find('"AttractIconText", nullptr'), run.find('IniKeepInt("Menu", "AttractIcon", v);')
+    if not (0 <= i_del < i_keep): problems.append('TruMenu.cpp: RunAt must remove AttractIconText before it writes AttractIcon')
+    run_code = fn_body(code, 'bool RunAt(')
+    if '"on"' in run_code or '"true"' in run_code: problems.append('TruMenu.cpp: RunAt must not take on / true any more (1 = text only)')
+    tables = src[src.find('const QbRow kQbSettings[] = {'):]
+    tables = tables[:tables.find('\n};')]
+    a, r, t = (tables.find('"menu.attracttimer", "", kQbBool'),
+               tables.find('{"Teaser-Anzeige", "Teaser display", "menu.attracticon", "", kQbValue, -1, kQcNone, kQvAtStyle,'),
+               tables.find('"set_tm", kQbGroup'))
+    if not (0 <= a < r < t):
+        problems.append('TruMenu.cpp: bar row "Teaser-Anzeige" (kQbValue kQvAtStyle) must follow menu.attracttimer in set_main')
+    if '"menu.attracticon", "", kQbBool' in src: problems.append('TruMenu.cpp: the bool bar row menu.attracticon must be gone')
+    if 'kQvAtStyle };' not in src: problems.append('TruMenu.cpp: kQvAtStyle must close the QbVal enum')
+    if ': val == kQvAtStyle ? kAtStyleN : 0;' not in fn_body(src, 'int QbValueCount('):
+        problems.append('TruMenu.cpp: QbValueCount must give kAtStyleN for kQvAtStyle')
+    if 'case kQvAtStyle: Out(o, n, "%d", i); break;' not in fn_body(src, 'void QbValueArg('):
+        problems.append('TruMenu.cpp: QbValueArg kQvAtStyle missing')
+    if 'case kQvAtStyle: v = static_cast<int>(g_atStyle); break;' not in fn_body(src, 'int QbValueNow('):
+        problems.append('TruMenu.cpp: QbValueNow kQvAtStyle missing')
+    ivs = fn_body(src, 'bool ItemValueShort(')
+    if 'Out(o, n, "%ld %s", s, de ? AtStyleOf(s).de : AtStyleOf(s).en);' not in ivs:
+        problems.append('TruMenu.cpp: ItemValueShort must name the style (DE / EN)')
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.40 - ' not in readme or '\n### TO TEST 0.22.40' not in readme:
+        problems.append('README.md: section "## 0.22.40 - ..." with "### TO TEST 0.22.40" missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if '11bce73110d4c61c3b85cf8375e5bb019442c6154060468027b589372a10f6d5' not in ps:
+        problems.append('Set-TruMenu.ps1: the 0.22.39 build hash (work/asi/menu0262) is missing')
+    return problems, ('attract display styles (Q126b): [Menu] AttractIcon 0 .. 7 = 7 live, 8 styles, 0.22.39 INI mapped '
+                      'once, item value 0..7, bar row with the style name')
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -5346,6 +5455,10 @@ def main(argv):
     for p in cproblems39: print('Q02239 %s' % p)
     if not cproblems39: print('ok: 0.22.39 %s' % csummary39)
     problems += cproblems39
+    cproblems40, csummary40 = check_02240(ini_path, opt.get('--switches', SWITCHES))   # 0.22.40 (Q126b styles)
+    for p in cproblems40: print('Q02240 %s' % p)
+    if not cproblems40: print('ok: 0.22.40 %s' % csummary40)
+    problems += cproblems40
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

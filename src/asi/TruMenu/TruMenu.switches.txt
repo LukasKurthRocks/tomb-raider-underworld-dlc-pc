@@ -261,7 +261,7 @@ TruMenu | Debug | TriggerCornerId | bool | Trigger-Nummer an der Kastenecke | Tr
 group | tmeingabe | Eingabe (TruMenu) | Input (TruMenu)
 TruMenu | Input | DeviceGlyphs | bool | Tasten-Hinweise nach Gerät (Pad / Tastatur) | Button prompts by device (pad / keyboard) | restart | 1 | Zuletzt benutztes Gerät: Pad-Symbole oder Tastennamen // Last used device: pad symbols or key names | TruMenu 0.22.38
 
-# 2026-11-13 (Q126, owner idea): TruMenu 0.22.39 - [Menu] AttractIcon / AttractIconText (AtReadSwitch, about once a second = live)
+# 2026-11-13 (Q126, owner idea): TruMenu 0.22.39 - [Menu] AttractIcon (AtReadSwitch, about once a second = live)
+# 0.22.40 (Q126b): one cycle switch 0 .. 7 instead of AttractIcon 0 / 1 + AttractIconText (the bar row names the style)
 group | tmhauptmenue | Hauptmenü (TruMenu) | Main menu (TruMenu)
-TruMenu | Menu | AttractIcon | bool | Teaser-Symbol im Hauptmenü (Kreis) | Teaser icon in the main menu (circle) | live | 1 | Kreis füllt sich bis zum Teaser, blinkt beim Limit // Circle fills up to the teaser, blinks at the limit | TruMenu 0.22.39
-TruMenu | Menu | AttractIconText | bool | Teaser-Symbol: Sekunden + Zähler | Teaser icon: seconds + counter | live | 1 | Links vom Kreis: 12 / 40 s, übersprungen n // Left of the circle: 12 / 40 s, skipped n | TruMenu 0.22.39
+TruMenu | Menu | AttractIcon | int:0..7 | Teaser-Anzeige im Hauptmenü (0-7) | Teaser display in the main menu (0-7) | live | 7 | 0 aus, 1 Text, 2-7 Kreis (3/6 Strich, 4/6 innen, 5 unten) // 0 off, 1 text, 2-7 circle (3/6 strike, 4/6 inside, 5 below) | TruMenu 0.22.40
