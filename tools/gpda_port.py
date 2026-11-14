@@ -673,7 +673,11 @@ KNOW = os.path.join(REPO, 'docs', 'data', 'gpda_port.json')
 # and the DLC list entries kept the raw Xbox string index (23 words in 3347 / 3360 / 3367, 1 in 3384)
 # -3 (Q55): base rules learned on member twins by declaration order (tools/script_member_pairs.py) instead of the
 # converter's guessed names; member_twins = the PC twin entry offset of every pack entry of a ported script
-VERSION = 'G20261111-3'
+# -4 (E2-8, 2026-11-14): re-learned with the Q58 Symbol twins (docs/data/symbol_twins.json; -3 was learned before
+# them): base script pairs 266 -> 285, init rules 786 -> 909 (123 new keys, 9 changed: s32 / id32:7 -> id-mixed,
+# raw -> s32text), ui rules 181 -> 200; 3 member twins of 3347 moved one PC entry (tag-59 members Xbox userTypes 5425 /
+# 5427 / 5429: 5427 = PC 4971 proven by the same-layout pair 3238 <-> 3379); recipes, md5s, changed members unchanged
+VERSION = 'G20261114-4'
 UI_UTS = (301, 303, 316, 320)
 LOC_RULES = ('id16a:101', 'id32:101')     # locals string id classes (tools/script_learn.py; DlcIds.loc = locals map)
 PH = 0xBEEBBEEB
