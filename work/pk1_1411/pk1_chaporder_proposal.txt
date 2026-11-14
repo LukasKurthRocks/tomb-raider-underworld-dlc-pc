@@ -1,0 +1,28 @@
+// PK.1 (2026-11-14): proposed TruMenu kChapOrder rows for DLC 1 - NOT built into TruMenu (the generator
+// work/b_nav_1211/q105_order_table.py covers the base game only; the DLC 1 rows are hand-written, and the second-visit
+// split below is inferred). Same struct as TruMenu.cpp: {group, unit, ring, cps, head "DE|EN", visit}.
+// Ids = the installed own tree (13.11. 15:08 build): level1_start 29392, dungeonhallb 26713. The kit / stack tree
+// (B270, mods_stack_20261113_*) has 12241 / 12245 for the same two checkpoints - the rows of TruMenu 0.22.44 carry the
+// kit ids, so cp.jump to them fails in the own tree.
+// Proof column: L = live TruTrace 13.11. (sessions 50920, 15860, 46356, 35628), D = data (portal graph, player intro at
+// the first-entry portal, trigger positions), G = geometry only (Q113 key d_in / (d_in + d_out)).
+    {"DLC 1", "dlc_level1_start", false, "29392",                       // L: intro cine 10656 -> warp (35628 21:06)
+     "Start: Szene 10 (cine_dlc1_start_spangs), dann Warp zu dlc_caverns|Start: cutscene 10, then warp to dlc_caverns"},
+    {"DLC 1", "dlc_caverns", false, "9847 9848 9849", nullptr},         // L 9847 9849 (6 runs), G 9848 (never saved)
+    {"DLC 1", "dlc_caverns_hall", false, "9817", nullptr},              // L portal 0 caverns -> caverns_hall
+    {"DLC 1", "dlc_water_wheel", false, "9751", nullptr},               // L portal 1; 'bats pass 1'
+    {"DLC 1", "dlc_watertunnel", false, "9433", nullptr},               // L portal 2 water_wheel -> watertunnel
+    {"DLC 1", "dlc_dungeon", false, "9444 10657 9445", nullptr},        // L portal 0; 10657 only in 46356
+    {"DLC 1", "dlc_dungeonhalla", false, "9676 9677 9717", nullptr},    // L portal 0 dungeon -> dungeonhalla
+    {"DLC 1", "dlc_pillory", false, "9710 9707 9718 9708 9706", nullptr},  // L 9710 9707 9718 (portal 1), G 9708 9706
+    {"DLC 1", "dlc_water_wheel", false, "9857 9752",                    // D trigger 9607 'bats pass 2' / 'prep pillory
+     "Abstecher vom Pranger: Wasserrad oben, Schleusentor (gefolgert)|Side trip from the pillory: water wheel upper "
+     "level, sluice gate (inferred)", 2},                               //   visit 2'; G order (side trip, d_in only)
+    {"DLC 1", "dlc_pillory", false, "9709", nullptr, 2},                // D 'birth visit 2' trigger 10665; G 9709
+    {"DLC 1", "dlc_dungeonhallb", false, "26713 9411 9590", nullptr},   // D player intro 9420 5 m at the pillory portal
+    {"DLC 1", "dlc_dungeon", false, "9446 9447 10658 10659",            // D trigger 10014 'dungeon second visit' 6 m at
+     "Kerker 2. Besuch: vier Gitter schlie\303\237en, dann Schatzkammer|Dungeon visit 2: close four gates, then treasure "
+     "room", 2},                                                         //   the hallb portal; L 10659 + 4 gates (35628)
+    {"DLC 1", "dlc_treasureroom", false, "", nullptr},                  // L trigger 10679 -> cine 9459 -> credits_DLC1
+    {"DLC 1", "dlc_level1_left", false, ""},
+    {"DLC 1", "dlc_level1_right", false, ""},
