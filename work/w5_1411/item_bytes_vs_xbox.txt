@@ -1,0 +1,19 @@
+== own dlc_level1_start
+dlc_level1_start.drm vs dlc_level1_start.drm: 22 items PC, 22 Xbox, 0 with differences
+== old dlc_level1_start
+dlc_level1_start.drm vs dlc_level1_start.drm: 22 items PC, 22 Xbox, 0 with differences
+== own dlc_caverns
+dlc_caverns.drm vs dlc_caverns.drm: 28 items PC, 28 Xbox, 0 with differences
+== old dlc_caverns
+dlc_caverns.drm vs dlc_caverns.drm: 28 items PC, 28 Xbox, 0 with differences
+== own dlc_caverns_hall
+dlc_caverns_hall.drm vs dlc_caverns_hall.drm: 6 items PC, 6 Xbox, 0 with differences
+== old dlc_caverns_hall
+dlc_caverns_hall.drm vs dlc_caverns_hall.drm: 6 items PC, 6 Xbox, 0 with differences
+== own dlc_dungeon
+dlc_dungeon.drm vs dlc_dungeon.drm: 73 items PC, 73 Xbox, 0 with differences
+== old dlc_dungeon
+id 2102 (item 2): 1 differing words: +04 PC a6234c4c Xbox a6234c4c
+id 2103 (item 3): 1 differing words: +04 PC a6234c4c Xbox a6234c4c
+id 2178 (item 66): 1 differing words: +38 PC b0adeefc Xbox adb0fcee
+dlc_dungeon.drm vs dlc_dungeon.drm: 73 items PC, 73 Xbox, 3 with differences

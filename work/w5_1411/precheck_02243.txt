@@ -1,0 +1,12 @@
+# TruMenu 0.22.43 (W5 markup): kW5MkChecks = the code whose rules draw.markup copies, in the order of the table in
+# TruMenu.cpp - the box matrix getter (owner instance -> bone matrix [inst+0x90] + s16 rec+0x30 * 0x40, markup2 item,
+# else identity), the user that transforms the poly line only for an owner with [owner+0x2d8] != 0, the point transform
+# 0x49ba20 (x * row0 + y * row1 + z * row2 + row3), the type getter (item +0x4d, else record +0x33) and the skip tests of
+# the markup query (record +0x32 == 1, box +0x28 bit 31, owner +0x18 bit 2 / 0x20000000, stream unit entry +5)
+# (checked offline: ../bin/pyt -t 120 tools/pe_bytes_check.py <Steam tru.exe> --file work/w5_1411/precheck_02243.txt)
+0x005be360 8b510c 85d2 7411 8b4120 0fbf4030 c1e006 038290000000 c3
+0x005c41c3 8b460c 85c0 740e 83b8d802000000 c644241301
+0x0049ba20 558bec 83e4f0 8b4d10 0f2801 8b4d0c 0f285120 0f285910 8b4508 0f28c8 0fc6c8aa 0f59ca 0f285130 0f58ca
+0x005be340 8b4124 85c0 7405 0fbe404d c3 8b4920 85c9 7405 0fbe4133 c3
+0x005ce447 8b4120 80783201 0f8486000000 8b7128 85f6 787f 83790c00 7423 8b510c 8b4218 a802 756f a900000020 7568
+0x005ce484 83793c00 740e 8b513c 807a0500

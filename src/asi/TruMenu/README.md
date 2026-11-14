@@ -2928,6 +2928,73 @@ Reihenfolge fest (Flacker-Test)".
   combos as set now (e.g. `LB + View = weiter . RB + View = 1 Bild . LB + RB + View = Foto`), built from the INI values,
   so it follows any change.
 
+## 0.22.43 - W5: markup drawn where the engine uses it, type + id labels (2026-11-14)
+
+Built into `work\asi\menu0266`, not installed, no live test (finding in the workspace
+`docs\Befund-W5-Markup-Saeule-1411.md`; owner live notes of 13.11.: floating yellow lines in the caverns 21:20, a yellow
+"coil" in front of a dungeon wall 21:53, a grey line in Thailand 00:52, V pairs on a climbing wall 00:01).
+Section "0.22.43 W5 markup" in `TruMenu.cpp`; render thread, read only - nothing is written into tru.exe memory.
+
+- **Object markup at its real place.** A markup box with an owner instance (box `+0xc`) keeps its poly line in the
+  object's local frame. The engine's users take the matrix of the getter 0x5be360 (`[owner+0x90] + s16 record +0x30 *
+  0x40` = the bone matrix) and transform every point with 0x49ba20 (x * row0 + y * row1 + z * row2 + row3) - only when
+  `[owner+0x2d8]` is set (0x5c41c3). `draw.markup` drew the stored points, so every object ledge appeared around the
+  world origin. The 21:53 coil was exactly that: the ledges of `dlc1_uo_pillar_of_doom_a` / `_b` (local rings around
+  their bones), projected with the logged camera of 21:53:11, cover the coil on the shot to a few pixels. Markup2 (unit
+  DTP items) and classic unit markup stay as stored - they are world points already and sit on beams / walls live.
+  Without its matrix an object box is left out (no known place).
+- **Unusable boxes left out.** The engine's markup query skips record `+0x32 == 1`, box `+0x28` bit 31 (disabled), owners
+  with `+0x18` bit 2 or 0x20000000 and boxes whose stream unit entry `+0x3c` has byte `+5` set (0x5ce447 .. 0x5ce496);
+  `draw.markup` does the same.
+- **Labels "type #id".** At the middle point of each line within 15 m (4350 units) of Lara, the nearest 24, through the
+  W3 label rect list (one label per box, `LabelStack`, `LabelCellMax`). Type / id as the engine's getter 0x5be340 (markup2
+  item `+0x4d` / `+0x48`, else record `+0x33` / `+0x2e`). Names in the bar language:
+
+  | Type | DE | EN | Colour |
+  |---|---|---|---|
+  | 1 | Kante | ledge | yellow |
+  | 2 | Sprungziel | jump landing | light grey |
+  | 3 | Gegner-Absprung | enemy drop-down | red |
+  | 4 / 5 / 6 | Wandstange / Stange senkrecht / Reckstange | wall pole / vertical pole / horizontal pole | cyan |
+  | 7 / 8 | Seilrutsche / Rutschschiene | zip line / rail slide | pink |
+  | 9 | Leiter | ladder | green |
+  | 10 | Volumen | volume | blue |
+  | 11 | Seil | rope | orange |
+  | 12 | Deckung | cover | lilac |
+  | 13 | Pfostenkopf | perch | magenta |
+  | 14 | Balken | balance beam | light green |
+  | 15 | Säule | pillar | dark orange |
+  | 16 .. 20 | Griff 2 / 1 / 4 / 3 oben links / 3 oben rechts | hold 2 / 1 / 4 / 3 top left / 3 top right | white |
+  | 22 / 23 | Felsader (TU) / Art 23 (TU) | rock vein (TU) / type 23 (TU) | brown |
+
+  There is no markup type for wall-jump pairs: the climbing wall of 00:01 is made of free-climb holds (types 16 .. 20,
+  class DICE) - each hold a 3-point line, drawn as a "V"; the jump between holds is chosen at run time by the jump
+  targeting (`gt+0xa64` jump-target box).
+- **RoomOnly and fading.** With `dbg.roomonly` a box stays when its stream unit entry is Lara's, its owner's `+0xe0` unit
+  is Lara's, or a point lies within `[Debug] RoomNear`; lines and labels within 15 m fade behind geometry like the trigger
+  labels (`dbg.occlusion`, key = the box address).
+- **Bar.** Page Render, group "Markup / Kanten / Physik / SAP": the rows `Markup` and `Nur Kanten` come first now.
+- 6 byte checks (`kW5MkChecks` = `work\w5_1411\precheck_02243.txt`, `pe_bytes_check`: 6 / 0 on the Steam exe); on a
+  mismatch object markup is left out and no query filter applies (log line `0.22.43 W5: ...`). Menu page Markup shows the
+  counters of the last frame. No new INI key, no new item.
+
+### TO TEST 0.22.43
+
+1. Start, `TruMenu.log`: `0.22.43 W5: draw.markup - object markup through the owner's bone matrix, ...: ok (6 checks)`.
+2. DLC 1 `dlc_dungeon`, the wall with the round windows (21:53, Lara about 1504 / 1394 / -1320), `Markup` on: **no
+   coil** in the air; the yellow rings sit on the pillar_of_doom objects (or are gone while those objects are disabled /
+   hidden). Labels `Kante #2187` ... at the pillar.
+3. DLC 1 `dlc_caverns`, the skull-niche hall (21:20, Lara about -459 / -1333 / -122), looking up: do the **three parallel
+   yellow lines** stay? If yes, their labels name type + id - please note them (the W5 data search found no exact match;
+   the best candidates are the cavern gate ledges `Kante #2309 / #2310 / #2312`, which now move to the gates).
+4. Same place, `Nur aktueller Raum` on / off: with it on, only markup of Lara's unit or within 30 m stays (menu page
+   Markup: "left out by RoomOnly" counts the rest).
+5. `dlc_dungeon` wooden post (x -268 / y 10178): labels `Pfostenkopf #2170` and `Säule #2175` at the top.
+6. Main game Mediterranean climbing wall (00:01): white V lines labelled `Griff 3 oben links #65` etc.
+7. Thailand `l2_junglehub` (00:52 spot): the grey 3-point line is labelled `Sprungziel #639`.
+8. Label behind a wall with `dbg.occlusion faded`: line and label pale; `hidden`: gone.
+9. Bar page Render: group "Markup / Kanten / Physik / SAP" starts with `Markup`, `Nur Kanten`.
+
 ## 0.22.42 - W3: debug view after the test evening - room rule, near labels, de-clutter, empty jars, teaser icon (2026-11-14)
 
 Built into `work\asi\menu0265`, not installed, no live test (finding in the workspace

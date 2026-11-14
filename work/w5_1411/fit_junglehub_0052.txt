@@ -1,0 +1,2 @@
+id   639 type  2 jumplanding  max residual  366.7 px, camera t moved  2285.7 units -> t -13835.5 -12056.9 -2644.1
+id   852 type  1 ledgegrab    max residual  464.4 px, camera t moved 19799700682733232.0 units -> t -4233437992259467.5 -1073051835725435.0 19312035357499948.0

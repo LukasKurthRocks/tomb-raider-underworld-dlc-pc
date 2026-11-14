@@ -1,0 +1,15 @@
+204 candidate segments (>= 300 units)
+73 of them within 8000 units of Lara
+3984 parallel triples x orders tried
+worst error  150.2 px  yaw  136.8 pitch   7.6  top / middle / bottom = dlc1_uo_cavern_hall_gate_two object 2312 (local at origin) | dlc1_uo_cavern_hall_gate object 2310 (local at origin) | dlc1_uo_cavern_hall_gate object 2309 (local at origin) (flipped)
+worst error  150.2 px  yaw  136.8 pitch   7.5  top / middle / bottom = dlc1_uo_cavern_hall_gate_two object 2312 (local at origin) | dlc1_uo_cavern_hall_gate object 2310 (local at origin) | dlc1_uo_cavern_hall_gate_two object 2311 (local at origin) (flipped)
+worst error  159.7 px  yaw   93.0 pitch  69.6  top / middle / bottom = dlc_caverns markup2 2544 | dlc_caverns markup2 2335 | dlc_caverns markup2 2333 (flipped)
+worst error  163.2 px  yaw   92.1 pitch  69.6  top / middle / bottom = dlc_caverns markup2 2540 | dlc_caverns markup2 2335 | dlc_caverns markup2 2333
+worst error  166.1 px  yaw   92.8 pitch  70.6  top / middle / bottom = dlc_caverns markup2 2546 | dlc_caverns markup2 2335 | dlc_caverns markup2 2333
+worst error  211.9 px  yaw   92.5 pitch  81.0  top / middle / bottom = dlc_caverns markup2 2546 | dlc_caverns markup2 2335 | dlc_caverns markup2 2333 (flipped)
+worst error  221.9 px  yaw  285.3 pitch   0.2  top / middle / bottom = dlc_caverns markup2 2544 | dlc_caverns markup2 2335 | dlc_caverns markup2 2333
+worst error  224.7 px  yaw  285.1 pitch   0.3  top / middle / bottom = dlc_caverns markup2 2546 | dlc_caverns markup2 2335 | dlc_caverns markup2 2333 (flipped)
+worst error  224.8 px  yaw  285.1 pitch   0.3  top / middle / bottom = dlc_caverns markup2 2540 | dlc_caverns markup2 2335 | dlc_caverns markup2 2333 (flipped)
+worst error  240.3 px  yaw   92.0 pitch  88.3  top / middle / bottom = dlc_caverns markup2 2547 | dlc_caverns markup2 2335 | dlc_caverns markup2 2333
+worst error  258.6 px  yaw  108.6 pitch  -1.2  top / middle / bottom = dlc1_uo_cavern_hall_gate_two object 2312 (local at origin) | dlc1_uo_raft_bridge_spawned object 2203 (local at origin) | dlc1_uo_cavern_hall_gate object 2309 (local at origin) (flipped)
+worst error  258.7 px  yaw  108.6 pitch  -1.2  top / middle / bottom = dlc1_uo_cavern_hall_gate_two object 2312 (local at origin) | dlc1_uo_raft_bridge_spawned object 2203 (local at origin) | dlc1_uo_cavern_hall_gate_two object 2311 (local at origin) (flipped)

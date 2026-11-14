@@ -1,0 +1,343 @@
+005c9da0  55                   push    ebp
+005c9da1  8bec                 mov     ebp, esp
+005c9da3  83e4f0               and     esp, 0xfffffff0
+005c9da6  81eca4000000         sub     esp, 0xa4
+005c9dac  a1ac9ccd00           mov     eax, dword ptr [0xcd9cac]
+005c9db1  53                   push    ebx
+005c9db2  8b5d0c               mov     ebx, dword ptr [ebp + 0xc]
+005c9db5  56                   push    esi
+005c9db6  8b7508               mov     esi, dword ptr [ebp + 8]
+005c9db9  57                   push    edi
+005c9dba  894c2458             mov     dword ptr [esp + 0x58], ecx
+005c9dbe  8b4848               mov     ecx, dword ptr [eax + 0x48]
+005c9dc1  8b11                 mov     edx, dword ptr [ecx]
+005c9dc3  8b4234               mov     eax, dword ptr [edx + 0x34]
+005c9dc6  6a00                 push    0
+005c9dc8  6a5c                 push    0x5c
+005c9dca  89742464             mov     dword ptr [esp + 0x64], esi
+005c9dce  ffd0                 call    eax
+005c9dd0  6a5c                 push    0x5c
+005c9dd2  8bf8                 mov     edi, eax
+005c9dd4  6a00                 push    0
+005c9dd6  57                   push    edi
+005c9dd7  e894a32400           call    0x814170
+005c9ddc  8b0dac9ccd00         mov     ecx, dword ptr [0xcd9cac]
+005c9de2  8b839c000000         mov     eax, dword ptr [ebx + 0x9c]
+005c9de8  8b4948               mov     ecx, dword ptr [ecx + 0x48]
+005c9deb  8b11                 mov     edx, dword ptr [ecx]
+005c9ded  8b5234               mov     edx, dword ptr [edx + 0x34]
+005c9df0  83c40c               add     esp, 0xc
+005c9df3  83c001               add     eax, 1
+005c9df6  6a00                 push    0
+005c9df8  c1e004               shl     eax, 4
+005c9dfb  50                   push    eax
+005c9dfc  ffd2                 call    edx
+005c9dfe  894758               mov     dword ptr [edi + 0x58], eax
+005c9e01  8b8b9c000000         mov     ecx, dword ptr [ebx + 0x9c]
+005c9e07  8908                 mov     dword ptr [eax], ecx
+005c9e09  8b5758               mov     edx, dword ptr [edi + 0x58]
+005c9e0c  8b0a                 mov     ecx, dword ptr [edx]
+005c9e0e  85c9                 test    ecx, ecx
+005c9e10  0f8429040000         je      0x5ca23f
+005c9e16  807b4d0a             cmp     byte ptr [ebx + 0x4d], 0xa
+005c9e1a  f30f100d1c118400     movss   xmm1, dword ptr [0x84111c]
+005c9e22  f30f100588328400     movss   xmm0, dword ptr [0x843288]
+005c9e2a  8b93a0000000         mov     edx, dword ptr [ebx + 0xa0]
+005c9e30  f30f114c243c         movss   dword ptr [esp + 0x3c], xmm1
+005c9e36  f30f114c2438         movss   dword ptr [esp + 0x38], xmm1
+005c9e3c  f30f114c2434         movss   dword ptr [esp + 0x34], xmm1
+005c9e42  f30f114c2430         movss   dword ptr [esp + 0x30], xmm1
+005c9e48  0f286c2430           movaps  xmm5, xmmword ptr [esp + 0x30]
+005c9e4d  f30f11442438         movss   dword ptr [esp + 0x38], xmm0
+005c9e53  f30f11442434         movss   dword ptr [esp + 0x34], xmm0
+005c9e59  f30f11442430         movss   dword ptr [esp + 0x30], xmm0
+005c9e5f  f30f10055c188400     movss   xmm0, dword ptr [0x84185c]
+005c9e67  f30f114c243c         movss   dword ptr [esp + 0x3c], xmm1
+005c9e6d  0f28542430           movaps  xmm2, xmmword ptr [esp + 0x30]
+005c9e72  f30f114c244c         movss   dword ptr [esp + 0x4c], xmm1
+005c9e78  f30f11442448         movss   dword ptr [esp + 0x48], xmm0
+005c9e7e  f30f11442444         movss   dword ptr [esp + 0x44], xmm0
+005c9e84  f30f11442440         movss   dword ptr [esp + 0x40], xmm0
+005c9e8a  0f285c2440           movaps  xmm3, xmmword ptr [esp + 0x40]
+005c9e8f  0f296c2460           movaps  xmmword ptr [esp + 0x60], xmm5
+005c9e94  0f29542430           movaps  xmmword ptr [esp + 0x30], xmm2
+005c9e99  0f295c2440           movaps  xmmword ptr [esp + 0x40], xmm3
+005c9e9e  0f8549010000         jne     0x5c9fed
+005c9ea4  f30f104208           movss   xmm0, dword ptr [edx + 8]
+005c9ea9  f30f11442428         movss   dword ptr [esp + 0x28], xmm0
+005c9eaf  f30f104204           movss   xmm0, dword ptr [edx + 4]
+005c9eb4  f30f11442424         movss   dword ptr [esp + 0x24], xmm0
+005c9eba  f30f1002             movss   xmm0, dword ptr [edx]
+005c9ebe  f30f11442420         movss   dword ptr [esp + 0x20], xmm0
+005c9ec4  8d41ff               lea     eax, [ecx - 1]
+005c9ec7  f30f114c242c         movss   dword ptr [esp + 0x2c], xmm1
+005c9ecd  0f28442420           movaps  xmm0, xmmword ptr [esp + 0x20]
+005c9ed2  c1e005               shl     eax, 5
+005c9ed5  03c2                 add     eax, edx
+005c9ed7  83bed400000000       cmp     dword ptr [esi + 0xd4], 0
+005c9ede  0f29842480000000     movaps  xmmword ptr [esp + 0x80], xmm0
+005c9ee6  f30f104008           movss   xmm0, dword ptr [eax + 8]
+005c9eeb  f30f11442428         movss   dword ptr [esp + 0x28], xmm0
+005c9ef1  f30f104004           movss   xmm0, dword ptr [eax + 4]
+005c9ef6  f30f11442424         movss   dword ptr [esp + 0x24], xmm0
+005c9efc  f30f1000             movss   xmm0, dword ptr [eax]
+005c9f00  f30f114c242c         movss   dword ptr [esp + 0x2c], xmm1
+005c9f06  f30f11442420         movss   dword ptr [esp + 0x20], xmm0
+005c9f0c  0f28442420           movaps  xmm0, xmmword ptr [esp + 0x20]
+005c9f11  0f29442470           movaps  xmmword ptr [esp + 0x70], xmm0
+005c9f16  740e                 je      0x5c9f26
+005c9f18  8b86d4000000         mov     eax, dword ptr [esi + 0xd4]
+005c9f1e  8b88d0000000         mov     ecx, dword ptr [eax + 0xd0]
+005c9f24  eb06                 jmp     0x5c9f2c
+005c9f26  8b8ed0000000         mov     ecx, dword ptr [esi + 0xd0]
+005c9f2c  8b11                 mov     edx, dword ptr [ecx]
+005c9f2e  8b4220               mov     eax, dword ptr [edx + 0x20]
+005c9f31  ffd0                 call    eax
+005c9f33  f30f1005a8138400     movss   xmm0, dword ptr [0x8413a8]
+005c9f3b  0f284c2470           movaps  xmm1, xmmword ptr [esp + 0x70]
+005c9f40  0f588c2480000000     addps   xmm1, xmmword ptr [esp + 0x80]
+005c9f48  8d4c2420             lea     ecx, [esp + 0x20]
+005c9f4c  51                   push    ecx
+005c9f4d  0fc6c000             shufps  xmm0, xmm0, 0
+005c9f51  8d942494000000       lea     edx, [esp + 0x94]
+005c9f58  53                   push    ebx
+005c9f59  0f59c8               mulps   xmm1, xmm0
+005c9f5c  52                   push    edx
+005c9f5d  8bf0                 mov     esi, eax
+005c9f5f  0f298424ac000000     movaps  xmmword ptr [esp + 0xac], xmm0
+005c9f67  0f294c242c           movaps  xmmword ptr [esp + 0x2c], xmm1
+005c9f6c  e8afb2e6ff           call    0x435220
+005c9f71  0f2808               movaps  xmm1, xmmword ptr [eax]
+005c9f74  0f2806               movaps  xmm0, xmmword ptr [esi]
+005c9f77  0f58c1               addps   xmm0, xmm1
+005c9f7a  0f2944246c           movaps  xmmword ptr [esp + 0x6c], xmm0
+005c9f7f  0f2844247c           movaps  xmm0, xmmword ptr [esp + 0x7c]
+005c9f84  0f5c84248c000000     subps   xmm0, xmmword ptr [esp + 0x8c]
+005c9f8c  0f598424ac000000     mulps   xmm0, xmmword ptr [esp + 0xac]
+005c9f94  8d8424ac000000       lea     eax, [esp + 0xac]
+005c9f9b  50                   push    eax
+005c9f9c  8d8c24a0000000       lea     ecx, [esp + 0xa0]
+005c9fa3  51                   push    ecx
+005c9fa4  0f298424b4000000     movaps  xmmword ptr [esp + 0xb4], xmm0
+005c9fac  e85f63e9ff           call    0x460310
+005c9fb1  8b10                 mov     edx, dword ptr [eax]
+005c9fb3  8b4804               mov     ecx, dword ptr [eax + 4]
+005c9fb6  f30f100530118400     movss   xmm0, dword ptr [0x841130]
+005c9fbe  89542454             mov     dword ptr [esp + 0x54], edx
+005c9fc2  8b5008               mov     edx, dword ptr [eax + 8]
+005c9fc5  8b400c               mov     eax, dword ptr [eax + 0xc]
+005c9fc8  894c2458             mov     dword ptr [esp + 0x58], ecx
+005c9fcc  8954245c             mov     dword ptr [esp + 0x5c], edx
+005c9fd0  89442460             mov     dword ptr [esp + 0x60], eax
+005c9fd4  0f284c2454           movaps  xmm1, xmmword ptr [esp + 0x54]
+005c9fd9  0fc6c000             shufps  xmm0, xmm0, 0
+005c9fdd  0f59c1               mulps   xmm0, xmm1
+005c9fe0  83c414               add     esp, 0x14
+005c9fe3  0f29442430           movaps  xmmword ptr [esp + 0x30], xmm0
+005c9fe8  e913020000           jmp     0x5ca200
+005c9fed  0f2833               movaps  xmm6, xmmword ptr [ebx]
+005c9ff0  d9ee                 fldz    
+005c9ff2  0f286310             movaps  xmm4, xmmword ptr [ebx + 0x10]
+005c9ff6  0f28fc               movaps  xmm7, xmm4
+005c9ff9  0fc6fcd2             shufps  xmm7, xmm4, 0xd2
+005c9ffd  0f28c6               movaps  xmm0, xmm6
+005ca000  0fc6c6c9             shufps  xmm0, xmm6, 0xc9
+005ca004  0f59c7               mulps   xmm0, xmm7
+005ca007  0f28fe               movaps  xmm7, xmm6
+005ca00a  0fc6fed2             shufps  xmm7, xmm6, 0xd2
+005ca00e  0fc6e4c9             shufps  xmm4, xmm4, 0xc9
+005ca012  0f59fc               mulps   xmm7, xmm4
+005ca015  0f286320             movaps  xmm4, xmmword ptr [ebx + 0x20]
+005ca019  0f5cc7               subps   xmm0, xmm7
+005ca01c  0f59c4               mulps   xmm0, xmm4
+005ca01f  0f28e0               movaps  xmm4, xmm0
+005ca022  0f28f0               movaps  xmm6, xmm0
+005ca025  0fc6e002             shufps  xmm4, xmm0, 2
+005ca029  0fc6f001             shufps  xmm6, xmm0, 1
+005ca02d  f30f58f4             addss   xmm6, xmm4
+005ca031  f30f58c6             addss   xmm0, xmm6
+005ca035  0f298424a0000000     movaps  xmmword ptr [esp + 0xa0], xmm0
+005ca03d  d89c24a0000000       fcomp   dword ptr [esp + 0xa0]
+005ca044  c644241b01           mov     byte ptr [esp + 0x1b], 1
+005ca049  dfe0                 fnstsw  ax
+005ca04b  f6c441               test    ah, 0x41
+005ca04e  7405                 je      0x5ca055
+005ca050  c644241b00           mov     byte ptr [esp + 0x1b], 0
+005ca055  33c0                 xor     eax, eax
+005ca057  3bc8                 cmp     ecx, eax
+005ca059  89442450             mov     dword ptr [esp + 0x50], eax
+005ca05d  0f8e6e010000         jle     0x5ca1d1
+005ca063  83c204               add     edx, 4
+005ca066  8944241c             mov     dword ptr [esp + 0x1c], eax
+005ca06a  89542454             mov     dword ptr [esp + 0x54], edx
+005ca06e  eb10                 jmp     0x5ca080
+005ca070  f30f100d1c118400     movss   xmm1, dword ptr [0x84111c]
+005ca078  8b542454             mov     edx, dword ptr [esp + 0x54]
+005ca07c  8b74245c             mov     esi, dword ptr [esp + 0x5c]
+005ca080  83bed400000000       cmp     dword ptr [esi + 0xd4], 0
+005ca087  f30f104204           movss   xmm0, dword ptr [edx + 4]
+005ca08c  f30f11842488000000   movss   dword ptr [esp + 0x88], xmm0
+005ca095  f30f1002             movss   xmm0, dword ptr [edx]
+005ca099  f30f11842484000000   movss   dword ptr [esp + 0x84], xmm0
+005ca0a2  f30f1042fc           movss   xmm0, dword ptr [edx - 4]
+005ca0a7  f30f118c248c000000   movss   dword ptr [esp + 0x8c], xmm1
+005ca0b0  f30f11842480000000   movss   dword ptr [esp + 0x80], xmm0
+005ca0b9  0f28842480000000     movaps  xmm0, xmmword ptr [esp + 0x80]
+005ca0c1  0f29442420           movaps  xmmword ptr [esp + 0x20], xmm0
+005ca0c6  740e                 je      0x5ca0d6
+005ca0c8  8b8ed4000000         mov     ecx, dword ptr [esi + 0xd4]
+005ca0ce  8b89d0000000         mov     ecx, dword ptr [ecx + 0xd0]
+005ca0d4  eb06                 jmp     0x5ca0dc
+005ca0d6  8b8ed0000000         mov     ecx, dword ptr [esi + 0xd0]
+005ca0dc  8b11                 mov     edx, dword ptr [ecx]
+005ca0de  8b4220               mov     eax, dword ptr [edx + 0x20]
+005ca0e1  ffd0                 call    eax
+005ca0e3  8b542424             mov     edx, dword ptr [esp + 0x24]
+005ca0e7  8b4c2420             mov     ecx, dword ptr [esp + 0x20]
+005ca0eb  8bf0                 mov     esi, eax
+005ca0ed  8b442428             mov     eax, dword ptr [esp + 0x28]
+005ca0f1  89542474             mov     dword ptr [esp + 0x74], edx
+005ca0f5  8d542470             lea     edx, [esp + 0x70]
+005ca0f9  52                   push    edx
+005ca0fa  8944247c             mov     dword ptr [esp + 0x7c], eax
+005ca0fe  894c2474             mov     dword ptr [esp + 0x74], ecx
+005ca102  8b4c2430             mov     ecx, dword ptr [esp + 0x30]
+005ca106  8d842494000000       lea     eax, [esp + 0x94]
+005ca10d  53                   push    ebx
+005ca10e  50                   push    eax
+005ca10f  898c2488000000       mov     dword ptr [esp + 0x88], ecx
+005ca116  e80519edff           call    0x49ba20
+005ca11b  0f2808               movaps  xmm1, xmmword ptr [eax]
+005ca11e  0f2806               movaps  xmm0, xmmword ptr [esi]
+005ca121  0f285c244c           movaps  xmm3, xmmword ptr [esp + 0x4c]
+005ca126  0f58c1               addps   xmm0, xmm1
+005ca129  0f28c8               movaps  xmm1, xmm0
+005ca12c  0f584c246c           addps   xmm1, xmmword ptr [esp + 0x6c]
+005ca131  0f28e9               movaps  xmm5, xmm1
+005ca134  0f284c243c           movaps  xmm1, xmmword ptr [esp + 0x3c]
+005ca139  83c40c               add     esp, 0xc
+005ca13c  807c241b00           cmp     byte ptr [esp + 0x1b], 0
+005ca141  0f5dc8               minps   xmm1, xmm0
+005ca144  0f28d1               movaps  xmm2, xmm1
+005ca147  0f5fd8               maxps   xmm3, xmm0
+005ca14a  0f29442420           movaps  xmmword ptr [esp + 0x20], xmm0
+005ca14f  0f296c2460           movaps  xmmword ptr [esp + 0x60], xmm5
+005ca154  0f29542430           movaps  xmmword ptr [esp + 0x30], xmm2
+005ca159  0f295c2440           movaps  xmmword ptr [esp + 0x40], xmm3
+005ca15e  742b                 je      0x5ca18b
+005ca160  8b4f58               mov     ecx, dword ptr [edi + 0x58]
+005ca163  8b01                 mov     eax, dword ptr [ecx]
+005ca165  2b442450             sub     eax, dword ptr [esp + 0x50]
+005ca169  8b542424             mov     edx, dword ptr [esp + 0x24]
+005ca16d  c1e004               shl     eax, 4
+005ca170  03c1                 add     eax, ecx
+005ca172  8b4c2420             mov     ecx, dword ptr [esp + 0x20]
+005ca176  8908                 mov     dword ptr [eax], ecx
+005ca178  8b4c2428             mov     ecx, dword ptr [esp + 0x28]
+005ca17c  895004               mov     dword ptr [eax + 4], edx
+005ca17f  8b54242c             mov     edx, dword ptr [esp + 0x2c]
+005ca183  894808               mov     dword ptr [eax + 8], ecx
+005ca186  89500c               mov     dword ptr [eax + 0xc], edx
+005ca189  eb26                 jmp     0x5ca1b1
+005ca18b  8b4758               mov     eax, dword ptr [edi + 0x58]
+005ca18e  8b4c241c             mov     ecx, dword ptr [esp + 0x1c]
+005ca192  8b542420             mov     edx, dword ptr [esp + 0x20]
+005ca196  8d440810             lea     eax, [eax + ecx + 0x10]
+005ca19a  8b4c2424             mov     ecx, dword ptr [esp + 0x24]
+005ca19e  8910                 mov     dword ptr [eax], edx
+005ca1a0  8b542428             mov     edx, dword ptr [esp + 0x28]
+005ca1a4  894804               mov     dword ptr [eax + 4], ecx
+005ca1a7  8b4c242c             mov     ecx, dword ptr [esp + 0x2c]
+005ca1ab  895008               mov     dword ptr [eax + 8], edx
+005ca1ae  89480c               mov     dword ptr [eax + 0xc], ecx
+005ca1b1  8b442450             mov     eax, dword ptr [esp + 0x50]
+005ca1b5  8b5758               mov     edx, dword ptr [edi + 0x58]
+005ca1b8  8344245420           add     dword ptr [esp + 0x54], 0x20
+005ca1bd  8344241c10           add     dword ptr [esp + 0x1c], 0x10
+005ca1c2  83c001               add     eax, 1
+005ca1c5  3b02                 cmp     eax, dword ptr [edx]
+005ca1c7  89442450             mov     dword ptr [esp + 0x50], eax
+005ca1cb  0f8c9ffeffff         jl      0x5ca070
+005ca1d1  8b4758               mov     eax, dword ptr [edi + 0x58]
+005ca1d4  db00                 fild    dword ptr [eax]
+005ca1d6  d9e8                 fld1    
+005ca1d8  def1                 fdivrp  st(1)
+005ca1da  d95c241c             fstp    dword ptr [esp + 0x1c]
+005ca1de  f30f1044241c         movss   xmm0, dword ptr [esp + 0x1c]
+005ca1e4  0fc6c000             shufps  xmm0, xmm0, 0
+005ca1e8  0f59c5               mulps   xmm0, xmm5
+005ca1eb  0f5cd0               subps   xmm2, xmm0
+005ca1ee  0f5cd8               subps   xmm3, xmm0
+005ca1f1  0f29442460           movaps  xmmword ptr [esp + 0x60], xmm0
+005ca1f6  0f29542430           movaps  xmmword ptr [esp + 0x30], xmm2
+005ca1fb  0f295c2440           movaps  xmmword ptr [esp + 0x40], xmm3
+005ca200  d9442460             fld     dword ptr [esp + 0x60]
+005ca204  d95f34               fstp    dword ptr [edi + 0x34]
+005ca207  d9442464             fld     dword ptr [esp + 0x64]
+005ca20b  d95f38               fstp    dword ptr [edi + 0x38]
+005ca20e  d9442468             fld     dword ptr [esp + 0x68]
+005ca212  d95f3c               fstp    dword ptr [edi + 0x3c]
+005ca215  d9442430             fld     dword ptr [esp + 0x30]
+005ca219  d95f40               fstp    dword ptr [edi + 0x40]
+005ca21c  d9442434             fld     dword ptr [esp + 0x34]
+005ca220  d95f44               fstp    dword ptr [edi + 0x44]
+005ca223  d9442438             fld     dword ptr [esp + 0x38]
+005ca227  d95f48               fstp    dword ptr [edi + 0x48]
+005ca22a  d9442440             fld     dword ptr [esp + 0x40]
+005ca22e  d95f4c               fstp    dword ptr [edi + 0x4c]
+005ca231  d9442444             fld     dword ptr [esp + 0x44]
+005ca235  d95f50               fstp    dword ptr [edi + 0x50]
+005ca238  d9442448             fld     dword ptr [esp + 0x48]
+005ca23c  d95f54               fstp    dword ptr [edi + 0x54]
+005ca23f  8b742458             mov     esi, dword ptr [esp + 0x58]
+005ca243  53                   push    ebx
+005ca244  57                   push    edi
+005ca245  8bce                 mov     ecx, esi
+005ca247  e80444ffff           call    0x5be650
+005ca24c  f7472800001000       test    dword ptr [edi + 0x28], 0x100000
+005ca253  8944241c             mov     dword ptr [esp + 0x1c], eax
+005ca257  7409                 je      0x5ca262
+005ca259  33c0                 xor     eax, eax
+005ca25b  8944241c             mov     dword ptr [esp + 0x1c], eax
+005ca25f  894758               mov     dword ptr [edi + 0x58], eax
+005ca262  83c608               add     esi, 8
+005ca265  56                   push    esi
+005ca266  e855d4fcff           call    0x5976c0
+005ca26b  8b4c245c             mov     ecx, dword ptr [esp + 0x5c]
+005ca26f  8bf0                 mov     esi, eax
+005ca271  83c110               add     ecx, 0x10
+005ca274  56                   push    esi
+005ca275  51                   push    ecx
+005ca276  e8f5d3fcff           call    0x597670
+005ca27b  d9ee                 fldz    
+005ca27d  8b542468             mov     edx, dword ptr [esp + 0x68]
+005ca281  8b4c2428             mov     ecx, dword ptr [esp + 0x28]
+005ca285  33c0                 xor     eax, eax
+005ca287  894634               mov     dword ptr [esi + 0x34], eax
+005ca28a  0f57c0               xorps   xmm0, xmm0
+005ca28d  894638               mov     dword ptr [esi + 0x38], eax
+005ca290  89563c               mov     dword ptr [esi + 0x3c], edx
+005ca293  895e24               mov     dword ptr [esi + 0x24], ebx
+005ca296  0f294610             movaps  xmmword ptr [esi + 0x10], xmm0
+005ca29a  89460c               mov     dword ptr [esi + 0xc], eax
+005ca29d  897e20               mov     dword ptr [esi + 0x20], edi
+005ca2a0  8b4728               mov     eax, dword ptr [edi + 0x28]
+005ca2a3  d9562c               fst     dword ptr [esi + 0x2c]
+005ca2a6  83c40c               add     esp, 0xc
+005ca2a9  d95e30               fstp    dword ptr [esi + 0x30]
+005ca2ac  894e34               mov     dword ptr [esi + 0x34], ecx
+005ca2af  8b4c2458             mov     ecx, dword ptr [esp + 0x58]
+005ca2b3  56                   push    esi
+005ca2b4  894628               mov     dword ptr [esi + 0x28], eax
+005ca2b7  e8e49effff           call    0x5c41a0
+005ca2bc  56                   push    esi
+005ca2bd  e8cebff7ff           call    0x546290
+005ca2c2  83c404               add     esp, 4
+005ca2c5  5f                   pop     edi
+005ca2c6  5e                   pop     esi
+005ca2c7  5b                   pop     ebx
+005ca2c8  8be5                 mov     esp, ebp
+005ca2ca  5d                   pop     ebp
+005ca2cb  c20800               ret     8
+005ca2ce  cc                   int3    
+005ca2cf  cc                   int3    

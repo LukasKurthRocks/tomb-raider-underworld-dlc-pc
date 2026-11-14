@@ -1,0 +1,63 @@
+dlc1_ei_hpole_a.drm dtp 23721: 1 object markup records
+  # 0 id  2084 type  4 wallvertpole bone   0 skip 0 pos (353 0 0)  2 pts x 75..632 y -0..0 z 0..0
+dlc1_uo_cavern_hall_gate.drm dtp 20854: 2 object markup records
+  # 0 id  2309 type  1 ledgegrab    bone   1 skip 0 pos (-55 -6 468)  2 pts x -55..-55 y -575..562 z 468..468
+  # 1 id  2310 type  1 ledgegrab    bone   1 skip 0 pos (-55 -6 1100)  2 pts x -55..-55 y -575..562 z 1100..1100
+dlc1_uo_cavern_hall_gate_two.drm dtp 20861: 2 object markup records
+  # 0 id  2311 type  1 ledgegrab    bone   1 skip 0 pos (-55 -6 468)  2 pts x -55..-55 y -575..562 z 468..468
+  # 1 id  2312 type  1 ledgegrab    bone   1 skip 0 pos (-55 -6 1418)  2 pts x -55..-55 y -575..562 z 1418..1418
+dlc1_uo_goo_pit_lever.drm dtp 23320: 1 object markup records
+  # 0 id  2227 type  1 ledgegrab    bone   0 skip 0 pos (-34 -13 783)  2 pts x -34..-34 y -162..136 z 783..783
+dlc1_uo_guillotine.drm dtp 21254: 1 object markup records
+  # 0 id  2143 type  1 ledgegrab    bone   1 skip 0 pos (-0 -100 1)  2 pts x -131..131 y -100..-100 z 1..1
+dlc1_uo_pillar_of_doom_a.drm dtp 20472: 10 object markup records
+  # 0 id  2187 type  1 ledgegrab    bone  16 skip 0 pos (0 -376 216)  7 pts x -384..384 y -474..-279 z 216..216
+  # 1 id  2188 type  1 ledgegrab    bone  16 skip 0 pos (0 376 216)  7 pts x -384..384 y 279..474 z 216..216
+  # 2 id  2189 type  1 ledgegrab    bone  12 skip 0 pos (376 0 225)  7 pts x 279..474 y -384..384 z 225..225
+  # 3 id  2190 type  1 ledgegrab    bone  12 skip 0 pos (-376 0 225)  7 pts x -474..-279 y -384..384 z 225..225
+  # 4 id  2191 type  1 ledgegrab    bone   8 skip 0 pos (376 0 149)  7 pts x 279..474 y -384..384 z 149..149
+  # 5 id  2192 type  1 ledgegrab    bone   8 skip 0 pos (-376 0 149)  7 pts x -474..-279 y -384..384 z 149..149
+  # 6 id  2193 type  1 ledgegrab    bone   6 skip 0 pos (0 -376 183)  7 pts x -384..384 y -474..-279 z 183..183
+  # 7 id  2194 type  1 ledgegrab    bone   6 skip 0 pos (0 376 183)  7 pts x -384..384 y 279..474 z 183..183
+  # 8 id  2195 type  1 ledgegrab    bone   5 skip 0 pos (-375 -2 209)  7 pts x -474..-276 y -385..382 z 209..209
+  # 9 id  2196 type  1 ledgegrab    bone   5 skip 0 pos (375 2 209)  7 pts x 276..474 y -382..385 z 209..209
+dlc1_uo_pillar_of_doom_b.drm dtp 20478: 13 object markup records
+  # 0 id  2228 type  1 ledgegrab    bone   1 skip 0 pos (-3 385 4896)  7 pts x -398..392 y 284..486 z 4896..4896
+  # 1 id  2229 type  1 ledgegrab    bone   1 skip 0 pos (-3 -385 4893)  7 pts x -398..392 y -486..-284 z 4893..4893
+  # 2 id  2184 type  1 ledgegrab    bone  17 skip 0 pos (372 -6 223)  7 pts x 270..474 y -390..377 z 223..223
+  # 3 id  2185 type  1 ledgegrab    bone  17 skip 0 pos (-372 6 223)  7 pts x -474..-270 y -377..390 z 223..223
+  # 4 id  2303 type  1 ledgegrab    bone  13 skip 0 pos (0 -376 147)  7 pts x -384..384 y -474..-279 z 147..147
+  # 5 id  2367 type  1 ledgegrab    bone  13 skip 0 pos (0 376 147)  7 pts x -384..384 y 279..474 z 147..147
+  # 6 id  2368 type  1 ledgegrab    bone   9 skip 0 pos (375 -1 184)  7 pts x 277..474 y -385..382 z 184..184
+  # 7 id  2369 type  1 ledgegrab    bone   9 skip 0 pos (-375 1 184)  7 pts x -474..-277 y -382..385 z 184..184
+  # 8 id  2197 type  1 ledgegrab    bone   1 skip 0 pos (3 2 5771) 21 pts closed x -488..494 y -489..493 z 5771..5771
+  # 9 id  2199 type  1 ledgegrab    bone   1 skip 0 pos (273 375 5136)  3 pts x 151..395 y 287..464 z 5136..5136
+  #10 id  2200 type  1 ledgegrab    bone   1 skip 0 pos (273 -375 5136)  3 pts x 151..395 y -464..-287 z 5136..5136
+  #11 id  2208 type  1 ledgegrab    bone   5 skip 0 pos (0 -376 214)  7 pts x -384..384 y -474..-279 z 214..214
+  #12 id  2209 type  1 ledgegrab    bone   5 skip 0 pos (0 376 214)  7 pts x -384..384 y 279..474 z 214..214
+dlc1_uo_pillory.drm dtp 20624: 1 object markup records
+  # 0 id  2260 type  1 ledgegrab    bone   0 skip 0 pos (178 -178 4549) 11 pts x -356..711 y -711..356 z 4549..4549
+dlc1_uo_pillory.drm dtp 20625: 2 object markup records
+  # 0 id  2263 type  1 ledgegrab    bone   0 skip 0 pos (-178 178 2664) 11 pts x -711..356 y -356..711 z 2664..2664
+  # 1 id  2262 type  1 ledgegrab    bone   0 skip 0 pos (178 178 3291) 11 pts x -356..711 y -356..711 z 3290..3292
+dlc1_uo_pillory.drm dtp 20626: 2 object markup records
+  # 0 id  2265 type  1 ledgegrab    bone   0 skip 0 pos (-264 -149 1376) 10 pts x -711..184 y -711..414 z 1376..1376
+  # 1 id  2264 type  1 ledgegrab    bone   0 skip 0 pos (264 -178 751) 10 pts x -184..711 y -711..356 z 751..751
+dlc1_uo_pillory.drm dtp 20630: 2 object markup records
+  # 0 id  2267 type  1 ledgegrab    bone   0 skip 0 pos (0 -0 3921) 25 pts closed x -711..711 y -711..711 z 3921..3921
+  # 1 id  2266 type  1 ledgegrab    bone   0 skip 0 pos (156 -0 2028) 27 pts x -711..1023 y -711..711 z 2028..2028
+dlc1_uo_pillory_axle.drm dtp 20644: 3 object markup records
+  # 0 id  2268 type  1 ledgegrab    bone   0 skip 0 pos (712 -40 2028)  2 pts x 237..1187 y -40..-40 z 2028..2028
+  # 1 id  2269 type 14 balancebeam  bone   0 skip 0 pos (712 0 2028)  2 pts x 237..1187 y 0..0 z 2028..2028
+  # 2 id  2270 type  1 ledgegrab    bone   0 skip 0 pos (713 41 2028)  2 pts x 237..1189 y 41..41 z 2028..2028
+dlc1_uo_raft_bridge_spawned.drm dtp 21116: 5 object markup records
+  # 0 id  2149 type  1 ledgegrab    bone   0 skip 0 pos (-51 -205 977)  3 pts x -311..208 y -342..-69 z 977..977
+  # 1 id  2152 type  1 ledgegrab    bone   0 skip 0 pos (-382 158 977)  2 pts x -382..-382 y -69..385 z 977..977
+  # 2 id  2160 type  1 ledgegrab    bone   0 skip 0 pos (63 346 977)  3 pts x -274..400 y 200..492 z 977..977
+  # 3 id  2202 type  1 ledgegrab    bone   0 skip 0 pos (415 81 977)  2 pts x 415..415 y -37..200 z 977..977
+  # 4 id  2203 type  1 ledgegrab    bone   0 skip 0 pos (290 -208 977)  3 pts x 208..371 y -378..-37 z 977..977
+dlc1_uo_sewer_gate.drm dtp 20755: 1 object markup records
+  # 0 id  2302 type  1 ledgegrab    bone   0 skip 0 pos (11 -230 5609)  2 pts x -476..499 y -230..-230 z 5609..5609
+dlc1_uo_sluice_gate.drm dtp 23446: 1 object markup records
+  # 0 id  2198 type  4 wallvertpole bone   1 skip 0 pos (0 504 533)  2 pts x -418..419 y 504..504 z 533..533
+records by type: balancebeam 1, ledgegrab 44, wallvertpole 2

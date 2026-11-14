@@ -1,0 +1,24 @@
+own_all dlc1_ei_hpole_a: dtp 23721: 1 markup records at +0x1d0, types 4: 1  Xbox diff words: none 
+old_all dlc1_ei_hpole_a: dtp 23721: 1 markup records at +0x1d0, types 4: 1  Xbox diff words: none 
+own_all dlc1_uo_cavern_hall_gate: dtp 20854: 2 markup records at +0x270, types 1: 2  Xbox diff words: none 
+old_all dlc1_uo_cavern_hall_gate: dtp 20854: 2 markup records at +0x270, types 1: 2  Xbox diff words: none 
+own_all dlc1_uo_cavern_hall_gate_two: dtp 20861: 2 markup records at +0x270, types 1: 2  Xbox diff words: none 
+old_all dlc1_uo_cavern_hall_gate_two: dtp 20861: 2 markup records at +0x270, types 1: 2  Xbox diff words: none 
+own_all dlc1_uo_goo_pit_lever: dtp 23320: 1 markup records at +0x250, types 1: 1  Xbox diff words: none 
+old_all dlc1_uo_goo_pit_lever: dtp 23320: 1 markup records at +0x250, types 1: 1  Xbox diff words: none 
+own_all dlc1_uo_guillotine: dtp 21254: 1 markup records at +0x1c0, types 1: 1  Xbox diff words: none 
+old_all dlc1_uo_guillotine: dtp 21254: 1 markup records at +0x1c0, types 1: 1  Xbox diff words: none 
+own_all dlc1_uo_pillar_of_doom_a: dtp 20472: 10 markup records at +0xe80, types 1: 10  Xbox diff words: none 
+old_all dlc1_uo_pillar_of_doom_a: dtp 20472: 10 markup records at +0xe80, types 1: 10  Xbox diff words: +2c x3 
+own_all dlc1_uo_pillar_of_doom_b: dtp 20478: 13 markup records at +0x1760, types 1: 13  Xbox diff words: none 
+old_all dlc1_uo_pillar_of_doom_b: dtp 20478: 13 markup records at +0x1760, types 1: 13  Xbox diff words: +2c x5 
+own_all dlc1_uo_pillory: dtp 20624: 1 markup records at +0x3a0, types 1: 1  Xbox diff words: none dtp 20625: 2 markup records at +0x460, types 1: 2  Xbox diff words: none dtp 20626: 2 markup records at +0xb70, types 1: 2  Xbox diff words: none dtp 20630: 2 markup records at +0x650, types 1: 2  Xbox diff words: none 
+old_all dlc1_uo_pillory: dtp 20624: 1 markup records at +0x3a0, types 1: 1  Xbox diff words: none dtp 20625: 2 markup records at +0x460, types 1: 2  Xbox diff words: none dtp 20626: 2 markup records at +0xb70, types 1: 2  Xbox diff words: none dtp 20630: 2 markup records at +0x650, types 1: 2  Xbox diff words: none 
+own_all dlc1_uo_pillory_axle: dtp 20644: 3 markup records at +0x210, types 1: 2, 14: 1  Xbox diff words: none 
+old_all dlc1_uo_pillory_axle: dtp 20644: 3 markup records at +0x210, types 1: 2, 14: 1  Xbox diff words: none 
+own_all dlc1_uo_raft_bridge_spawned: dtp 21116: 5 markup records at +0x4f0, types 1: 5  Xbox diff words: none 
+old_all dlc1_uo_raft_bridge_spawned: dtp 21116: 5 markup records at +0x4f0, types 1: 5  Xbox diff words: none 
+own_all dlc1_uo_sewer_gate: dtp 20755: 1 markup records at +0x210, types 1: 1  Xbox diff words: none 
+old_all dlc1_uo_sewer_gate: dtp 20755: 1 markup records at +0x210, types 1: 1  Xbox diff words: none 
+own_all dlc1_uo_sluice_gate: dtp 23446: 1 markup records at +0x3a0, types 4: 1  Xbox diff words: none 
+old_all dlc1_uo_sluice_gate: dtp 23446: 1 markup records at +0x3a0, types 4: 1  Xbox diff words: none 

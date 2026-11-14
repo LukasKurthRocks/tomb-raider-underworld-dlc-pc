@@ -1,0 +1,2 @@
+cavern gates 2312 / 2310 / 2309 at the origin: best worst error 355.3 px at focal 875 (logged 463.53), yaw 339.0 pitch 27.4
+cavern gates 2312 / 2310 / 2309 at the origin (flipped): best worst error 150.0 px at focal 475 (logged 463.53), yaw 137.1 pitch 7.7

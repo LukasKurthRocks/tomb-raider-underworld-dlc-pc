@@ -1,0 +1,10 @@
+near (-17575.8 -6919.7 -11612.2) within 2000: 7 items
+l2_junglehub_pcbig.drm: origin (-8558.2 19414.4 18073.2), unit DTP section 45 (id 10638): +0x2c = 96 items, +0x30 -> section 45 +0x16030
+types: balancebeam 1, jumplanding 1, ledgegrab 5
+  id   812 type 14 balancebeam  kind 0  2 pts x -17035..-17034 y -6637..-6180 z -10585..-10585
+  id   816 type  1 ledgegrab    kind 0  2 pts x -17066..-17066 y -7049..-6733 z -10822..-10822
+  id   843 type  1 ledgegrab    kind 0  2 pts x -17066..-17066 y -6872..-6347 z -10585..-10585
+  id   639 type  2 jumplanding  kind 0  3 pts x -18012..-16892 y -6341..-5991 z -11682..-11682
+  id   640 type  1 ledgegrab    kind 0  2 pts x -19922..-17075 y -6635..-6635 z -11612..-11612
+  id   637 type  1 ledgegrab    kind 0  4 pts x -17066..-17003 y -6637..-6180 z -10585..-10585
+  id   860 type  1 ledgegrab    kind 0  2 pts x -16633..-16633 y -8204..-6846 z -10372..-10372

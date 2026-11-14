@@ -1,0 +1,4 @@
+l2_junglehub_pcbig.drm: origin (-8558.2 19414.4 18073.2), unit DTP section 45 (id 10638): +0x2c = 96 items, +0x30 -> section 45 +0x16030
+types: balancebeam 6, horizpole 1, jumplanding 2, ledgegrab 81, perch 3, pillar 1, wallvertpole 2
+  id   816 type  1 ledgegrab    kind 0  2 pts x -17066..-17066 y -7049..-6733 z -10822..-10822  screen (267 160) (384 130)
+  id   640 type  1 ledgegrab    kind 0  2 pts x -19922..-17075 y -6635..-6635 z -11612..-11612  screen (312 647) (3170 1252)

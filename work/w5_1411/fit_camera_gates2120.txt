@@ -1,0 +1,6 @@
+case gates2120, line direction as listed: worst end point error 0.4 px (6 points, 5 unknowns), yaw 94.3 deg, pitch 38.1 deg, camera at (1213 -8 -141), t 74.3 741.7 1038.5
+   Lara (-458.8 -1333.3 -122.1) -> shot (-101 1027); camera - Lara distance 2134 units
+case gates2120, line direction flipped: worst end point error 0.4 px (6 points, 5 unknowns), yaw 274.3 deg, pitch 38.1 deg, camera at (-1323 -5 -141), t 70.8 821.4 1125.6
+   Lara (-458.8 -1333.3 -122.1) -> shot (2615 1008); camera - Lara distance 1585 units
+with Lara, direction as listed: worst error 150.3 px, per point 69 150 93 69 147 150 150, yaw 136.8 pitch 7.5
+with Lara, direction flipped: worst error 413.9 px, per point 414 148 77 170 413 274 414, yaw 205.9 pitch -5.1

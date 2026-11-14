@@ -5014,8 +5014,8 @@ def check_02242(ini_path, switches_path):
     with TO TEST; Set-TruMenu knows the 0.22.41 hash"""
     problems = []
     src = read_cpp()
-    if '"TruMenu 0.22.42 (W3 debug view' not in src[:src.find('\n', src.find('kVersion = '))]:
-        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.42 (W3 debug view"')
+    if '0.22.42 (W3 debug view' not in src[:src.find('\n', src.find('kVersion = '))]:   # 0.22.43: a part
+        problems.append('TruMenu.cpp: kVersion must hold the 0.22.42 part "0.22.42 (W3 debug view"')
     # byte checks of the teaser icon = the offline list
     offline = []
     if os.path.exists(W3_CHECKS_02242):
@@ -5142,6 +5142,90 @@ def check_02242(ini_path, switches_path):
                       'test point +1 m; one label per instance and frame, uber labels after the debug view, LabelStack / '
                       'LabelCellMax; HideEmptyPots; teaser icon main menu only, %d byte checks = precheck_02242; %d keys, '
                       '%d items)' % (len(rows), len(W3_KEYS_02242) + 1, len(W3_ITEMS_02242)))
+
+
+W5_CHECKS_02243 = os.path.join(ROOT, 'work', 'w5_1411', 'precheck_02243.txt')
+W5_HASH_02242 = 'c415a6c42b146f1051a017b921ce7c3542476dae6f989be2f0013224e46f140e'
+
+
+def check_02243():
+    """0.22.43 (W5, owner live notes of the test evening 13.11.; workspace docs/Befund-W5-Markup-Saeule-1411.md):
+    DrawMarkup = W5DrawMarkup - object markup (box +0xc owner) through the owner's bone matrix like the engine (0x5be360:
+    [owner+0x90] + s16 record +0x30 * 0x40, 0x49ba20 x * row0 + y * row1 + z * row2 + row3, only with owner +0x2d8 set,
+    0x5c41c3), without a matrix left out; the query's skip rules (record +0x32 == 1, box +0x28 bit 31, owner +0x18
+    0x20000002, stream unit entry +5) - W5Skipped; type / id as the getter 0x5be340 (item +0x4d / +0x48, record +0x33 /
+    +0x2e); 24 type names DE / EN; labels within kW5LabelNear 4350 (15 m), at most kW5LabelMax 24, through W3LabFrame /
+    W3LabPlace / W3LabAdd; dbg.roomonly (W5RoomKeeps) and P5OcclFactor (key = box); kW5MkChecks = precheck_02243.txt;
+    W5Check after W3Check; bar rows Markup / Nur Kanten first in their group (once); no new key or item; README 0.22.43
+    with TO TEST; Set-TruMenu knows the 0.22.42 hash"""
+    problems = []
+    src = read_cpp()
+    if '"TruMenu 0.22.43 (W5 markup' not in src[:src.find('\n', src.find('kVersion = '))]:
+        problems.append('TruMenu.cpp: kVersion must start with "TruMenu 0.22.43 (W5 markup"')
+    offline = []
+    if os.path.exists(W5_CHECKS_02243):
+        for line in open(W5_CHECKS_02243, encoding='utf-8'):
+            line = line.split('#')[0].strip()
+            if line:
+                addr, hexs = line.split(None, 1)
+                offline.append(('%08x' % int(addr, 16), hexs.replace(' ', '').lower()))
+    else:
+        problems.append('work/w5_1411/precheck_02243.txt (the offline byte list) is missing')
+    rows = [(a.lower(), b.lower()) for a, b in sv_rows(src, 'kW5MkChecks')]
+    if rows != offline or len(rows) != 6:
+        problems.append('TruMenu.cpp: kW5MkChecks (%d rows) must be the 6 rows of precheck_02243.txt in order' % len(rows))
+    if 'g_w5MkOk = DvChecks(kW5MkChecks,' not in fn_body(src, 'void W5Check('):
+        problems.append('TruMenu.cpp: W5Check must set g_w5MkOk from DvChecks(kW5MkChecks, ...)')
+    if 'void DrawMarkup() { W5DrawMarkup(); }' not in src:
+        problems.append('TruMenu.cpp: DrawMarkup must call W5DrawMarkup')
+    om = fn_body(src, 'bool W5OwnerMatrix(')
+    for need in ('ReadDword(owner + 0x2d8, &use) || !use) return false;', 'ReadWord(rec + 0x30, &bone)',
+                 'ReadDword(owner + 0x90, &base)', 'static_cast<short>(bone)) * 0x40'):
+        if need not in om: problems.append('TruMenu.cpp: W5OwnerMatrix lacks %s' % need)
+    if 'out[c] = p[0] * m[c] + p[1] * m[4 + c] + p[2] * m[8 + c] + m[12 + c];' not in fn_body(src, 'void W5Apply('):
+        problems.append('TruMenu.cpp: W5Apply must be x * row0 + y * row1 + z * row2 + row3 (0x49ba20)')
+    sk = fn_body(src, 'bool W5Skipped(')
+    for need in ('ReadByte(rec + 0x32, &b) && b == 1', 'flags & 0x80000000u', '(oflags & 0x20000002u)',
+                 'ReadByte(entry + 5, &b) && b'):
+        if need not in sk: problems.append('TruMenu.cpp: W5Skipped lacks %s' % need)
+    dm = fn_body(src, 'void W5DrawMarkup(')
+    for need in ('if (g_w5MkOk && W5Skipped(here, rec, flags, owner)) { ++skipped; continue; }',
+                 'const bool xform = local && g_w5MkOk && W5OwnerMatrix(owner, rec, m);',
+                 'if (local && !xform) { ++skipped; continue; }', 'if (!W5RoomKeeps(here, owner, nearest)) { ++room; continue; }',
+                 'ReadByte(item + 0x4d, &tb)', 'ReadWord(item + 0x48, &w)', 'ReadByte(rec + 0x33, &tb)',
+                 'ReadWord(rec + 0x2e, &w)', 'alpha = P5OcclFactor(here, mid);', 'W3LabFrame();',
+                 'if (!W3LabPlace(&r, l.at, fs + 3.0f)) continue;', 'W3LabAdd(l.box, r);'):
+        if need not in dm: problems.append('TruMenu.cpp: W5DrawMarkup lacks %s' % need)
+    rk = fn_body(src, 'bool W5RoomKeeps(')
+    for need in ('if (!g_p5RoomOnly) return true;', 'entry == RkUnitEntry(laraSid)', 'ReadDword(owner + 0xe0, &sid) && sid == laraSid',
+                 'nearest <= g_w3RoomNear'):
+        if need not in rk: problems.append('TruMenu.cpp: W5RoomKeeps lacks %s' % need)
+    if 'const float kW5LabelNear = 4350.0f;' not in src or 'const int kW5LabelMax = 24;' not in src:
+        problems.append('TruMenu.cpp: kW5LabelNear 4350.0f / kW5LabelMax 24 missing')
+    m = re.search(r'const W5Type kW5Types\[24\] = \{(.*?)\n\};', src, re.S)
+    if not m or len(re.findall(r'\{"[^"]*", "[^"]*", IM_COL32', m.group(1))) != 24:
+        problems.append('TruMenu.cpp: kW5Types must hold 24 rows {de, en, colour}')
+    if not re.search(r'\n    W3Check\(\);[^\n]*\n    W5Check\(\);', src):
+        problems.append('TruMenu.cpp: the load must call W5Check right after W3Check')
+    for row in ('{"Markup", "Markup", "draw.markup", "", kQbBool, -1, kQcMarkup, 0, kQbMarkup},',
+                '{"Nur Kanten", "Ledges only", "draw.ledges", "", kQbBool, -1, kQcNone, 0, kQbMarkup},'):
+        if src.count(row) != 1: problems.append('TruMenu.cpp: bar row %s must exist once' % row)
+    grp = src.find('"rd_markup", kQbGroup')
+    if grp < 0 or not (0 <= src.find('"draw.markup", "", kQbBool', grp) < src.find('"dbg.slide"', grp)):
+        problems.append('TruMenu.cpp: bar rows Markup / Nur Kanten must come first in the group rd_markup')
+    for fn in ('void W5Check(', 'bool W5Skipped(', 'bool W5OwnerMatrix(', 'void W5Apply(', 'bool W5RoomKeeps(',
+               'void W5DrawMarkup('):
+        body = fn_body(src, fn)
+        if not body: problems.append('TruMenu.cpp: %s missing' % fn.strip('(')); continue
+        if any(w in body for w in ('WriteByte(', 'WriteBytes(', 'WriteDword(', 'reinterpret_cast<volatile', 'Fn>(', 'LcPatch(')):
+            problems.append('TruMenu.cpp: %s must not write game memory or call the game' % fn.strip('('))
+    readme = open(os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'README.md'), encoding='utf-8').read()
+    if '\n## 0.22.43 - ' not in readme or '\n### TO TEST 0.22.43' not in readme:
+        problems.append('README.md: section "## 0.22.43 - ..." with "### TO TEST 0.22.43" missing')
+    ps = open(os.path.join(ROOT, 'scripts', 'windows', 'Set-TruMenu.ps1'), encoding='utf-8-sig').read()
+    if W5_HASH_02242 not in ps: problems.append('Set-TruMenu.ps1: the 0.22.42 build hash (work/asi/menu0265) is missing')
+    return problems, ('W5 markup (object markup through the bone matrix, query skip rules, type + id labels within 15 m, '
+                      'RoomOnly / occlusion, bar rows first; %d byte checks = precheck_02243)' % len(rows))
 
 
 SV_HEADER = os.path.join(ROOT, 'src', 'asi', 'TruMenu', 'TruSaveProbe.h')
@@ -5747,6 +5831,10 @@ def main(argv):
     for p in cproblems42: print('Q02242 %s' % p)
     if not cproblems42: print('ok: 0.22.42 %s' % csummary42)
     problems += cproblems42
+    cproblems43, csummary43 = check_02243()   # 0.22.43 (W5 markup)
+    for p in cproblems43: print('Q02243 %s' % p)
+    if not cproblems43: print('ok: 0.22.43 %s' % csummary43)
+    problems += cproblems43
     cproblems27, csummary27 = check_02227(ini_path, opt.get('--switches', SWITCHES))   # 0.22.27
     for p in cproblems27: print('Q02227 %s' % p)
     if not cproblems27: print('ok: 0.22.27 %s' % csummary27)

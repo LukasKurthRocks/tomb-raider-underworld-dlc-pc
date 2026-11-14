@@ -1,0 +1,27 @@
+=== dlc_level1_start own vs old
+compare dlc_level1_start.drm: origin (-4897.8 308.4 -3034.1), unit DTP section 37 (id 26889): +0x2c = 22 items, +0x30 -> section 37 +0x6320
+  same 22, different 0 (ids A 22, B 22)
+=== dlc_level1_start own vs xbox
+compare dlc_level1_start.drm: origin (-4897.8 308.4 -3034.1), unit DTP section 37 (id 20081): +0x2c = 22 items, +0x30 -> section 37 +0x6320
+  same 22, different 0 (ids A 22, B 22)
+=== dlc_caverns own vs old
+compare dlc_caverns.drm: origin (12784.2 2686.1 -7427.2), unit DTP section 22 (id 20872): +0x2c = 28 items, +0x30 -> section 22 +0x6900
+  same 28, different 0 (ids A 28, B 28)
+=== dlc_caverns own vs xbox
+compare dlc_caverns.drm: origin (12784.2 2686.1 -7427.2), unit DTP section 22 (id 20872): +0x2c = 28 items, +0x30 -> section 22 +0x6900
+  same 28, different 0 (ids A 28, B 28)
+=== dlc_caverns_hall own vs old
+compare dlc_caverns_hall.drm: origin (1352.9 12638.6 -5849.2), unit DTP section 25 (id 20810): +0x2c = 6 items, +0x30 -> section 25 +0x54d0
+  same 6, different 0 (ids A 6, B 6)
+=== dlc_caverns_hall own vs xbox
+compare dlc_caverns_hall.drm: origin (1352.9 12638.6 -5849.2), unit DTP section 25 (id 20810): +0x2c = 6 items, +0x30 -> section 25 +0x54d0
+  same 6, different 0 (ids A 6, B 6)
+=== dlc_dungeon own vs old
+compare dlc_dungeon.drm: origin (-11592.6 16926.6 -11006.4), unit DTP section 70 (id 20258): +0x2c = 73 items, +0x30 -> section 70 +0x18f90
+  id 2102: type 1/1 kind 0/0 +50 00/00 pts 2/2 max point diff 490569315609.02
+  id 2103: type 1/1 kind 0/0 +50 00/00 pts 3/3 max point diff 508789589777.11
+  id 2178: type 15/15 kind 0/0 +50 00/00 pts 2/2 max point diff 9914315626794585800776139716496982016.00
+  same 70, different 3 (ids A 73, B 73)
+=== dlc_dungeon own vs xbox
+compare dlc_dungeon.drm: origin (-11592.6 16926.6 -11006.4), unit DTP section 70 (id 20258): +0x2c = 73 items, +0x30 -> section 70 +0x18f90
+  same 73, different 0 (ids A 73, B 73)

@@ -1,0 +1,24 @@
+positive (unchanged source): 0 problem(s) ok
+case version           : 1 problem(s) ok - TruMenu.cpp: kVersion must start with "TruMenu 0.22.43 (W5 markup"
+case check row changed : 1 problem(s) ok - TruMenu.cpp: kW5MkChecks (6 rows) must be the 6 rows of precheck_02243.txt in order
+case W5Check table     : 1 problem(s) ok - TruMenu.cpp: W5Check must set g_w5MkOk from DvChecks(kW5MkChecks, ...)
+case DrawMarkup old    : 1 problem(s) ok - TruMenu.cpp: DrawMarkup must call W5DrawMarkup
+case no +0x2d8         : 1 problem(s) ok - TruMenu.cpp: W5OwnerMatrix lacks ReadDword(owner + 0x2d8, &use) || !use) return false;
+case bone stride       : 1 problem(s) ok - TruMenu.cpp: W5OwnerMatrix lacks static_cast<short>(bone)) * 0x40
+case transform         : 1 problem(s) ok - TruMenu.cpp: W5Apply must be x * row0 + y * row1 + z * row2 + row3 (0x49ba20)
+case skip bit 31       : 1 problem(s) ok - TruMenu.cpp: W5Skipped lacks flags & 0x80000000u
+case skip owner flags  : 1 problem(s) ok - TruMenu.cpp: W5Skipped lacks (oflags & 0x20000002u)
+case skip unit +5      : 1 problem(s) ok - TruMenu.cpp: W5Skipped lacks ReadByte(entry + 5, &b) && b
+case no object skip    : 1 problem(s) ok - TruMenu.cpp: W5DrawMarkup lacks if (local && !xform) { ++skipped; continue; }
+case type item         : 1 problem(s) ok - TruMenu.cpp: W5DrawMarkup lacks ReadByte(item + 0x4d, &tb)
+case id record         : 1 problem(s) ok - TruMenu.cpp: W5DrawMarkup lacks ReadWord(rec + 0x2e, &w)
+case occlusion         : 1 problem(s) ok - TruMenu.cpp: W5DrawMarkup lacks alpha = P5OcclFactor(here, mid);
+case label place       : 1 problem(s) ok - TruMenu.cpp: W5DrawMarkup lacks if (!W3LabPlace(&r, l.at, fs + 3.0f)) continue;
+case room off          : 1 problem(s) ok - TruMenu.cpp: W5RoomKeeps lacks if (!g_p5RoomOnly) return true;
+case room near         : 1 problem(s) ok - TruMenu.cpp: W5RoomKeeps lacks nearest <= g_w3RoomNear
+case label radius      : 1 problem(s) ok - TruMenu.cpp: kW5LabelNear 4350.0f / kW5LabelMax 24 missing
+case type rows         : 1 problem(s) ok - TruMenu.cpp: kW5Types must hold 24 rows {de, en, colour}
+case load order        : 1 problem(s) ok - TruMenu.cpp: the load must call W5Check right after W3Check
+case bar order         : 3 problem(s) ok - TruMenu.cpp: bar row {"Markup", "Markup", "draw.markup", "", kQbBool, -1, kQcMarkup, 0, kQbMarkup}, must exist once
+case writes memory     : 1 problem(s) ok - TruMenu.cpp: void W5DrawMarkup must not write game memory or call the game
+22 cases + 1 positive, 0 failed

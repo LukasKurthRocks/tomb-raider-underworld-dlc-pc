@@ -1,0 +1,27 @@
+level header: section 0 +0x0, words beebbeeb 00000000 00000000 00000000 00000000 00000000
+  header +0x00 -> section 1 (type 0 id 0, size 0x18) +0x0
+markup2 (unit DTP +0x2c / +0x30, live = M * p - origin (-4897.8 308.4 -3034.1)): unit DTP section 37 (id 26889): +0x2c = 22 items, +0x30 -> section 37 +0x6320
+  kind / type counts: kind 0 ledgegrab: 20, kind 0 balancebeam: 2
+  item   0 sec 37 +0x06380 id  2343 +4a     0 kind 0 type  1 ledgegrab      +50 00  13 pts (-19512.0 5054.6 1145.3) .. (-21216.8 4600.3 1157.8)
+  item   1 sec 37 +0x06430 id  2344 +4a     0 kind 0 type  1 ledgegrab      +50 00  11 pts (-21903.9 4785.7 1194.9) .. (-23512.2 4650.2 1138.2)
+  item   2 sec 37 +0x064e0 id  2345 +4a     0 kind 0 type  1 ledgegrab      +50 00  44 pts (-24526.5 4331.9 1201.0) .. (-27751.1 -316.3 1152.3)
+  item   3 sec 37 +0x06590 id  2346 +4a     0 kind 0 type  1 ledgegrab      +50 00   9 pts (-21886.0 4014.4 3044.9) .. (-21886.0 4014.4 3044.9)
+  item   4 sec 37 +0x06640 id  2347 +4a     0 kind 0 type  1 ledgegrab      +50 00   9 pts (-25561.1 3140.9 3029.7) .. (-25561.1 3140.9 3029.7)
+  item   5 sec 37 +0x066f0 id  2348 +4a     0 kind 0 type  1 ledgegrab      +50 00   6 pts (-19762.9 2307.0 3192.1) .. (-19875.1 808.8 3192.1)
+  item   6 sec 37 +0x067a0 id  2349 +4a     0 kind 0 type  1 ledgegrab      +50 00   5 pts (-24032.8 3183.6 1718.1) .. (-24032.8 3183.6 1718.1)
+  item   7 sec 37 +0x06850 id  2350 +4a     0 kind 0 type  1 ledgegrab      +50 00  11 pts (-25823.5 815.5 3474.7) .. (-25535.7 116.7 3474.7)
+  item   8 sec 37 +0x06900 id  2351 +4a     0 kind 0 type 14 balancebeam    +50 00   2 pts (-25855.1 812.1 3474.7) .. (-25855.1 1579.3 3474.7)
+  item   9 sec 37 +0x069b0 id  2352 +4a     0 kind 0 type 14 balancebeam    +50 00   2 pts (-25013.3 -450.6 3474.7) .. (-25555.8 91.9 3474.7)
+  item  10 sec 37 +0x06a60 id  2353 +4a     0 kind 0 type  1 ledgegrab      +50 00   5 pts (-24251.0 -840.0 4002.8) .. (-23940.0 -1581.6 4002.8)
+  item  11 sec 37 +0x06b10 id  2354 +4a     0 kind 0 type  1 ledgegrab      +50 00   9 pts (-20566.9 2922.8 1850.4) .. (-20566.9 2922.8 1850.4)
+  item  12 sec 37 +0x06bc0 id  2355 +4a     0 kind 0 type  1 ledgegrab      +50 00   6 pts (-25919.5 -22.8 1850.4) .. (-25923.6 908.9 1850.4)
+  item  13 sec 37 +0x06c70 id  2356 +4a     0 kind 0 type  1 ledgegrab      +50 00   9 pts (-25518.3 2303.8 1850.4) .. (-25518.3 2303.8 1850.4)
+  item  14 sec 37 +0x06d20 id  2357 +4a     0 kind 0 type  1 ledgegrab      +50 00   9 pts (-20310.6 871.7 1850.4) .. (-20310.6 871.7 1850.4)
+  item  15 sec 37 +0x06dd0 id  2358 +4a     0 kind 0 type  1 ledgegrab      +50 00   7 pts (-21305.6 -1031.1 1850.4) .. (-21575.6 -1691.1 1850.4)
+  item  16 sec 37 +0x06e80 id  2359 +4a     0 kind 0 type  1 ledgegrab      +50 00   9 pts (-22198.4 4191.8 1850.4) .. (-22198.4 4191.8 1850.4)
+  item  17 sec 37 +0x06f30 id  2360 +4a     0 kind 0 type  1 ledgegrab      +50 00   5 pts (-23088.4 1983.0 1569.2) .. (-23088.4 1983.0 1569.2)
+  item  18 sec 37 +0x06fe0 id  2361 +4a     0 kind 0 type  1 ledgegrab      +50 00   8 pts (-22946.5 -3408.4 3192.1) .. (-25309.9 -2875.2 3192.1)
+  item  19 sec 37 +0x07090 id  2362 +4a     0 kind 0 type  1 ledgegrab      +50 00   7 pts (-19446.6 4917.6 3192.1) .. (-20874.3 3705.7 3191.9)
+  item  20 sec 37 +0x07140 id  2363 +4a     0 kind 0 type  1 ledgegrab      +50 00   7 pts (-19842.9 1.5 3192.1) .. (-18637.7 -930.9 3192.1)
+  item  21 sec 37 +0x071f0 id  2364 +4a     0 kind 0 type  1 ledgegrab      +50 00   8 pts (-26982.3 -1644.0 3192.1) .. (-27798.1 225.4 3192.1)
+classic unit markup: Level+0x08 = 0, Level+0x0c not relocated - none

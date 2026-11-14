@@ -1,0 +1,98 @@
+l2_junglehub_pcbig.drm: origin (-8558.2 19414.4 18073.2), unit DTP section 45 (id 10638): +0x2c = 96 items, +0x30 -> section 45 +0x16030
+types: balancebeam 6, horizpole 1, jumplanding 2, ledgegrab 81, perch 3, pillar 1, wallvertpole 2
+  id   775 type  1 ledgegrab    kind 0  2 pts x -4096..-4096 y -1511..-251 z -13519..-13519  screen (-14535 3313)
+  id   776 type  1 ledgegrab    kind 0  2 pts x -3843..-3843 y -1511..-251 z -13519..-13519  screen (-13712 3081)
+  id   777 type  1 ledgegrab    kind 0  2 pts x -1813..84 y -1390..-1390 z -13824..-13824  screen (-7982 1621) (-9724 2164)
+  id   778 type  1 ledgegrab    kind 0  2 pts x -1813..84 y -1642..-1642 z -13824..-13824  screen (-8252 1864) (-7026 1447)
+  id   779 type  1 ledgegrab    kind 0  2 pts x -4645..-3134 y -6709..-6709 z -13960..-13960  screen (-1434 536) (-1344 573)
+  id   780 type  1 ledgegrab    kind 0  2 pts x -4645..-3134 y -6962..-6962 z -13960..-13960  screen (-1255 550) (-1348 516)
+  id   781 type  1 ledgegrab    kind 0  2 pts x -4894..-4894 y -8407..-6962 z -14000..-14000  screen (-1234 561) (-839 457)
+  id   782 type  1 ledgegrab    kind 0  2 pts x -4641..-4641 y -8407..-6962 z -14000..-14000  screen (-856 453) (-1251 555)
+  id   783 type  1 ledgegrab    kind 0  2 pts x -19200..-17304 y 3161..3161 z -10046..-10046
+  id   784 type  1 ledgegrab    kind 0  2 pts x -19200..-17304 y 2908..2908 z -10046..-10046
+  id   785 type  1 ledgegrab    kind 0  2 pts x -15857..-15857 y -530..1366 z -10046..-10046
+  id   786 type  1 ledgegrab    kind 0  2 pts x -15605..-15605 y -530..1366 z -10046..-10046
+  id   787 type  1 ledgegrab    kind 0  2 pts x -5994..-4098 y 2..2 z -13632..-13632
+  id   788 type  1 ledgegrab    kind 0  2 pts x -5994..-4098 y -251..-251 z -13632..-13632
+  id   789 type  1 ledgegrab    kind 0  2 pts x -541..-251 y 4005..4005 z -11810..-11810
+  id   790 type  1 ledgegrab    kind 0  3 pts x 739..1309 y 3973..4503 z -11827..-11826
+  id   641 type 14 balancebeam  kind 0  2 pts x -5492..-4420 y 2237..2237 z -12839..-12839
+  id   791 type  1 ledgegrab    kind 0  3 pts x -4424..-4104 y 2073..2395 z -12024..-12024
+  id   792 type 14 balancebeam  kind 0  2 pts x -4278..-4278 y 3194..3695 z -12549..-12549
+  id   793 type 14 balancebeam  kind 0  2 pts x -5592..-4427 y 3868..3868 z -11324..-11324
+  id   794 type  1 ledgegrab    kind 0  2 pts x -8172..-8172 y 3657..4289 z -11231..-11231
+  id   795 type 15 pillar       kind 0  2 pts x -1857..-1857 y 1022..1022 z -11969..-10743
+  id   796 type  1 ledgegrab    kind 0  3 pts x -4420..-4100 y 3699..3980 z -11724..-11724
+  id   797 type  1 ledgegrab    kind 0  4 pts x -4424..-4099 y 3691..4019 z -10476..-10476
+  id   798 type  1 ledgegrab    kind 0  3 pts x -12162..-11425 y -1400..-529 z -10330..-10330
+  id   799 type  1 ledgegrab    kind 0  2 pts x -12162..-12162 y -2905..-2032 z -10330..-10330
+  id   800 type 13 perch        kind 0  2 pts x -1926..-1866 y 2227..2277 z -11072..-11072
+  id   801 type  1 ledgegrab    kind 0  2 pts x -5492..-4420 y 2206..2206 z -12839..-12839
+  id   802 type  1 ledgegrab    kind 0  2 pts x -5492..-4420 y 2269..2269 z -12839..-12839
+  id   803 type  1 ledgegrab    kind 0  2 pts x -5498..-4490 y 3834..3834 z -11324..-11324
+  id   804 type  1 ledgegrab    kind 0  2 pts x -5498..-4427 y 3897..3897 z -11324..-11324
+  id   805 type  1 ledgegrab    kind 0  5 pts x -7560..-7560 y -110..6575 z -11120..-11119
+  id   642 type 13 perch        kind 0  2 pts x -1859..-1841 y 965..1019 z -10743..-10743
+  id   806 type 13 perch        kind 0  2 pts x -6685..-6633 y 3739..3803 z -11482..-11482
+  id   807 type  1 ledgegrab    kind 0  3 pts x -2034..-1702 y 3692..4018 z -10479..-10479
+  id   808 type  1 ledgegrab    kind 0  2 pts x -20560..-20559 y -130..6501 z -9179..-9179
+  id   809 type  1 ledgegrab    kind 0  9 pts x -17950..-15518 y 2423..6500 z -8927..-8927
+  id   810 type  1 ledgegrab    kind 0  2 pts x -20602..-20602 y -2755..-1203 z -10359..-10359
+  id   811 type  1 ledgegrab    kind 0  2 pts x -20602..-20602 y -3250..-1121 z -11612..-11612
+  id   812 type 14 balancebeam  kind 0  2 pts x -17035..-17034 y -6637..-6180 z -10585..-10585  screen (162 -23) (-288 -35)
+  id   813 type  1 ledgegrab    kind 0  4 pts x -2028..-541 y 3689..3940 z -11258..-11255
+  id   814 type  1 ledgegrab    kind 0  2 pts x -1716..-251 y 4003..4003 z -11258..-11258
+  id   815 type 14 balancebeam  kind 0  2 pts x -1716..-541 y 3971..3972 z -11258..-11258
+  id   816 type  1 ledgegrab    kind 0  2 pts x -17066..-17066 y -7049..-6733 z -10822..-10822  screen (267 160) (384 130)
+  id   817 type  1 ledgegrab    kind 0  2 pts x -15534..-15235 y -4155..-4153 z -10583..-10583
+  id   818 type  1 ledgegrab    kind 0  2 pts x 1309..1309 y 3982..5046 z -11598..-11598
+  id   819 type  1 ledgegrab    kind 0  4 pts x -9756..-8837 y -5980..-4810 z -14112..-13874  screen (-2218 1124) (-1748 1021) (-1533 966) (-1220 905)
+  id   820 type  1 ledgegrab    kind 0  4 pts x -556..-242 y 863..1158 z -10920..-10920
+  id   821 type  1 ledgegrab    kind 0  3 pts x 182..951 y 1681..2794 z -11511..-11511
+  id   822 type  1 ledgegrab    kind 0  2 pts x -15518..-15518 y 2423..4528 z -8927..-8927
+  id   823 type  1 ledgegrab    kind 0  3 pts x -14141..-13388 y 2418..4429 z -8927..-8927
+  id   824 type  1 ledgegrab    kind 0  4 pts x -1680..-552 y 520..843 z -13970..-13955  screen (-241477 47956)
+  id   825 type  1 ledgegrab    kind 0  2 pts x -3637..-3205 y 2078..2089 z -13748..-13739
+  id   826 type  1 ledgegrab    kind 0  4 pts x -3936..-3213 y 2063..2411 z -13645..-13639
+  id   827 type  1 ledgegrab    kind 0  2 pts x -5508..-4423 y 1969..1981 z -13616..-13616
+  id   828 type  1 ledgegrab    kind 0  2 pts x -2046..-2043 y 1489..2067 z -13971..-13971
+  id   829 type  1 ledgegrab    kind 0  2 pts x -2043..-2038 y 1192..1489 z -13982..-13971
+  id   830 type  1 ledgegrab    kind 0  3 pts x -3830..-3485 y 3698..4013 z -13747..-13747
+  id   831 type  1 ledgegrab    kind 0  4 pts x -4105..-3200 y 3697..4022 z -13665..-13640
+  id   832 type  1 ledgegrab    kind 0  4 pts x -5231..-4431 y 3691..4023 z -13640..-13637
+  id   833 type  1 ledgegrab    kind 0  2 pts x -5231..-4966 y 3997..4002 z -13736..-13730
+  id   834 type  1 ledgegrab    kind 0  2 pts x -6535..-5995 y 4002..4020 z -13649..-13631
+  id   835 type  1 ledgegrab    kind 0  2 pts x -6538..-6007 y 2064..2082 z -13639..-13637
+  id   836 type  1 ledgegrab    kind 0  4 pts x -15802..-14285 y -5788..-4986 z -14334..-14334  screen (-876 2481) (-788 2598) (-204 1699) (-597 1438)
+  id   837 type  1 ledgegrab    kind 0  2 pts x -15229..-14280 y -4986..-4986 z -14334..-14334  screen (-1217 2033) (-975 2352)
+  id   838 type  1 ledgegrab    kind 0  2 pts x -20560..-20560 y -1122..-530 z -9179..-9179
+  id   839 type  1 ledgegrab    kind 0  4 pts x -15762..-14969 y -9962..-9560 z -10454..-10454  screen (261 -38) (328 -39) (413 -40) (452 -37)
+  id   840 type  1 ledgegrab    kind 0  4 pts x -15498..-14153 y 4500..4539 z -9192..-9189
+  id   841 type  1 ledgegrab    kind 0  4 pts x -14285..-13964 y -5731..-5369 z -13689..-13683  screen (-1075 1596) (-777 1354) (-847 1307) (-1144 1530)
+  id   842 type  1 ledgegrab    kind 0  3 pts x -5491..-5231 y 3691..3998 z -13662..-13640
+  id   843 type  1 ledgegrab    kind 0  2 pts x -17066..-17066 y -6872..-6347 z -10585..-10585  screen (-46 -30) (302 -20)
+  id   844 type  2 jumplanding  kind 0  3 pts x -21099..-20639 y 5180..6555 z -9180..-9180
+  id   845 type  1 ledgegrab    kind 0  2 pts x -15758..-15142 y -4154..-4154 z -10310..-10310
+  id   846 type  1 ledgegrab    kind 0  2 pts x -15142..-14992 y -4603..-4154 z -10310..-10310
+  id   847 type  1 ledgegrab    kind 0  2 pts x -17066..-17066 y -4633..-4159 z -11182..-11182
+  id   639 type  2 jumplanding  kind 0  3 pts x -18012..-16892 y -6341..-5991 z -11682..-11682  screen (87 797) (-178 1058) (873 1488)
+  id   640 type  1 ledgegrab    kind 0  2 pts x -19922..-17075 y -6635..-6635 z -11612..-11612  screen (312 647) (3170 1252)
+  id   848 type  1 ledgegrab    kind 0  3 pts x -17003..-15239 y -4633..-4159 z -11182..-11182
+  id   849 type 14 balancebeam  kind 0  2 pts x -17035..-17034 y -4633..-4159 z -11182..-11182
+  id   850 type  1 ledgegrab    kind 0  3 pts x -14288..-13964 y -8638..-8302 z -9503..-9503  screen (-293 -363) (-223 -373) (-116 -338)
+  id   851 type  1 ledgegrab    kind 0  2 pts x -15537..-15221 y -8628..-8628 z -10101..-10101  screen (208 -161) (134 -157)
+  id   852 type  1 ledgegrab    kind 0  3 pts x -15534..-15229 y -8628..-8324 z -9461..-9461  screen (169 -392) (92 -382) (8 -421)
+  id   853 type  4 wallvertpole kind 0  2 pts x -14115..-14115 y -8316..-7048 z -10257..-10257  screen (-771 -166) (-174 -108)
+  id   854 type  4 wallvertpole kind 0  2 pts x -15379..-15379 y -8316..-7048 z -10257..-10257  screen (-410 -196) (110 -119)
+  id   855 type  1 ledgegrab    kind 0  3 pts x -15534..-15218 y -7060..-6744 z -10372..-10372  screen (-672 -148) (-560 -156) (-323 -131)
+  id   856 type  6 horizpole    kind 0  2 pts x -14127..-14127 y -6730..-5378 z -11799..-11799  screen (-612 477) (-2215 986)
+  id   857 type  1 ledgegrab    kind 0  2 pts x -15509..-15218 y -6744..-6744 z -11259..-11259  screen (-433 324) (-340 338)
+  id   858 type  1 ledgegrab    kind 0  2 pts x -14275..-13969 y -5374..-5374 z -12431..-12431  screen (-1690 1281) (-1748 1213)
+  id   859 type  1 ledgegrab    kind 0  2 pts x -14275..-13969 y -5369..-5369 z -13045..-13045  screen (-1347 1460) (-1412 1393)
+  id   636 type  1 ledgegrab    kind 0  4 pts x -4306..-4243 y 3194..3695 z -12548..-12548
+  id   637 type  1 ledgegrab    kind 0  4 pts x -17066..-17003 y -6637..-6180 z -10585..-10585  screen (141 -23) (-317 -35) (-259 -36) (-46 -30)
+  id   638 type  1 ledgegrab    kind 0  2 pts x -3200..-2884 y 4020..4020 z -10476..-10476
+  id   860 type  1 ledgegrab    kind 0  2 pts x -16633..-16633 y -8204..-6846 z -10372..-10372  screen (445 -93) (12 -178)
+  id   861 type  1 ledgegrab    kind 0  2 pts x -1710..-565 y 4024..4025 z -13978..-13969
+  id   862 type  1 ledgegrab    kind 0  2 pts x -242..-230 y 1179..2052 z -13969..-13953
+  id   863 type  1 ledgegrab    kind 0  2 pts x -246..-241 y 2374..3603 z -13977..-13962
