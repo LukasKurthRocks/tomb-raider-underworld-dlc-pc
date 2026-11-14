@@ -1102,6 +1102,67 @@ def twin_names(d, rel, xs, pc_sec, K, key, st, risk):
         d[o:o + 4] = want; st['path words -> final member name'] += 1; st['init words changed'] += 1
 
 
+def u16_path_arrays(xd, xrl, d, rel):
+    """the inline u16 arrays {u32 n, internal pointer -> the next word, u16[n]} of a ported / new script whose first
+    Xbox element is a member name of the Xbox script: UI target paths (tru.exe 0x4c9410 walks records {u32 n entries,
+    entries *, path {u32 n, u16 *}} of a UI member's init and resolves each path with 0x4d08e0: element 0 = the
+    DataMember of that name in the screen's own ScriptType, 0x4c8420 over ScriptType+0x2c, else a function up the class
+    chain, 0x4d0850). -> (arrays [(data offset, n, words, Xbox u16 values incl. padding, Xbox member entry offset of
+    element 0)], counter of the arrays left out); offsets of the converted section = the Xbox offsets"""
+    import script_member_pairs as MP
+    from script_u16array_check import arrays
+    xr = R.parse(xrl, 'be')
+    xptr = set(xr.pointer_offsets())
+    r = rel if isinstance(rel, R.Reloc) else R.parse(rel, 'le')
+    bptr = set(r.pointer_offsets())
+    xby = collections.defaultdict(list)
+    for q in MP.entries(xd, xrl, 'be')[1]['members']: xby[q['name']].append(q['a'])
+    out, left = [], collections.Counter()
+    for co, n, t, words in sorted(arrays(xd, xr)):
+        if t + 4 * words > len(d): left['beyond the section'] += 1; continue
+        if any((t + 4 * k) in xptr or (t + 4 * k) in bptr for k in range(words)): left['a pointer word inside'] += 1; continue
+        xv = list(struct.unpack_from('>%dH' % (2 * words), xd, t))
+        if xv[0] not in xby: left['element 0 is no Xbox member name'] += 1; continue
+        if len(xby[xv[0]]) != 1: left['element 0 names several Xbox members'] += 1; continue
+        out.append((t, n, words, xv, xby[xv[0]][0]))
+    return out, left
+
+
+def u16_paths(d, rel, xs, st, risk, sid):
+    """crash 2026-11-14 20:33 (new base game after the intro, tru.exe +0xc94ac, docs Befund-Absturz-gpda-NeuesSpiel-1411):
+    the converter swaps the words of these u16 path arrays as s32 and keeps the Xbox values (finding 43); the stage-2b
+    fix `uipath` only touches new scripts (id >= 20000) and entry lists, and rule_member keeps the converted word for
+    the id classes of the UI userTypes (ui_init_fix assumes the converter mapped them) - so 3384's one-element path
+    {0x14f6} stayed (0x0000, 0x14f6): element 0 = 0 names no member, 0x4d08e0 returns the address of a zeroed local
+    and 0x4c9410 calls slot 2 of a NULL vtable. Rule: member element -> the FINAL name of that member (same entry
+    offset, after twin_names), any other element -> the converter's PC Symbol (DlcIds.sym, as `uipath`), Xbox order,
+    u16 little-endian, the padding u16 unchanged. A path whose element 0 already is the final member name stays (PC copy /
+    path_words); one naming another member of this script stays and is listed as a risk."""
+    import script_member_pairs as MP
+    I = ids()
+    paths, left = u16_path_arrays(xs['data'], xs['reloc'], bytes(d), rel)
+    for k, v in left.items(): st['u16 arrays left (%s)' % k] += v
+    final = {q['a']: q['name'] for q in MP.entries(bytes(d), R.write(rel, 'le'), 'le')[1]['members']}
+    built = set(final.values())
+    for t, n, words, xv, xa in paths:
+        pv = list(xv)
+        pv[0] = final[xa]
+        for k in range(1, n):
+            if xv[k] not in (0, 0xffff): pv[k] = I.sym(xv[k])
+        if max(pv) > 0xffff:
+            risk.append('%d +0x%x: u16 path %s maps above 0xffff - kept' % (sid, t, xv[:n])); st['u16 paths not mappable (kept)'] += 1; continue
+        want = struct.pack('<%dH' % len(pv), *pv)
+        cur = bytes(d[t:t + 4 * words])
+        c0 = struct.unpack_from('<H', cur, 0)[0]
+        if cur == want: st['u16 paths already right'] += 1; continue
+        if c0 == pv[0]: st['u16 paths: element 0 = final member name, other elements kept'] += 1; continue
+        if c0 in built:
+            risk.append('%d +0x%x: u16 path names member %d, the Xbox path names %d (final name) - kept' % (sid, t, c0, pv[0]))
+            st['u16 paths naming another member (kept)'] += 1; continue
+        d[t:t + 4 * words] = want
+        st['u16 paths -> final member names (element 0 named no member)'] += 1; st['init words changed'] += words
+
+
 def protected_offsets(W):
     """word offsets of every structural array (members, functions, code, vtable, ...) and of its count word"""
     out = set()
@@ -1221,6 +1282,7 @@ def build(argv):
         d = bytearray(s.data); r = R.parse(s.reloc, 'le')
         port_init2(d, r, s.data, pc.get((t, sid)) if rec[key] == 'port' else None, xs, K, key, sst, srisk)
         if rec[key] == 'port': twin_names(d, r, xs, pc[(t, sid)], K, key, sst, srisk)
+        u16_paths(d, r, xs, sst, srisk, sid)          # after twin_names: paths name the final member names
         # c) PC vtable slot 31 for the uiscreen classes
         v0 = View(s.data, s.reloc, 'le')
         if v0.super_id() == UISCREEN:
@@ -1416,6 +1478,34 @@ def gate_sections(S, pc, PCS, pk, inv, rec, targets):
             else: badp.append('%d:%d +0x%x name %d -> %s (target +0x%x)' % (key[0], key[1], o, n0, names.get(n0), ta))
     out.append(('ok   ' if not badp else 'FAIL ') + 'Symbol paths of the ported scripts: %s, other %d %s' % (
         dict(pst), len(badp), badp[:6]))
+    # (6) u16 UI target paths (crash 2026-11-14 20:33, tru.exe +0xc94ac): element 0 of every u16 path array of a ported
+    # / new script resolves like tru.exe 0x4d08e0 does it - a DataMember of that name in the script itself (0x4c8420),
+    # else a prototype (function) of that name up the class chain (0x4d0850) - and it is the member the Xbox path names
+    # (its final name); not found = the engine returns the address of a zeroed local and calls through a NULL vtable
+    ust = collections.Counter(); badu = []
+    for key in sorted(tset):
+        v = view(key); xs = pk[inv[key]]
+        if v is None: continue
+        fin = {}; mem = collections.Counter()
+        for kk, la in SIP.members(v.W, v.d, 'le').items():
+            if kk[0] == 'members':
+                for a in la: fin[a] = kk[1]; mem[kk[1]] += 1
+        fn_names, cls, hops = set(), v, 0
+        while cls is not None and hops < 16:
+            fn_names |= {nm for a, (kind_, k, nm) in cls.el.items() if kind_ == 'proto'}
+            sup = cls.super_id(); cls = view((8, sup)) if sup is not None else None; hops += 1
+        paths, left = u16_path_arrays(xs['data'], xs['reloc'], v.d, v.rel)
+        for k, c in left.items(): ust['left (%s)' % k] += c
+        for t, n, words, xv, xa in paths:
+            e0 = struct.unpack_from('<H', v.d, t)[0]
+            if mem[e0] == 1 and fin.get(xa) == e0: ust['element 0 = the Xbox-named member'] += 1; continue
+            why = ('names no member / function: 0x4d08e0 returns a stack address' if not mem[e0] and e0 not in fn_names else
+                   'resolves to a function, not the member' if not mem[e0] else
+                   'several members of that name' if mem[e0] > 1 else 'names another member (final name %s)' % fin.get(xa))
+            badu.append('%d:%d +0x%x n=%d Xbox %s built %s: %s' % (key[0], key[1], t, n, ' '.join('%04x' % x for x in xv[:n]),
+                                                                  v.d[t:t + 4 * words].hex(), why))
+    out.append(('ok   ' if not badu else 'FAIL ') + 'u16 UI target paths of the ported / new scripts: %s, other %d %s' % (
+        dict(ust), len(badu), badu[:8]))
     return out
 
 
