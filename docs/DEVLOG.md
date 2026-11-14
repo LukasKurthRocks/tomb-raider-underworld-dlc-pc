@@ -5,6 +5,20 @@ install or play; the [README](../README.md) and [INSTALL](INSTALL.md) cover that
 overlays, log lines, sometimes substitute shaders), scaled down to 1280 px. The README shows the current state; older
 pictures move here.
 
+## 2026-11-14 - the sonar in Lara's Shadow says "MAP"
+
+![Development build: the PDA sonar at the start of Lara's Shadow with TruMenu's full map on - instead of a map of the room it shows huge 3D block letters "MAP", with checkpoint flags and the portal to Yggdrasil hall 1 drawn by the debug view](screenshots/dev-sonar-map-placeholder-dlc2-2026-11-14.jpg)
+
+*Development build, TruMenu 0.22.48 "full sonar map" on (draw every vertex as revealed, display only) with the
+placeholder filter off, debug view labels on. At the foot of the Eitr fall (checkpoint 9400) the sonar map file of the
+DLC 2 start unit holds no map of the room - only the developers' placeholder: the word "MAP" as a 100-face block mesh.
+The same placeholder sits in base-game units that never got a sonar map (e.g. `l7_monastery`) and in every new
+`dlc2_*` room; the Xbox 360 source and the DLC 2 prototype hold the identical mesh, so this is not a port error. Only
+the three Yggdrasil units DLC 2 reuses from the main game have real maps. In normal play the letters are rarely seen
+(the sonar reveals only what is near and in sight); with the full map TruMenu hides them by default (`[Sonar]
+HidePlaceholder=1`). See [TRU-Knowledge.md](TRU-Knowledge.md) section 6, rows "Sonar maps DLC 2" / "Sonar maps DLC 1 /
+base".*
+
 ## 2026-11-09 (evening) - thralls stop falling at every punch
 
 No picture, the proof is in the logs: with TruShadowCombat 0.6.8 the tutorial thrall in hall02 takes three single
